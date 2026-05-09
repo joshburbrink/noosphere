@@ -42,14 +42,15 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
      |     |-- Reverse proxy → Nextcloud (:8080)
      |     └-- Reverse proxy → Kiwix (:8888)
      |
-     +-- Nextcloud (PHP + MariaDB)
+     +-- Nextcloud (snap)
      |     |-- File sharing & uploads
      |     |-- Nextcloud Talk (messaging/chat)
      |     └-- Document collaboration
      |
      +-- Kiwix-serve
            |-- Wikipedia (full, with images, ~100GB)
-           └-- WikiMed (~3GB)
+           |-- WikiMed (~3GB)
+           └-- + additional ZIM content (~257GB total)
 ```
 
 **Network layout:**
@@ -65,8 +66,8 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
 | Partition | Size | Format | Purpose |
 |---|---|---|---|
 | sda1 | 512MB | FAT32 | EFI boot |
-| sda2 | 30GB | ext4 | Debian Live OS + persistence |
-| sda3 | remainder (~870GB) | ext4 | Nextcloud data + Kiwix ZIM files |
+| sda2 | 30GB | ext4 | Ubuntu Server OS |
+| sda3 | ~901GB | ext4 | Nextcloud data + Kiwix ZIM files |
 
 ---
 
@@ -74,34 +75,28 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
 
 | Component | Version | Notes |
 |---|---|---|
-| Debian Live | 12 (Bookworm) | Base OS, persistent USB |
-| Nginx | latest stable | Reverse proxy + captive portal |
-| PHP | 8.2 | Nextcloud dependency |
-| MariaDB | 10.11 | Nextcloud database |
-| Nextcloud | latest stable | Core platform |
+| Ubuntu Server | 24.04 LTS | Base OS — broad hardware compatibility, 5yr support |
+| Nextcloud | latest stable | Installed via snap — zero dependency management |
 | Kiwix-serve | latest stable | ZIM file server |
+| Nginx | latest stable | Reverse proxy + captive portal |
 
 ---
 
 ## ZIM Content
 
-| File | Size | Source |
-|---|---|---|
-| Wikipedia (EN, images) | ~100GB | [download.kiwix.org](https://download.kiwix.org) |
-| WikiMed (medical) | ~3GB | [download.kiwix.org](https://download.kiwix.org) |
+See [docs/kiwix-content.md](docs/kiwix-content.md) for the full content list (~257GB).
 
 ---
 
 ## Build Phases
 
-- [ ] **Phase 1** — Partition and prepare 1TB USB drive
-- [ ] **Phase 2** — Build Debian Live base with persistence
-- [ ] **Phase 3** — Install and configure LAMP stack
-- [ ] **Phase 4** — Install and configure Nextcloud
-- [ ] **Phase 5** — Install Kiwix and download ZIM files
-- [ ] **Phase 6** — Configure Nginx reverse proxy + captive portal
-- [ ] **Phase 7** — Configure GL-SFT1200 router integration
-- [ ] **Phase 8** — End-to-end testing
+- [x] **Phase 1** — Partition and format 1TB USB drive
+- [ ] **Phase 2** — Install Ubuntu Server 24.04 LTS to USB
+- [ ] **Phase 3** — Install and configure Nextcloud (snap)
+- [ ] **Phase 4** — Install Kiwix and download ZIM files
+- [ ] **Phase 5** — Configure Nginx reverse proxy + captive portal
+- [ ] **Phase 6** — Configure GL-SFT1200 router integration
+- [ ] **Phase 7** — End-to-end testing
 
 ---
 
