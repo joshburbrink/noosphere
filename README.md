@@ -75,7 +75,7 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
 
 | Component | Version | Notes |
 |---|---|---|
-| Ubuntu Server | 24.04 LTS | Base OS — broad hardware compatibility, 5yr support |
+| Debian | 13 (Trixie) | Base OS — minimal install, broad hardware compatibility, no snap overhead |
 | Nextcloud | latest stable | Installed via snap — zero dependency management |
 | Kiwix-serve | latest stable | ZIM file server |
 | Nginx | latest stable | Reverse proxy + captive portal |
@@ -90,7 +90,7 @@ See [docs/kiwix-content.md](docs/kiwix-content.md) for the full content list (~2
 
 ## Build Phases
 
-- [x] **Phase 1** — Partition and format 1TB USB drive
+- [x] **Phase 1** — Partition and format 64GB USB drive (testing; larger drive later)
 - [ ] **Phase 2** — Install Ubuntu Server 24.04 LTS to USB
 - [ ] **Phase 3** — Install and configure Nextcloud (snap)
 - [ ] **Phase 4** — Install Kiwix and download ZIM files
