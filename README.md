@@ -91,9 +91,9 @@ See [docs/kiwix-content.md](docs/kiwix-content.md) for the full content list (~2
 ## Build Phases
 
 - [x] **Phase 1** — Partition and format 64GB USB drive (testing; larger drive later)
-- [ ] **Phase 2** — Install Ubuntu Server 24.04 LTS to USB
-- [ ] **Phase 3** — Install and configure Nextcloud (snap)
-- [ ] **Phase 4** — Install Kiwix and download ZIM files
+- [x] **Phase 2** — Install Debian 13 (Trixie) to 64GB USB
+- [x] **Phase 3** — Install and configure Nextcloud 33 (apt)
+- [x] **Phase 4** — Install Kiwix 3.7, homepage live
 - [ ] **Phase 5** — Configure Nginx reverse proxy + captive portal
 - [ ] **Phase 6** — Configure GL-SFT1200 router integration
 - [ ] **Phase 7** — End-to-end testing
