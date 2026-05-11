@@ -1,6 +1,6 @@
 # Noosphere
 
-A bootable USB system that turns any x86 laptop into an offline information hub for post-disaster or off-grid scenarios. Users connect to a portable WiFi router, get redirected to a local homepage, and can access a message board, shared files, and a full offline Wikipedia — no internet required.
+A bootable USB system that turns any x86 laptop into a self-contained offline information hub for disaster response, search and rescue, community events, or off-grid scenarios. Users connect to a portable WiFi router, get captive-portaled to the hub, and can coordinate, check in, communicate, and access reference information — no internet required.
 
 ---
 
@@ -10,17 +10,41 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
 |---|---|
 | Any x86 laptop | Server — boots from USB, runs all services |
 | GL.iNet GL-SFT1200 (Opal) | WiFi access point — connects users wirelessly |
-| 64GB USB drive | Storage — OS + services (test; production drive larger) |
+| 64GB+ USB drive | Storage — OS + services + content |
+
+Tested on HP 3105m. Any x86_64 laptop with 2GB+ RAM will work.
 
 ---
 
 ## Features
 
-- **Captive portal** — anyone connecting to the WiFi is redirected to the Noosphere homepage
-- **Nextcloud** — file sharing, document collaboration, chat (Talk), message board
-- **Kiwix** — full offline Wikipedia (with images), WikiMed, and other ZIM content
-- **No internet required** — fully self-contained, works in blackout/disaster conditions
-- **Persistent** — data survives reboots, survives across sessions
+- **Community Registry** — check in, report missing persons, list skills and supplies available/needed; configurable for shelter management, event check-in, or SAR
+- **Local Chat** — real-time messaging; links to registry profile for status badges
+- **Forum / Bulletin Board** — threaded posts with configurable categories (missing persons, lost & found, general, etc.)
+- **Shared Files** — upload and download documents, maps, photos
+- **Offline Map** — vector tile map of the local area with 4 color themes; tap to drop markers (search areas, hazards, camps, medical, resources, blocked routes)
+- **Offline Library** — Wikipedia, WikiMed, iFixit repair guides, and other ZIM content via Kiwix
+- **Topo PDFs** — USGS topographic maps for local counties
+- **Calendar** — shared event calendar
+- **Admin Panel** — configure all features, apply deployment presets, monitor system resources, manage bans
+- **Captive Portal** — anyone connecting to the WiFi is automatically redirected to the hub
+- **No accounts required** — no signup, no passwords for basic access; optional PIN for registry profile linking
+- **No internet required** — fully self-contained
+
+---
+
+## Software Stack
+
+| Component | Purpose |
+|---|---|
+| Debian 13 (Trixie) | Base OS |
+| Nginx | Web server + captive portal |
+| PHP 8.4 + PHP-FPM | App logic |
+| SQLite | All data storage (no database server needed) |
+| mbtileserver | Serves vector map tiles (MBTiles format) |
+| kiwix-serve | Serves offline ZIM library |
+| dnsmasq | DNS redirect for captive portal |
+| iptables | NAT redirect for captive portal |
 
 ---
 
@@ -29,114 +53,117 @@ A bootable USB system that turns any x86 laptop into an offline information hub 
 ```
 [WiFi Device]
      |
-     | (connects to GL-SFT1200 WiFi)
-     | DNS query → 192.168.8.2 (Noosphere dnsmasq)
-     | all domains resolve to 192.168.8.2
+     | connects to GL-SFT1200 WiFi
+     | DHCP → 192.168.8.x, DNS → 192.168.8.2
      |
 [GL-SFT1200 Router]  192.168.8.1
      |
-     | (ethernet, LAN port)
+     | ethernet (LAN port → laptop eno1)
      |
-[Laptop booted from USB]  192.168.8.2
+[Laptop / USB boot]  192.168.8.2
      |
-     +-- dnsmasq (port 53) — resolves all domains to 192.168.8.2
-     |
-     +-- iptables NAT — redirects port 80/443 from eno1 → localhost:80
-     |
-     +-- Nginx (port 80)
-     |     |-- / → captive portal homepage
-     |     |-- /nextcloud/ → Nextcloud (PHP-FPM)
-     |     └-- /kiwix/ → kiwix-serve (:8888)
-     |
-     +-- Nextcloud 33 (LAMP stack — Apache/MariaDB/PHP)
-     |
-     └-- kiwix-serve 3.7 (systemd service, port 8888)
+     +-- dnsmasq       all domains → 192.168.8.2
+     +-- iptables NAT  port 80 from router clients → localhost:80
+     +-- Nginx (80)
+     |     /              homepage
+     |     /registry/     community check-in
+     |     /chat/         real-time chat
+     |     /forum/        bulletin board
+     |     /files/        shared file uploads
+     |     /maps/         offline vector map + markers
+     |     /calendar/     shared calendar
+     |     /library/      Kiwix offline library (proxy → :8080)
+     |     /tiles/        map tile server (proxy → :8889)
+     |     /admin/        admin panel
+     +-- mbtileserver  port 8889 (vector tiles)
+     +-- kiwix-serve   port 8080 (ZIM library)
 ```
 
-**Network layout:**
-- Router: `192.168.8.1` (GL-SFT1200 LAN)
-- Laptop (server): `192.168.8.2` (static, eno1 ethernet)
-- WiFi clients: `192.168.8.x` (DHCP from router, DNS → 192.168.8.2)
+---
+
+## Deployment Presets
+
+The admin panel includes one-click presets that configure all settings for common scenarios:
+
+| Preset | Best for |
+|---|---|
+| **Emergency** | General disaster response — all features, skills + missing persons |
+| **Search & Rescue** | SAR operations — map + missing persons focused |
+| **Shelter** | Shelter management — bunk tracking, dietary needs, next of kin |
+| **Event** | Festival or community event — simplified check-in |
+| **Resource Hub** | Supply coordination — skills + supplies fields |
+| **Kiosk** | Read-only display — library, forum, and map only |
+
+Individual settings can be customized freely: registry label, status options (free text), forum categories (add/remove), feature toggles, instance name and alert banner.
 
 ---
 
-## Captive Portal Flow
+## Data
 
-1. User connects phone/laptop to GL-SFT1200 WiFi
-2. Router DHCP assigns IP, sets DNS server = `192.168.8.2`
-3. Any domain user visits resolves to `192.168.8.2` (Noosphere dnsmasq)
-4. Nginx serves Noosphere homepage — links to Nextcloud and Kiwix
-5. OS-level captive portal detection (iOS/Android/Windows) triggers automatically
+All application data is stored in SQLite databases at `/var/lib/noosphere/`:
 
-Captive portal detection endpoints handled: `/hotspot-detect.html`, `/generate_204`, `/gen_204`, `/ncsi.txt`, `/success.txt`, `/connecttest.txt`
-
----
-
-## Storage Layout (64GB USB — Test)
-
-| Partition | Size | Format | Purpose |
-|---|---|---|---|
-| sda1 | ~63GB | ext4 | Debian 13 OS + all services + data |
+| File | Contents |
+|---|---|
+| `settings.db` | All configuration |
+| `registry.db` | Community registry entries |
+| `chat.db` | Chat messages |
+| `forum.db` | Forum posts and threads |
+| `calendar.db` | Calendar events |
+| `map_markers.db` | Map markers |
+| `files/` | Uploaded files |
 
 ---
 
-## Software Stack
+## Offline Map Content
 
-| Component | Version | Notes |
-|---|---|---|
-| Debian | 13 (Trixie) | Base OS — minimal, broad hardware support, no snap overhead |
-| Nginx | 1.26.3 | Reverse proxy + captive portal |
-| Nextcloud | 33.0.3 | Installed via LAMP (MariaDB + PHP 8.4 + PHP-FPM) |
-| kiwix-serve | 3.7.0 | ZIM file server (apt package) |
-| dnsmasq | 2.91 | DNS redirect — all domains → 192.168.8.2 |
-| iptables | — | NAT redirect port 80/443 from eno1 clients |
+Vector tiles covering Bartholomew and Brown County, Indiana (OSM data, zoom 4–14, overzoom to 19). USGS topo PDFs for local quads stored at `/var/www/noosphere/maps/topo/`.
+
+To use different tile coverage, replace `/var/lib/noosphere/tiles/*.mbtiles` and update the mbtileserver config.
 
 ---
 
-## ZIM Content
+## Offline Library (Kiwix)
 
-See [docs/kiwix-content.md](docs/kiwix-content.md) for the full content list (~257GB).
-Download script: [scripts/download-zim.sh](scripts/download-zim.sh)
+ZIM files are stored in `/var/lib/kiwix/`. Drop a new ZIM file there and `kiwix-watch.service` registers it automatically.
+
+Recommended content: `wikipedia_en_medicine`, `wikipedia_en_simple_all`, `ifixit_en_all`, `wiktionary_en_all`, `lrnselfreliance_en_all`. See [docs/kiwix-content.md](docs/kiwix-content.md) for the full list.
 
 ---
 
 ## Build Phases
 
-- [x] **Phase 1** — Partition and format 64GB USB drive
-- [x] **Phase 2** — Install Debian 13 (Trixie) to 64GB USB
-- [x] **Phase 3** — Install and configure Nextcloud 33 (LAMP stack)
-- [x] **Phase 4** — Install Kiwix 3.7, homepage live at 192.168.8.2
-- [x] **Phase 5** — Captive portal: dnsmasq DNS redirect + iptables NAT + Nginx detection endpoints
-- [ ] **Phase 6** — Configure GL-SFT1200 router (plug in ethernet, run `/usr/local/bin/setup-router.sh`)
-- [ ] **Phase 7** — End-to-end testing (connect phone, verify captive portal triggers)
+- [x] **Phase 1** — Partition and format USB drive
+- [x] **Phase 2** — Install Debian 13 (Trixie)
+- [x] **Phase 3** — Install Nginx, PHP 8.4, SQLite; deploy all app code
+- [x] **Phase 4** — Install Kiwix, mbtileserver; load map tiles and ZIM content
+- [x] **Phase 5** — Captive portal: dnsmasq + iptables + Nginx detection endpoints
+- [ ] **Phase 6** — Configure GL-SFT1200 router (ethernet → `eno1`, run `setup-router.sh`)
+- [ ] **Phase 7** — End-to-end test: connect phone, verify captive portal, test all features
 
 ---
 
 ## Router Setup (Phase 6)
 
-Once the ethernet cable is connected from the laptop's `eno1` port to the GL-SFT1200 LAN port:
+Plug an ethernet cable from the laptop's `eno1` port into any LAN port on the GL-SFT1200 (leave the WAN port unplugged), then:
 
 ```bash
-# On the Noosphere server (root@192.168.8.2):
 /usr/local/bin/setup-router.sh
 ```
 
-This SSHes into the router and sets DHCP option 6 to point WiFi clients' DNS at `192.168.8.2`.
+**Manual alternative:** Connect to GL-SFT1200 web admin at `192.168.8.1` → Network → LAN → DHCP → Custom DNS: `192.168.8.2`
 
-**Manual alternative (GL.iNet web admin):**
-1. Connect to GL-SFT1200 WiFi → open `192.168.8.1` in browser
-2. Network → LAN → Advanced → DHCP → Custom DNS: `192.168.8.2`
-3. Save & Apply
+---
+
+## Admin Access
+
+- From a keyboard: type `aaa` quickly on the homepage
+- From a phone or tablet: navigate to `/admin/` directly
+- Admin wiki with full operator documentation available at `/admin/wiki/`
 
 ---
 
 ## Use Case
 
-Designed for scenarios where infrastructure has failed — natural disasters, grid outages, communications blackouts. Anyone with a WiFi-capable device (phone, laptop, tablet) can connect to the router and immediately access:
+Designed for scenarios where infrastructure has failed — natural disasters, grid outages, communications blackouts. Anyone with a WiFi-capable device can connect and immediately access community coordination tools and reference information.
 
-- Community message board for coordination
-- Shared file uploads (maps, documents, photos)
-- Full Wikipedia for reference
-- Medical information (WikiMed)
-
-No accounts required for basic access. No internet. No cloud dependency.
+No accounts. No internet. No cloud.
