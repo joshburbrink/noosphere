@@ -932,14 +932,6 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
   </div>
 </div>
 
-<!-- Simple module toggles -->
-<?php
-$simple_mods = [
-    ['show_chat',     't_chat',     'Chat'],
-    ['show_files',    't_files',    'Files'],
-    ['show_maps',     't_maps',     'Maps'],
-    ['show_calendar', 't_calendar', 'Calendar'],
-];
 <!-- Library (Kiwix) -->
 <div class="mod-section">
   <div class="mod-header" onclick="modToggle('library',document.getElementById('t_library').checked)" style="cursor:default">
@@ -975,7 +967,14 @@ $simple_mods = [
   </div>
 </div>
 
-<?php foreach ($simple_mods as [$key, $id, $label]):
+<?php
+$simple_mods = [
+    ['show_chat',     't_chat',     'Chat'],
+    ['show_files',    't_files',    'Files'],
+    ['show_maps',     't_maps',     'Maps'],
+    ['show_calendar', 't_calendar', 'Calendar'],
+];
+foreach ($simple_mods as [$key, $id, $label]):
 ?>
 <div class="mod-section">
   <div class="mod-header">
