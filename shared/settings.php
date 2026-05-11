@@ -280,6 +280,21 @@ function _presets() {
 
 function get_presets() { return _presets(); }
 
+// Auto-track page visits via shutdown hook (skips admin, requires active session)
+register_shutdown_function(function() {
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    $uri = $_SERVER['REQUEST_URI'] ?? '/';
+    if (strpos($uri, '/admin') !== false) return;
+    $module = 'home';
+    foreach (['/registry'=>'registry','/forum'=>'forum','/chat'=>'chat',
+              '/files'=>'files','/maps'=>'maps','/kiwix'=>'library',
+              '/calendar'=>'calendar'] as $path => $mod) {
+        if (strpos($uri, $path) !== false) { $module = $mod; break; }
+    }
+    $af = __DIR__ . '/analytics.php';
+    if (file_exists($af)) { require_once $af; track_visit($module); }
+});
+
 function apply_preset($mode) {
     _apply_preset($mode, _sdb());
 }

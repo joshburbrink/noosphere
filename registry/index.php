@@ -1,6 +1,7 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/analytics.php';
 sec_session_start();
 
 $db = new SQLite3('/var/lib/noosphere/registry.db');
@@ -121,9 +122,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $s->bindValue(9,$photo); $s->bindValue(10,$extra_json);
             $s->bindValue(11,$now); $s->bindValue(12,$now);
             $s->execute();
-            $msg = $entry_type === 'checkin'
-                 ? 'Registered. Remember your PIN to update later.'
-                 : 'Found person reported. Thank you.';
+            if ($entry_type === 'checkin') {
+                mark_registered($name);
+                $msg = 'Registered. Remember your PIN to update later.';
+            } else {
+                $msg = 'Found person reported. Thank you.';
+            }
         }
     }
 

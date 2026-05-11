@@ -182,6 +182,15 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- Clear analytics ---
+    if ($act === 'clear_stats') {
+        try {
+            $adb = new PDO('sqlite:/var/lib/noosphere/analytics.db');
+            $adb->exec('DELETE FROM sessions; DELETE FROM hits;');
+            $msg = 'Statistics cleared.';
+        } catch (Exception $e) { $msg = 'No stats data yet.'; }
+    }
+
     // --- Change Linux system credentials ---
     if ($act === 'change_linux_pw') {
         $target   = $_POST['linux_target'] ?? '';  // 'user' or 'root'
@@ -520,6 +529,7 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
 
 <div class="tab-bar">
   <div class="tab active" onclick="showTab('status')">Status</div>
+  <div class="tab" onclick="showTab('stats')">Stats</div>
   <div class="tab" onclick="showTab('scripts')">Scripts</div>
   <div class="tab" onclick="showTab('users')">Users</div>
   <div class="tab" onclick="showTab('bans')">Bans</div>
@@ -600,6 +610,111 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
       </div>
     </div>
   </section>
+</div>
+
+<!-- STATS -->
+<div id="tab-stats" class="tab-content">
+<?php
+require_once '/var/www/noosphere/shared/analytics.php';
+$st = analytics_stats();
+function fmt_dur($s) {
+    if ($s < 60) return $s . 's';
+    if ($s < 3600) return floor($s/60) . 'm ' . ($s%60) . 's';
+    return floor($s/3600) . 'h ' . floor(($s%3600)/60) . 'm';
+}
+$mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'Chat',
+               'files'=>'Files','maps'=>'Maps','library'=>'Library','calendar'=>'Calendar'];
+?>
+<?php if (!$st): ?>
+  <section><p style="color:#666;font-size:13px;padding:8px 0">No analytics data yet — visitors will be tracked automatically as they use the hub.</p></section>
+<?php else:
+  $unreg = $st['total'] - $st['registered'];
+  $reg_rate = $st['total'] ? round($st['registered'] / $st['total'] * 100) : 0;
+?>
+<section>
+  <h2>Overview</h2>
+  <div class="svc-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:16px">
+    <?php foreach ([
+      ['Unique visitors',        $st['total'],      '#e0e0e0'],
+      ['Registered',             $st['registered'], '#2ecc71'],
+      ['Browsed, didn\'t register', $unreg,         '#f39c12'],
+      ['Active today',           $st['today'],      '#4a9eff'],
+      ['Registration rate',      $reg_rate . '%',   $reg_rate >= 50 ? '#2ecc71' : '#f39c12'],
+      ['Avg time on site',       $st['avg_duration'] ? fmt_dur($st['avg_duration']) : '—', '#e0e0e0'],
+      ['Total page hits',        $st['total_hits'],  '#e0e0e0'],
+    ] as [$label, $val, $col]): ?>
+    <div class="svc-card">
+      <div class="svc-name"><?= $label ?></div>
+      <div class="svc-state" style="color:<?= $col ?>;font-size:16px;font-weight:bold"><?= $val ?></div>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</section>
+
+<section>
+  <h2>Module Popularity</h2>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+  <?php foreach ($st['modules'] as $mod => $cnt):
+    $pct = $st['max_hits'] ? round($cnt / $st['max_hits'] * 100) : 0;
+    $lbl = $mod_labels[$mod] ?? ucfirst($mod);
+  ?>
+    <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+      <div style="width:80px;color:#888;text-align:right;flex-shrink:0"><?= $lbl ?></div>
+      <div style="flex:1;background:#111126;border-radius:3px;height:18px;overflow:hidden">
+        <div style="width:<?= $pct ?>%;background:#e94560;height:100%;border-radius:3px;transition:.3s"></div>
+      </div>
+      <div style="width:40px;color:#aaa;font-size:12px;flex-shrink:0"><?= $cnt ?></div>
+    </div>
+  <?php endforeach; ?>
+  <?php if (!$st['modules']): ?><div style="color:#555;font-size:13px">No hits recorded yet.</div><?php endif; ?>
+  </div>
+</section>
+
+<section>
+  <h2>Peak Activity Hours <span style="font-size:11px;color:#555;font-weight:normal">(last 7 days)</span></h2>
+  <div style="display:flex;align-items:flex-end;gap:2px;height:60px;margin-top:10px">
+  <?php for ($h = 0; $h < 24; $h++):
+    $cnt = $st['hours'][$h];
+    $pct = $st['max_hour'] ? round($cnt / $st['max_hour'] * 100) : 0;
+    $col = $cnt === max($st['hours']) && $cnt > 0 ? '#e94560' : '#2a2a4a';
+  ?>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="flex:1;width:100%;display:flex;align-items:flex-end">
+        <div style="width:100%;height:<?= $pct ?>%;background:<?= $col ?>;min-height:<?= $cnt>0?'2':0 ?>px;border-radius:2px 2px 0 0"></div>
+      </div>
+      <?php if ($h % 6 === 0): ?><div style="font-size:9px;color:#555"><?= $h ?>h</div><?php else: ?><div style="font-size:9px;color:transparent">·</div><?php endif; ?>
+    </div>
+  <?php endfor; ?>
+  </div>
+</section>
+
+<section>
+  <h2>Visitors — Last 7 Days</h2>
+  <div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">
+  <?php foreach ($st['days'] as $date => $cnt):
+    $pct = $st['max_day'] ? round($cnt / $st['max_day'] * 100) : 0;
+    $dow = date('D', strtotime($date));
+  ?>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:100%;height:50px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:<?= max($pct,0) ?>%;background:#4a9eff;min-height:<?= $cnt>0?'3':0 ?>px;border-radius:3px 3px 0 0"></div>
+      </div>
+      <div style="font-size:10px;color:#555"><?= $dow ?></div>
+      <div style="font-size:10px;color:#888"><?= $cnt ?: '' ?></div>
+    </div>
+  <?php endforeach; ?>
+  </div>
+</section>
+
+<section style="margin-top:16px">
+  <form method="post" onsubmit="return confirm('Clear all stats? This cannot be undone.')">
+    <?= csrf_field() ?>
+    <input type="hidden" name="act" value="clear_stats">
+    <button type="submit" class="btn-red" style="font-size:12px;padding:6px 16px">Clear All Stats</button>
+    <span style="font-size:11px;color:#555;margin-left:8px">Useful when switching between deployments or events.</span>
+  </form>
+</section>
+<?php endif; ?>
 </div>
 
 <!-- SCRIPTS -->
