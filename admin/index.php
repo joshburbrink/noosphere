@@ -174,11 +174,31 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
-        $toggle_keys = ['show_registry','registry_checkin','registry_skills','registry_supplies',
-                        'registry_missing','registry_found_person','registry_shelter',
+        $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_shelter',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_calendar','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
+        }
+        // Registry fields: build from parallel arrays
+        if (isset($_POST['rf_label']) && is_array($_POST['rf_label'])) {
+            $fields      = [];
+            $rf_keys     = (array)($_POST['rf_key']     ?? []);
+            $rf_types    = (array)($_POST['rf_type']    ?? []);
+            $rf_enabled  = array_flip((array)($_POST['rf_enabled'] ?? []));
+            $valid_types = ['text','textarea','checkbox'];
+            foreach ($_POST['rf_label'] as $i => $label) {
+                $label = trim($label);
+                if (!$label) continue;
+                $key  = trim($rf_keys[$i] ?? '');
+                if (!$key) {
+                    $key = preg_replace('/[^a-z0-9]+/', '_', strtolower($label));
+                    $key = trim($key, '_') ?: 'field_' . $i;
+                }
+                $type    = in_array($rf_types[$i] ?? '', $valid_types) ? $rf_types[$i] : 'text';
+                $enabled = isset($rf_enabled[$key]);
+                $fields[] = ['key'=>$key, 'label'=>$label, 'type'=>$type, 'enabled'=>$enabled];
+            }
+            set_setting('registry_fields', json_encode($fields));
         }
         // Forum categories: build from parallel arrays
         if (isset($_POST['cat_label']) && is_array($_POST['cat_label'])) {
@@ -767,22 +787,35 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
     <input type="text" name="registry_statuses" value="<?= esc(get_setting('registry_statuses','OK, Need Help, Checking In')) ?>" placeholder="OK, Need Help, Checking In" style="margin-bottom:4px">
     <div style="font-size:11px;color:#555">Examples: "OK, Need Help, Checking In" &nbsp;·&nbsp; "Checked In, Discharged, Transferred" &nbsp;·&nbsp; "Attending, Left Early"</div>
 
-    <div class="field-label" style="margin-top:14px">Fields to collect</div>
-    <div class="sub-row">
-      <input type="checkbox" id="t_missing" name="registry_missing" <?= get_setting('registry_missing','1')==='1'?'checked':'' ?>>
-      <label for="t_missing">Missing family members</label>
+    <div class="field-label" style="margin-top:14px">Custom fields <span style="color:#555;font-weight:normal">— shown in the check-in form · check to enable</span></div>
+    <div id="rf-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
+    <?php foreach (get_registry_fields() as $rf): ?>
+      <div class="rf-row sub-row" style="gap:6px;align-items:center">
+        <input type="checkbox" name="rf_enabled[]" value="<?= esc($rf['key']) ?>" <?= $rf['enabled'] ? 'checked' : '' ?>>
+        <input type="hidden"   name="rf_key[]"     value="<?= esc($rf['key']) ?>">
+        <input type="text"     name="rf_label[]"   value="<?= esc($rf['label']) ?>" style="flex:1;min-width:0">
+        <select name="rf_type[]" style="width:96px;flex-shrink:0">
+          <option value="text"     <?= $rf['type']==='text'?'selected':'' ?>>Text</option>
+          <option value="textarea" <?= $rf['type']==='textarea'?'selected':'' ?>>Paragraph</option>
+          <option value="checkbox" <?= $rf['type']==='checkbox'?'selected':'' ?>>Checkbox</option>
+        </select>
+        <button type="button" onclick="removeField(this)" class="btn-red" style="font-size:11px;padding:4px 10px;flex-shrink:0">Remove</button>
+      </div>
+    <?php endforeach; ?>
     </div>
-    <div class="sub-row">
-      <input type="checkbox" id="t_skills" name="registry_skills" <?= get_setting('registry_skills','1')==='1'?'checked':'' ?>>
-      <label for="t_skills">Skills you can offer</label>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+      <input type="text" id="new-rf-label" placeholder="New field label" style="flex:1">
+      <select id="new-rf-type" style="width:96px">
+        <option value="text">Text</option>
+        <option value="textarea">Paragraph</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+      <button type="button" onclick="addField()" class="btn-green" style="white-space:nowrap">+ Add</button>
     </div>
-    <div class="sub-row">
-      <input type="checkbox" id="t_supplies" name="registry_supplies" <?= get_setting('registry_supplies','0')==='1'?'checked':'' ?>>
-      <label for="t_supplies">Supplies / resources needed</label>
-    </div>
-    <div class="sub-row">
+
+    <div class="sub-row" style="margin-top:14px">
       <input type="checkbox" id="t_shelter" name="registry_shelter" <?= get_setting('registry_shelter','0')==='1'?'checked':'' ?> onchange="shelterToggle(this.checked)">
-      <label for="t_shelter">Shelter fields — bunk assignment, dietary / medical, next of kin</label>
+      <label for="t_shelter">Shelter mode — shows capacity badge on homepage</label>
     </div>
     <div class="sub-body<?= get_setting('registry_shelter','0')!=='1'?' off':'' ?>" id="body_shelter">
       <div class="form-row" style="margin-top:6px">
@@ -940,6 +973,36 @@ function removeCat(btn) { btn.closest('.cat-row').remove(); }
 
 document.getElementById('new-cat-label') && document.getElementById('new-cat-label').addEventListener('keydown', function(e){
   if (e.key === 'Enter') { e.preventDefault(); addCat(); }
+});
+
+function addField() {
+  var label = document.getElementById('new-rf-label').value.trim();
+  if (!label) { document.getElementById('new-rf-label').focus(); return; }
+  var type = document.getElementById('new-rf-type').value;
+  var key  = label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'field_' + Date.now();
+  var sel  = '<select name="rf_type[]" style="width:96px;flex-shrink:0">' +
+    '<option value="text"'     + (type==='text'?     ' selected':'') + '>Text</option>' +
+    '<option value="textarea"' + (type==='textarea'? ' selected':'') + '>Paragraph</option>' +
+    '<option value="checkbox"' + (type==='checkbox'? ' selected':'') + '>Checkbox</option>' +
+    '</select>';
+  var row = document.createElement('div');
+  row.className = 'rf-row sub-row';
+  row.style.cssText = 'gap:6px;align-items:center';
+  row.innerHTML =
+    '<input type="checkbox" name="rf_enabled[]" value="' + ea(key) + '" checked>' +
+    '<input type="hidden"   name="rf_key[]"     value="' + ea(key) + '">' +
+    '<input type="text"     name="rf_label[]"   value="' + ea(label) + '" style="flex:1;min-width:0">' +
+    sel +
+    '<button type="button" onclick="removeField(this)" class="btn-red" style="font-size:11px;padding:4px 10px;flex-shrink:0">Remove</button>';
+  document.getElementById('rf-list').appendChild(row);
+  document.getElementById('new-rf-label').value = '';
+  document.getElementById('new-rf-label').focus();
+}
+
+function removeField(btn) { btn.closest('.rf-row').remove(); }
+
+document.getElementById('new-rf-label') && document.getElementById('new-rf-label').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') { e.preventDefault(); addField(); }
 });
 </script>
 </body>

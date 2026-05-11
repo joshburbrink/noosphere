@@ -14,6 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     readonly_die();
 
+    // Upload and delete require admin login
+    if (empty($_SESSION['admin'])) {
+        http_response_code(403);
+        echo json_encode(['ok'=>false,'err'=>'Admin login required.']);
+        exit;
+    }
+
     // Handle delete via POST
     if (isset($_POST['delete'])) {
         $del_name = $_POST['delete'];
@@ -126,6 +133,7 @@ h2 { font-size:15px; color:#e94560; margin-bottom:12px; }
   <?php if ($success): ?><div class="msg ok"><?= $success ?></div><?php endif; ?>
   <?php if ($error):   ?><div class="msg err"><?= esc($error) ?></div><?php endif; ?>
 
+  <?php if (!empty($_SESSION['admin'])): ?>
   <div class="upload-box">
     <form method="post" enctype="multipart/form-data" id="upload-form">
       <?= csrf_field() ?>
@@ -137,6 +145,9 @@ h2 { font-size:15px; color:#e94560; margin-bottom:12px; }
       <div style="font-size:11px;color:#555;margin-top:10px">Max 100MB per file</div>
     </form>
   </div>
+  <?php else: ?>
+  <div style="font-size:13px;color:#555;text-align:center;padding:16px 0 20px">Files are uploaded by administrators. Download any file below.</div>
+  <?php endif; ?>
 
   <h2>Available Files (<?= count($files) ?>)</h2>
   <div class="file-list">
@@ -160,11 +171,13 @@ h2 { font-size:15px; color:#e94560; margin-bottom:12px; }
       </div>
       <div class="file-actions">
         <a class="dl-btn" href="/files/dl/<?= urlencode($fname) ?>" download>Download</a>
+        <?php if (!empty($_SESSION['admin'])): ?>
         <form method="post" style="display:inline" onsubmit="return confirm('Delete <?= esc(addslashes($fname)) ?>?')">
           <?= csrf_field() ?>
           <input type="hidden" name="delete" value="<?= esc($fname) ?>">
           <button type="submit" class="del-btn">X</button>
         </form>
+        <?php endif; ?>
       </div>
     </div>
   <?php endforeach; endif; ?>

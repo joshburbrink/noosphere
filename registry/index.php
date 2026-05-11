@@ -9,20 +9,34 @@ $db->exec("CREATE TABLE IF NOT EXISTS registry (
     name TEXT NOT NULL,
     location TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'OK',
-    missing TEXT,
-    skills TEXT,
-    have TEXT,
-    need TEXT,
     notes TEXT,
     pin TEXT NOT NULL,
+    entry_type TEXT DEFAULT 'checkin',
+    is_child INTEGER DEFAULT 0,
+    age TEXT,
+    photo TEXT,
+    is_admin INTEGER DEFAULT 0,
+    extra_fields TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 )");
-// Migrations
-foreach (['age TEXT', 'is_child INTEGER DEFAULT 0', 'photo TEXT', "entry_type TEXT DEFAULT 'checkin'", 'is_admin INTEGER DEFAULT 0',
-          'bunk TEXT', 'dietary TEXT', 'next_of_kin TEXT'] as $col) {
+// Legacy column migrations (keep for backward compat, no longer written)
+foreach (['missing TEXT','skills TEXT','have TEXT','need TEXT','bunk TEXT',
+          'dietary TEXT','next_of_kin TEXT','extra_fields TEXT'] as $col) {
     @$db->exec("ALTER TABLE registry ADD COLUMN $col");
 }
+
+// One-time migration: move old individual columns into extra_fields JSON
+$db->exec("UPDATE registry
+    SET extra_fields = json_object(
+        'skills',       COALESCE(skills,''),
+        'have',         COALESCE(have,''),
+        'need',         COALESCE(need,''),
+        'bunk',         COALESCE(bunk,''),
+        'dietary',      COALESCE(dietary,''),
+        'next_of_kin',  COALESCE(next_of_kin,'')
+    )
+    WHERE extra_fields IS NULL OR extra_fields = ''");
 
 $photo_dir = '/var/lib/noosphere/registry_photos/';
 if (!is_dir($photo_dir)) mkdir($photo_dir, 0755, true);
@@ -41,20 +55,32 @@ function save_photo($field) {
     return $fname;
 }
 
-// Admin delete action
+function collect_extra_fields() {
+    $extra = [];
+    foreach (get_registry_fields() as $field) {
+        if (!$field['enabled']) continue;
+        $k = $field['key'];
+        if ($field['type'] === 'checkbox') {
+            $extra[$k] = !empty($_POST['ef_' . $k]) ? '1' : '0';
+        } else {
+            $extra[$k] = trim($_POST['ef_' . $k] ?? '');
+        }
+    }
+    return json_encode($extra ?: (object)[]);
+}
+
+// Admin delete
 if (isset($_GET['del']) && !empty($_SESSION['reg_admin'])) {
     $del_id = (int)$_GET['del'];
     if ($del_id > 0) {
         $del_row = $db->querySingle("SELECT photo FROM registry WHERE id=$del_id", true);
         if ($del_row && $del_row['photo']) {
-            $photo_path = $photo_dir . $del_row['photo'];
-            if (file_exists($photo_path) && strpos(realpath($photo_path), realpath($photo_dir)) === 0) {
-                unlink($photo_path);
-            }
+            $p = $photo_dir . $del_row['photo'];
+            if (file_exists($p) && strpos(realpath($p), realpath($photo_dir)) === 0) unlink($p);
         }
-        $stmt = $db->prepare('DELETE FROM registry WHERE id=?');
-        $stmt->bindValue(1, $del_id, SQLITE3_INTEGER);
-        $stmt->execute();
+        $s = $db->prepare('DELETE FROM registry WHERE id=?');
+        $s->bindValue(1, $del_id, SQLITE3_INTEGER);
+        $s->execute();
     }
     header('Location: /registry/');
     exit;
@@ -67,40 +93,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'register') {
         ban_check_or_die();
-        $entry_type = in_array($_POST['entry_type'] ?? '', ['checkin','found_person']) ? $_POST['entry_type'] : 'checkin';
-        $name     = trim($_POST['name'] ?? '');
+        $entry_type = in_array($_POST['entry_type'] ?? '', ['checkin','found_person'])
+                      ? $_POST['entry_type'] : 'checkin';
+        $name     = trim($_POST['name']     ?? '');
         $location = trim($_POST['location'] ?? '');
         $valid_statuses = get_status_options();
-        $status   = in_array($_POST['status'] ?? '', $valid_statuses) ? $_POST['status'] : $valid_statuses[0];
-        $missing  = trim($_POST['missing'] ?? '');
-        $skills   = implode(', ', array_filter(array_map('trim', (array)($_POST['skills'] ?? []))));
-        $have     = trim($_POST['have'] ?? '');
-        $need     = trim($_POST['need'] ?? '');
-        $notes    = trim($_POST['notes'] ?? '');
-        $pin      = trim($_POST['pin'] ?? '');
-        $age      = trim($_POST['age'] ?? '');
+        $status   = in_array($_POST['status'] ?? '', $valid_statuses)
+                    ? $_POST['status'] : $valid_statuses[0];
+        $notes    = trim($_POST['notes']    ?? '');
+        $pin      = trim($_POST['pin']      ?? '');
+        $age      = trim($_POST['age']      ?? '');
         $is_child = !empty($_POST['is_child']) ? 1 : 0;
         $photo    = save_photo('photo');
-        $bunk     = trim($_POST['bunk']       ?? '');
-        $dietary  = trim($_POST['dietary']    ?? '');
-        $next_of_kin = trim($_POST['next_of_kin'] ?? '');
+        $extra_json = ($entry_type === 'checkin') ? collect_extra_fields() : '{}';
 
         if (!$name || !$location || strlen($pin) < 4) {
-            $error = 'Name/description, location, and a 4+ digit PIN are required.';
+            $error = 'Name, location, and a 4+ digit PIN are required.';
         } else {
             $pin_hash = password_hash($pin, PASSWORD_DEFAULT);
             $now = time();
-            $stmt = $db->prepare("INSERT INTO registry (name,location,status,missing,skills,have,need,notes,pin,created_at,updated_at,age,is_child,photo,entry_type,bunk,dietary,next_of_kin) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $stmt->bindValue(1,$name); $stmt->bindValue(2,$location); $stmt->bindValue(3,$status);
-            $stmt->bindValue(4,$missing); $stmt->bindValue(5,$skills); $stmt->bindValue(6,$have);
-            $stmt->bindValue(7,$need); $stmt->bindValue(8,$notes); $stmt->bindValue(9,$pin_hash);
-            $stmt->bindValue(10,$now); $stmt->bindValue(11,$now); $stmt->bindValue(12,$age);
-            $stmt->bindValue(13,$is_child,SQLITE3_INTEGER); $stmt->bindValue(14,$photo); $stmt->bindValue(15,$entry_type);
-            $stmt->bindValue(16,$bunk); $stmt->bindValue(17,$dietary); $stmt->bindValue(18,$next_of_kin);
-            $stmt->execute();
-            if ($entry_type === 'checkin') $msg = "Registered. Remember your PIN to update later.";
-            elseif ($entry_type === 'found_person') $msg = "Found person reported. Thank you.";
-            else $msg = "Found item reported. Thank you.";
+            $s = $db->prepare("INSERT INTO registry
+                (name,location,status,notes,pin,entry_type,is_child,age,photo,extra_fields,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+            $s->bindValue(1,$name); $s->bindValue(2,$location); $s->bindValue(3,$status);
+            $s->bindValue(4,$notes); $s->bindValue(5,$pin_hash); $s->bindValue(6,$entry_type);
+            $s->bindValue(7,$is_child,SQLITE3_INTEGER); $s->bindValue(8,$age);
+            $s->bindValue(9,$photo); $s->bindValue(10,$extra_json);
+            $s->bindValue(11,$now); $s->bindValue(12,$now);
+            $s->execute();
+            $msg = $entry_type === 'checkin'
+                 ? 'Registered. Remember your PIN to update later.'
+                 : 'Found person reported. Thank you.';
         }
     }
 
@@ -111,85 +134,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rate_limit('pin', 5, 900);
         if ($row && password_verify($pin, $row['pin'])) {
             rate_reset('pin');
-            // Set admin session if this entry has is_admin flag
-            if (!empty($row['is_admin'])) {
-                $_SESSION['reg_admin'] = true;
-            }
+            if (!empty($row['is_admin'])) $_SESSION['reg_admin'] = true;
             $location = trim($_POST['location'] ?? '');
             $valid_statuses = get_status_options();
-            $status   = in_array($_POST['status'] ?? '', $valid_statuses) ? $_POST['status'] : $valid_statuses[0];
-            $missing  = trim($_POST['missing'] ?? '');
-            $skills   = implode(', ', array_filter(array_map('trim', (array)($_POST['skills'] ?? []))));
-            $have     = trim($_POST['have'] ?? '');
-            $need     = trim($_POST['need'] ?? '');
-            $notes    = trim($_POST['notes'] ?? '');
-            $age      = trim($_POST['age'] ?? '');
+            $status   = in_array($_POST['status'] ?? '', $valid_statuses)
+                        ? $_POST['status'] : $valid_statuses[0];
+            $notes    = trim($_POST['notes']    ?? '');
+            $age      = trim($_POST['age']      ?? '');
             $is_child = !empty($_POST['is_child']) ? 1 : 0;
             $photo    = save_photo('photo') ?? $row['photo'];
-            $bunk        = trim($_POST['bunk']       ?? '');
-            $dietary     = trim($_POST['dietary']    ?? '');
-            $next_of_kin = trim($_POST['next_of_kin'] ?? '');
+            $extra_json = collect_extra_fields();
             $now = time();
-            $stmt = $db->prepare("UPDATE registry SET location=?,status=?,missing=?,skills=?,have=?,need=?,notes=?,updated_at=?,age=?,is_child=?,photo=?,bunk=?,dietary=?,next_of_kin=? WHERE id=?");
-            $stmt->bindValue(1,$location); $stmt->bindValue(2,$status); $stmt->bindValue(3,$missing);
-            $stmt->bindValue(4,$skills); $stmt->bindValue(5,$have); $stmt->bindValue(6,$need);
-            $stmt->bindValue(7,$notes); $stmt->bindValue(8,$now); $stmt->bindValue(9,$age);
-            $stmt->bindValue(10,$is_child,SQLITE3_INTEGER); $stmt->bindValue(11,$photo);
-            $stmt->bindValue(12,$bunk); $stmt->bindValue(13,$dietary); $stmt->bindValue(14,$next_of_kin);
-            $stmt->bindValue(15,$id,SQLITE3_INTEGER);
-            $stmt->execute();
-            $msg = "Entry updated.";
+            $s = $db->prepare("UPDATE registry
+                SET location=?,status=?,notes=?,updated_at=?,age=?,is_child=?,photo=?,extra_fields=?
+                WHERE id=?");
+            $s->bindValue(1,$location); $s->bindValue(2,$status); $s->bindValue(3,$notes);
+            $s->bindValue(4,$now); $s->bindValue(5,$age);
+            $s->bindValue(6,$is_child,SQLITE3_INTEGER); $s->bindValue(7,$photo);
+            $s->bindValue(8,$extra_json); $s->bindValue(9,$id,SQLITE3_INTEGER);
+            $s->execute();
+            $msg = 'Entry updated.';
         } else {
-            $error = "Incorrect PIN.";
+            $error = 'Incorrect PIN.';
         }
     }
 }
 
 $filter = $_GET['filter'] ?? 'all';
 $search = trim($_GET['q'] ?? '');
-$where = "1=1";
+$where  = '1=1';
 if ($filter === 'help')         $where .= " AND status='Need Help'";
-if ($filter === 'missing')      $where .= " AND (missing != '' AND missing IS NOT NULL)";
-if ($filter === 'children')     $where .= " AND is_child=1";
 if ($filter === 'found_person') $where .= " AND entry_type='found_person'";
 if ($filter === 'checkin')      $where .= " AND (entry_type='checkin' OR entry_type IS NULL)";
+if ($filter === 'children')     $where .= " AND is_child=1";
+
 if ($search) {
-    $stmt_search = $db->prepare("SELECT * FROM registry WHERE $where AND (name LIKE ? OR location LIKE ? OR skills LIKE ? OR need LIKE ? OR have LIKE ? OR notes LIKE ?) ORDER BY updated_at DESC");
+    $stmt = $db->prepare("SELECT * FROM registry WHERE $where
+        AND (name LIKE ? OR location LIKE ? OR notes LIKE ? OR extra_fields LIKE ?)
+        ORDER BY updated_at DESC");
     $like = '%' . $search . '%';
-    $stmt_search->bindValue(1,$like); $stmt_search->bindValue(2,$like); $stmt_search->bindValue(3,$like);
-    $stmt_search->bindValue(4,$like); $stmt_search->bindValue(5,$like); $stmt_search->bindValue(6,$like);
-    $rows_result = $stmt_search->execute();
+    $stmt->bindValue(1,$like); $stmt->bindValue(2,$like);
+    $stmt->bindValue(3,$like); $stmt->bindValue(4,$like);
+    $res = $stmt->execute();
 } else {
-    $rows_result = $db->query("SELECT * FROM registry WHERE $where ORDER BY updated_at DESC");
+    $res = $db->query("SELECT * FROM registry WHERE $where ORDER BY updated_at DESC");
 }
 
-$all = [];
-while ($r = $rows_result->fetchArray(SQLITE3_ASSOC)) $all[] = $r;
+$all        = [];
+while ($r = $res->fetchArray(SQLITE3_ASSOC)) $all[] = $r;
 $total      = $db->querySingle("SELECT COUNT(*) FROM registry");
 $need_help  = $db->querySingle("SELECT COUNT(*) FROM registry WHERE status='Need Help'");
 $children   = $db->querySingle("SELECT COUNT(*) FROM registry WHERE is_child=1");
 $fnd_person = $db->querySingle("SELECT COUNT(*) FROM registry WHERE entry_type='found_person'");
 
-function esc($s) { return htmlspecialchars($s, ENT_QUOTES); }
-function ago($ts) {
-    $d = time() - $ts;
-    if ($d < 60) return "just now";
-    if ($d < 3600) return intval($d/60)."m ago";
-    if ($d < 86400) return intval($d/3600)."h ago";
-    return intval($d/86400)."d ago";
-}
-
-$skill_opts = ['Medical/First Aid','Construction/Repair','Food/Cooking','Communications/Radio','Vehicle/Mechanical','Childcare','Water/Sanitation','Navigation','Security','Other'];
 $edit_id  = intval($_GET['edit'] ?? 0);
 $edit_row = $edit_id ? $db->querySingle("SELECT * FROM registry WHERE id=$edit_id", true) : null;
 $entry_type_default = $_GET['type'] ?? 'checkin';
+$reg_fields = get_registry_fields();
+
+function esc($s) { return htmlspecialchars($s ?? '', ENT_QUOTES); }
+function ago($ts) {
+    $d = time() - $ts;
+    if ($d < 60) return 'just now';
+    if ($d < 3600) return intval($d/60).'m ago';
+    if ($d < 86400) return intval($d/3600).'h ago';
+    return intval($d/86400).'d ago';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Community Registry — Noosphere</title>
+<title><?= esc(get_setting('registry_label','Registry')) ?> — Noosphere</title>
 <style>
   :root { --bg:#0f0f1a; --card:#1a1a2e; --border:#2a2a4a; --accent:#e94560; --green:#2ecc71; --yellow:#f39c12; --text:#e0e0e0; --muted:#888; }
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -217,8 +234,6 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
   }
   input:focus, textarea:focus, select:focus { outline:none; border-color:var(--accent); }
   textarea { resize:vertical; min-height:52px; }
-  .skill-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px; margin-top:5px; }
-  .skill-grid label { display:flex; align-items:center; gap:5px; color:var(--text); font-size:12px; margin:0; cursor:pointer; }
   .child-row { display:flex; align-items:center; gap:10px; margin-top:9px; }
   .child-row label { margin:0; display:flex; align-items:center; gap:6px; color:var(--text); font-size:13px; cursor:pointer; }
   .photo-row { margin-top:9px; }
@@ -228,6 +243,9 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
   .btn-sm { background:var(--border); border:none; padding:4px 10px; font-size:11px; margin-top:0; width:auto; border-radius:4px; cursor:pointer; color:var(--text); text-decoration:none; display:inline-block; }
   .btn-danger { background:none; border:1px solid #3a2a2a; color:var(--accent); padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer; text-decoration:none; display:inline-block; }
   .btn-danger:hover { background:#3a1a1a; }
+  .cb-field { display:flex; align-items:center; gap:8px; margin-top:9px; }
+  .cb-field input[type=checkbox] { width:auto; }
+  .cb-field label { margin:0; color:var(--text); font-size:13px; cursor:pointer; }
   .filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
   .filters a { padding:5px 12px; border-radius:18px; font-size:12px; text-decoration:none; border:1px solid var(--border); color:var(--muted); white-space:nowrap; }
   .filters a.active, .filters a:hover { border-color:var(--accent); color:var(--accent); }
@@ -248,23 +266,19 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
   .badge-checking{ background:#2a2a1a; color:var(--yellow); }
   .badge-child   { background:#2a200a; color:#f39c12; }
   .badge-found   { background:#0a1a3a; color:#4a9eff; }
-  .badge-item    { background:#1a1a3a; color:#aaa; }
   .card-loc { color:var(--muted); font-size:12px; margin-top:3px; }
-  .tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
-  .tag { background:var(--border); padding:2px 8px; border-radius:10px; font-size:11px; }
   .card-row { margin-top:6px; font-size:12px; color:var(--muted); }
   .card-row span { color:var(--text); }
   .card-footer { margin-top:8px; font-size:11px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; }
   .empty { text-align:center; color:var(--muted); padding:40px; }
   .pin-note { font-size:11px; color:var(--muted); margin-top:4px; }
-  .section-hidden { display:none; }
 </style>
 </head>
 <body>
 <header>
   <div>
     <a href="/">&#x2190; Home</a>
-    <h1>Community Registry</h1>
+    <h1><?= esc(get_setting('registry_label','Registry')) ?></h1>
   </div>
   <div class="stats">
     <div><span><?= $total ?></span> total</div>
@@ -301,9 +315,10 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
           <input type="hidden" name="action" value="<?= $edit_row ? 'update' : 'register' ?>">
           <input type="hidden" name="entry_type" id="entry_type" value="<?= esc($cur_type) ?>">
           <?= csrf_field() ?>
+
           <?php if ($edit_row): ?>
             <input type="hidden" name="id" value="<?= $edit_row['id'] ?>">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Updating: <strong><?= esc($edit_row['name']) ?></strong></div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Updating: <strong><?= esc($edit_row['name']) ?></strong></div>
           <?php else: ?>
             <label id="name-label">Your Name *</label>
             <input type="text" name="name" required id="name-field" placeholder="Jane Smith">
@@ -312,7 +327,7 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
           <div class="child-row">
             <label><input type="checkbox" name="is_child" id="is_child" value="1" <?= !empty($edit_row['is_child']) ? 'checked' : '' ?>> Child (under 18)</label>
             <div style="flex:1">
-              <input type="text" name="age" id="age" value="<?= esc($edit_row['age'] ?? '') ?>" placeholder="Age (e.g. 8, ~35)" style="width:100%">
+              <input type="text" name="age" value="<?= esc($edit_row['age'] ?? '') ?>" placeholder="Age (e.g. 8)" style="width:100%">
             </div>
           </div>
 
@@ -323,61 +338,54 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
             <label>Status</label>
             <select name="status">
               <?php $status_opts = get_status_options(); foreach ($status_opts as $s): ?>
-                <option value="<?= $s ?>" <?= ($edit_row['status'] ?? $status_opts[0]) === $s ? 'selected' : '' ?>><?= $s ?></option>
+                <option value="<?= esc($s) ?>" <?= ($edit_row['status'] ?? $status_opts[0]) === $s ? 'selected' : '' ?>><?= esc($s) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
 
+          <!-- Dynamic extra fields — only shown for check-in -->
           <div id="checkin-section">
-            <?php if (get_setting('registry_missing','1')==='1'): ?>
-            <label>Missing family members</label>
-            <input type="text" name="missing" value="<?= esc($edit_row['missing'] ?? '') ?>" placeholder="John Smith (husband), Sara age 8">
-            <?php endif; ?>
-
-            <?php if (get_setting('registry_skills','1')==='1'): ?>
-            <label>Skills you can offer</label>
-            <div class="skill-grid">
-              <?php foreach ($skill_opts as $sk):
-                $checked = $edit_row && strpos($edit_row['skills'] ?? '', $sk) !== false ? 'checked' : ''; ?>
-                <label><input type="checkbox" name="skills[]" value="<?= esc($sk) ?>" <?= $checked ?>><?= esc($sk) ?></label>
-              <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
-
-            <?php if (get_setting('registry_supplies','0')==='1'): ?>
-            <label>Supplies / resources you need</label>
-            <textarea name="need" placeholder="Insulin, baby formula, crutches..."><?= esc($edit_row['need'] ?? '') ?></textarea>
-            <?php endif; ?>
-
-            <?php if (get_setting('registry_shelter','0')==='1'): ?>
-            <label>Bunk / Room Assignment</label>
-            <input type="text" name="bunk" value="<?= esc($edit_row['bunk'] ?? '') ?>" placeholder="Shelter B, Bunk 14">
-            <label>Dietary / Medical Notes</label>
-            <input type="text" name="dietary" value="<?= esc($edit_row['dietary'] ?? '') ?>" placeholder="Diabetic, peanut allergy, wheelchair...">
-            <label>Next of Kin / Emergency Contact</label>
-            <input type="text" name="next_of_kin" value="<?= esc($edit_row['next_of_kin'] ?? '') ?>" placeholder="Jane Smith, 555-1234">
-            <?php endif; ?>
+            <?php
+            $edit_ef = $edit_row ? (json_decode($edit_row['extra_fields'] ?? '{}', true) ?: []) : [];
+            foreach ($reg_fields as $field):
+                if (!$field['enabled']) continue;
+                $k   = $field['key'];
+                $val = $edit_ef[$k] ?? '';
+            ?>
+              <?php if ($field['type'] === 'checkbox'): ?>
+                <div class="cb-field">
+                  <input type="checkbox" name="ef_<?= esc($k) ?>" value="1" id="ef_<?= esc($k) ?>" <?= $val === '1' ? 'checked' : '' ?>>
+                  <label for="ef_<?= esc($k) ?>"><?= esc($field['label']) ?></label>
+                </div>
+              <?php elseif ($field['type'] === 'textarea'): ?>
+                <label><?= esc($field['label']) ?></label>
+                <textarea name="ef_<?= esc($k) ?>"><?= esc($val) ?></textarea>
+              <?php else: ?>
+                <label><?= esc($field['label']) ?></label>
+                <input type="text" name="ef_<?= esc($k) ?>" value="<?= esc($val) ?>">
+              <?php endif; ?>
+            <?php endforeach; ?>
           </div>
 
-          <label>Notes / Description</label>
-          <textarea name="notes" placeholder="Any other details..."><?= esc($edit_row['notes'] ?? '') ?></textarea>
+          <label>Notes / Additional details</label>
+          <textarea name="notes"><?= esc($edit_row['notes'] ?? '') ?></textarea>
 
           <div class="photo-row">
-            <label>Photo <?php if ($edit_row && $edit_row['photo']): ?>(current photo on file -- upload new to replace)<?php endif; ?></label>
+            <label>Photo <?php if ($edit_row && $edit_row['photo']): ?>(upload new to replace)<?php endif; ?></label>
             <input type="file" name="photo" accept="image/*">
             <div class="pin-note">Max 5MB / jpg, png, gif, webp</div>
             <?php if ($edit_row && $edit_row['photo']): ?>
-              <img src="/registry/photos/<?= esc($edit_row['photo']) ?>" style="width:80px;height:80px;object-fit:cover;border-radius:6px;margin-top:6px;">
+              <img src="/registry/photos/<?= esc($edit_row['photo']) ?>" style="width:80px;height:80px;object-fit:cover;border-radius:6px;margin-top:6px">
             <?php endif; ?>
           </div>
 
           <label>PIN (4+ digits)</label>
-          <input type="password" name="pin" required minlength="4" placeholder="<?= $edit_row ? 'Enter your PIN to confirm' : 'Choose a PIN -- write it down' ?>">
-          <?php if (!$edit_row): ?><div class="pin-note">You'll need this PIN to update the entry later.</div><?php endif; ?>
+          <input type="password" name="pin" required minlength="4" placeholder="<?= $edit_row ? 'Enter your PIN to confirm' : 'Choose a PIN — write it down' ?>">
+          <?php if (!$edit_row): ?><div class="pin-note">You need this PIN to update your entry later.</div><?php endif; ?>
 
           <button type="submit" class="btn"><?= $edit_row ? 'Save Changes' : 'Submit' ?></button>
           <?php if ($edit_row): ?>
-            <a href="/registry/" style="display:block;text-align:center;margin-top:8px;font-size:12px;color:var(--muted);">Cancel</a>
+            <a href="/registry/" style="display:block;text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">Cancel</a>
           <?php endif; ?>
         </form>
       </div>
@@ -386,13 +394,14 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
     <!-- LIST -->
     <div>
       <div class="filters">
-        <a href="/registry/" class="<?= $filter==='all'?'active':'' ?>">All (<?= $total ?>)</a>
-        <a href="/registry/?filter=checkin" class="<?= $filter==='checkin'?'active':'' ?>">Check-ins</a>
-        <a href="/registry/?filter=help" class="<?= $filter==='help'?'active':'' ?>">Need Help (<?= $need_help ?>)</a>
-        <a href="/registry/?filter=missing" class="<?= $filter==='missing'?'active':'' ?>">Missing</a>
-        <a href="/registry/?filter=children" class="<?= $filter==='children'?'active':'' ?>">Children (<?= $children ?>)</a>
-        <?php if ($fnd_person): ?><a href="/registry/?filter=found_person" class="<?= $filter==='found_person'?'active':'' ?>">Found Persons (<?= $fnd_person ?>)</a><?php endif; ?>
-        <form method="get" style="flex:1;min-width:140px;">
+        <a href="/registry/"                           class="<?= $filter==='all'?'active':'' ?>">All (<?= $total ?>)</a>
+        <a href="/registry/?filter=checkin"            class="<?= $filter==='checkin'?'active':'' ?>">Check-ins</a>
+        <a href="/registry/?filter=help"               class="<?= $filter==='help'?'active':'' ?>">Need Help (<?= $need_help ?>)</a>
+        <a href="/registry/?filter=children"           class="<?= $filter==='children'?'active':'' ?>">Children (<?= $children ?>)</a>
+        <?php if ($fnd_person): ?>
+        <a href="/registry/?filter=found_person"       class="<?= $filter==='found_person'?'active':'' ?>">Found Persons (<?= $fnd_person ?>)</a>
+        <?php endif; ?>
+        <form method="get" style="flex:1;min-width:140px">
           <input type="hidden" name="filter" value="<?= esc($filter) ?>">
           <input type="text" name="q" value="<?= esc($search) ?>" placeholder="Search...">
         </form>
@@ -403,11 +412,18 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
           <div class="empty">No entries found.</div>
         <?php endif; ?>
         <?php foreach ($all as $r):
-          $etype = $r['entry_type'] ?? 'checkin';
+          $etype    = $r['entry_type'] ?? 'checkin';
           $is_child = !empty($r['is_child']);
+          $ef       = json_decode($r['extra_fields'] ?? '{}', true) ?: [];
           $card_class = 'card' . ($is_child ? ' child' : '') . ($etype !== 'checkin' ? ' found' : '');
-          $bc = ['OK'=>'badge-ok','Need Help'=>'badge-help','Checking In'=>'badge-checking'];
-          $bclass = $bc[$r['status']] ?? 'badge-ok';
+          $status_bc  = [];
+          foreach (get_status_options() as $i => $so) {
+              $lc = strtolower($so);
+              if (strpos($lc,'help') !== false) $status_bc[$so] = 'badge-help';
+              elseif ($i === 0) $status_bc[$so] = 'badge-ok';
+              else $status_bc[$so] = 'badge-checking';
+          }
+          $bclass = $status_bc[$r['status']] ?? 'badge-ok';
         ?>
           <div class="<?= $card_class ?>">
             <?php if ($r['photo']): ?>
@@ -422,30 +438,38 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
                   <div class="card-loc">&#x1F4CD; <?= esc($r['location']) ?></div>
                 </div>
                 <div class="badges">
-                  <?php if ($etype === 'found_person'): ?><span class="badge badge-found">Found Person</span>
-                  <?php else: ?><span class="badge <?= $bclass ?>"><?= esc($r['status']) ?></span><?php endif; ?>
-                  <?php if ($is_child): ?><span class="badge badge-child">Child<?= $r['age'] ? ' / Age '.$r['age'] : '' ?></span>
-                  <?php elseif ($r['age']): ?><span class="badge" style="background:var(--border);color:var(--muted)">Age <?= esc($r['age']) ?></span><?php endif; ?>
+                  <?php if ($etype === 'found_person'): ?>
+                    <span class="badge badge-found">Found Person</span>
+                  <?php else: ?>
+                    <span class="badge <?= esc($bclass) ?>"><?= esc($r['status']) ?></span>
+                  <?php endif; ?>
+                  <?php if ($is_child): ?>
+                    <span class="badge badge-child">Child<?= $r['age'] ? ' · Age '.$r['age'] : '' ?></span>
+                  <?php elseif ($r['age']): ?>
+                    <span class="badge" style="background:var(--border);color:var(--muted)">Age <?= esc($r['age']) ?></span>
+                  <?php endif; ?>
                 </div>
               </div>
 
-              <?php if ($r['missing']): ?>
-                <div class="card-row" style="margin-top:6px;"><span style="color:var(--accent);font-weight:bold;">Missing: </span><span><?= esc($r['missing']) ?></span></div>
+              <?php foreach ($reg_fields as $field):
+                if (!$field['enabled']) continue;
+                $val = $ef[$field['key']] ?? '';
+                if ($val === '' || $val === '0') continue;
+              ?>
+                <?php if ($field['type'] === 'checkbox'): ?>
+                  <div class="card-row"><span><?= esc($field['label']) ?></span></div>
+                <?php else: ?>
+                  <div class="card-row"><span style="color:var(--muted)"><?= esc($field['label']) ?>: </span><span><?= esc($val) ?></span></div>
+                <?php endif; ?>
+              <?php endforeach; ?>
+
+              <?php if ($r['notes']): ?>
+                <div class="card-row"><span style="color:var(--muted)">Notes: </span><span><?= esc($r['notes']) ?></span></div>
               <?php endif; ?>
-              <?php if ($r['skills']): ?>
-                <div class="tags">
-                  <?php foreach (explode(', ', $r['skills']) as $sk): ?><span class="tag"><?= esc(trim($sk)) ?></span><?php endforeach; ?>
-                </div>
-              <?php endif; ?>
-              <?php if ($r['need']): ?><div class="card-row"><span style="color:#ff9999">Needs: </span><span><?= esc($r['need']) ?></span></div><?php endif; ?>
-              <?php if ($r['notes']): ?><div class="card-row"><span>Notes: </span><span><?= esc($r['notes']) ?></span></div><?php endif; ?>
-              <?php if (!empty($r['bunk'])): ?><div class="card-row"><span style="color:#2ecc71">Bunk: </span><span><?= esc($r['bunk']) ?></span></div><?php endif; ?>
-              <?php if (!empty($r['dietary'])): ?><div class="card-row"><span>Dietary/Medical: </span><span><?= esc($r['dietary']) ?></span></div><?php endif; ?>
-              <?php if (!empty($r['next_of_kin'])): ?><div class="card-row"><span>Next of Kin: </span><span><?= esc($r['next_of_kin']) ?></span></div><?php endif; ?>
 
               <div class="card-footer">
                 <span>Updated <?= ago($r['updated_at']) ?></span>
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div style="display:flex;gap:8px;align-items:center">
                   <?php if ($etype === 'checkin'): ?>
                     <a href="/registry/?edit=<?= $r['id'] ?>" class="btn btn-sm">Update my entry</a>
                   <?php endif; ?>
@@ -464,27 +488,24 @@ $entry_type_default = $_GET['type'] ?? 'checkin';
 
 <script>
 var typeLabels = {
-  checkin:      { name:'Your Name *',                  loc:'Where can you be found? *',       nameHint:'Jane Smith' },
-  found_person: { name:"Person's name (or Unknown)",   loc:'Where was this person found?',    nameHint:'Unknown' }
+  checkin:      { name:'Your Name *',               loc:'Where can you be found? *',    nameHint:'Jane Smith' },
+  found_person: { name:"Person's name (or Unknown)", loc:'Where was this person found?', nameHint:'Unknown' }
 };
-
 function setType(t) {
   document.getElementById('entry_type').value = t;
   var lbl = typeLabels[t];
   document.getElementById('name-label').textContent = lbl.name;
   document.getElementById('name-field').placeholder = lbl.nameHint;
-  document.getElementById('loc-label').textContent = lbl.loc;
-  var checkinSec = document.getElementById('checkin-section');
-  var statusSec  = document.getElementById('status-section');
-  checkinSec.style.display = (t === 'checkin') ? '' : 'none';
-  statusSec.style.display  = (t === 'checkin') ? '' : 'none';
-  document.querySelectorAll('.type-tab').forEach(function(el){ el.classList.remove('active'); });
-  document.querySelectorAll('.type-tab').forEach(function(el){
-    if (el.textContent.toLowerCase().includes(t === 'checkin' ? 'check' : 'person'))
-      el.classList.add('active');
+  document.getElementById('loc-label').textContent  = lbl.loc;
+  document.getElementById('checkin-section').style.display = (t === 'checkin') ? '' : 'none';
+  document.getElementById('status-section').style.display  = (t === 'checkin') ? '' : 'none';
+  document.querySelectorAll('.type-tab').forEach(function(el) {
+    el.classList.toggle('active',
+      (t === 'checkin' && el.textContent.toLowerCase().includes('check')) ||
+      (t === 'found_person' && el.textContent.toLowerCase().includes('person'))
+    );
   });
 }
-// Init on load
 setType(document.getElementById('entry_type').value);
 </script>
 </body>

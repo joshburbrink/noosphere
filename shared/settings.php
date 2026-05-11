@@ -17,20 +17,21 @@ function _init_settings($db) {
     if ($count == 0) _apply_preset('emergency', $db);
 }
 
+$_settings_cache = [];
+
 function get_setting($key, $default = '') {
-    static $cache = [];
-    if (array_key_exists($key, $cache)) return $cache[$key];
+    global $_settings_cache;
+    if (array_key_exists($key, $_settings_cache)) return $_settings_cache[$key];
     $s = _sdb()->prepare('SELECT value FROM settings WHERE key=?');
     $s->execute([$key]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
-    $cache[$key] = $row ? $row['value'] : $default;
-    return $cache[$key];
+    $_settings_cache[$key] = $row ? $row['value'] : $default;
+    return $_settings_cache[$key];
 }
 
 function set_setting($key, $value) {
-    // Reset static cache so subsequent get_setting calls read fresh values
-    get_setting('__bust__');
-    $ref = &$GLOBALS;  // force cache access via workaround below
+    global $_settings_cache;
+    unset($_settings_cache[$key]);
     _sdb()->prepare('INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)')->execute([$key, (string)$value]);
 }
 
@@ -55,6 +56,27 @@ function get_status_options() {
     return ['OK', 'Need Help', 'Checking In'];
 }
 
+// Returns array of ['key','label','type','enabled'] for configurable registry fields
+function get_registry_fields() {
+    $raw = get_setting('registry_fields', '');
+    if ($raw) {
+        $fields = json_decode($raw, true);
+        if (is_array($fields) && $fields) return $fields;
+    }
+    return _default_registry_fields();
+}
+
+function _default_registry_fields() {
+    return [
+        ['key'=>'skills',      'label'=>'Skills you can offer',             'type'=>'textarea', 'enabled'=>true],
+        ['key'=>'have',        'label'=>'Supplies / resources available',   'type'=>'textarea', 'enabled'=>false],
+        ['key'=>'need',        'label'=>'Supplies / resources needed',      'type'=>'textarea', 'enabled'=>false],
+        ['key'=>'bunk',        'label'=>'Bunk / room assignment',           'type'=>'text',     'enabled'=>false],
+        ['key'=>'dietary',     'label'=>'Dietary / medical needs',          'type'=>'text',     'enabled'=>false],
+        ['key'=>'next_of_kin', 'label'=>'Next of kin / emergency contact', 'type'=>'text',     'enabled'=>false],
+    ];
+}
+
 // Returns array of ['key','label','icon','desc'] — excludes announcements (always hardcoded)
 function get_forum_categories() {
     $raw = get_setting('forum_categories', '');
@@ -73,6 +95,12 @@ function _default_forum_cats() {
     ];
 }
 
+function _rf($enabled_keys) {
+    $all = _default_registry_fields();
+    foreach ($all as &$f) $f['enabled'] = in_array($f['key'], $enabled_keys);
+    return json_encode($all);
+}
+
 function _presets() {
     $full_cats  = json_encode(_default_forum_cats());
     $event_cats = json_encode([['key'=>'general','label'=>'General','icon'=>'💬','desc'=>'Questions, coordination, everything else']]);
@@ -81,142 +109,130 @@ function _presets() {
 
     return [
         'emergency' => [
-            'instance_tagline'    => 'Offline information hub — no internet required',
-            'readonly'            => '0',
-            'homepage_alert'      => '',
-            'show_registry'       => '1',
-            'registry_label'      => 'Registry',
-            'registry_checkin'    => '1',
-            'registry_statuses'   => 'OK, Need Help, Checking In',
-            'registry_skills'     => '1',
-            'registry_supplies'   => '0',
-            'registry_missing'    => '1',
+            'instance_tagline'     => 'Offline information hub — no internet required',
+            'readonly'             => '0',
+            'homepage_alert'       => '',
+            'show_registry'        => '1',
+            'registry_label'       => 'Registry',
+            'registry_checkin'     => '1',
+            'registry_statuses'    => 'OK, Need Help, Checking In',
+            'registry_fields'      => _rf(['skills']),
             'registry_found_person'=> '1',
-            'registry_shelter'    => '0',
-            'shelter_name'        => '',
-            'shelter_capacity'    => '0',
-            'show_chat'           => '1',
-            'show_forum'          => '1',
-            'forum_categories'    => $full_cats,
-            'show_files'          => '1',
-            'show_library'        => '1',
-            'show_maps'           => '1',
-            'show_calendar'       => '1',
+            'registry_shelter'     => '0',
+            'shelter_name'         => '',
+            'shelter_capacity'     => '0',
+            'show_chat'            => '1',
+            'show_forum'           => '1',
+            'forum_categories'     => $full_cats,
+            'show_files'           => '1',
+            'show_library'         => '1',
+            'show_maps'            => '1',
+            'show_calendar'        => '1',
         ],
         'event' => [
-            'instance_tagline'    => 'Event check-in and information hub',
-            'readonly'            => '0',
-            'homepage_alert'      => '',
-            'show_registry'       => '1',
-            'registry_label'      => 'Event Check-In',
-            'registry_checkin'    => '1',
-            'registry_statuses'   => 'Attending, Not Yet Arrived, Left Early',
-            'registry_skills'     => '0',
-            'registry_supplies'   => '0',
-            'registry_missing'    => '0',
+            'instance_tagline'     => 'Event check-in and information hub',
+            'readonly'             => '0',
+            'homepage_alert'       => '',
+            'show_registry'        => '1',
+            'registry_label'       => 'Event Check-In',
+            'registry_checkin'     => '1',
+            'registry_statuses'    => 'Attending, Not Yet Arrived, Left Early',
+            'registry_fields'      => _rf([]),
             'registry_found_person'=> '0',
-            'registry_shelter'    => '0',
-            'shelter_name'        => '',
-            'shelter_capacity'    => '0',
-            'show_chat'           => '1',
-            'show_forum'          => '1',
-            'forum_categories'    => $event_cats,
-            'show_files'          => '1',
-            'show_library'        => '0',
-            'show_maps'           => '1',
-            'show_calendar'       => '1',
+            'registry_shelter'     => '0',
+            'shelter_name'         => '',
+            'shelter_capacity'     => '0',
+            'show_chat'            => '1',
+            'show_forum'           => '1',
+            'forum_categories'     => $event_cats,
+            'show_files'           => '1',
+            'show_library'         => '0',
+            'show_maps'            => '1',
+            'show_calendar'        => '1',
         ],
         'sar' => [
-            'instance_tagline'    => 'Search & Rescue Operations',
-            'readonly'            => '0',
-            'homepage_alert'      => 'Search & Rescue Operation Active',
-            'show_registry'       => '1',
-            'registry_label'      => 'Registry',
-            'registry_checkin'    => '0',
-            'registry_statuses'   => 'OK, Need Help, Checking In',
-            'registry_skills'     => '0',
-            'registry_supplies'   => '0',
-            'registry_missing'    => '1',
+            'instance_tagline'     => 'Search & Rescue Operations',
+            'readonly'             => '0',
+            'homepage_alert'       => 'Search & Rescue Operation Active',
+            'show_registry'        => '1',
+            'registry_label'       => 'Registry',
+            'registry_checkin'     => '0',
+            'registry_statuses'    => 'OK, Need Help, Checking In',
+            'registry_fields'      => _rf([]),
             'registry_found_person'=> '1',
-            'registry_shelter'    => '0',
-            'shelter_name'        => '',
-            'shelter_capacity'    => '0',
-            'show_chat'           => '1',
-            'show_forum'          => '0',
-            'forum_categories'    => $sar_cats,
-            'show_files'          => '0',
-            'show_library'        => '0',
-            'show_maps'           => '1',
-            'show_calendar'       => '0',
+            'registry_shelter'     => '0',
+            'shelter_name'         => '',
+            'shelter_capacity'     => '0',
+            'show_chat'            => '1',
+            'show_forum'           => '0',
+            'forum_categories'     => $sar_cats,
+            'show_files'           => '0',
+            'show_library'         => '0',
+            'show_maps'            => '1',
+            'show_calendar'        => '0',
         ],
         'shelter' => [
-            'instance_tagline'    => 'Shelter check-in and management',
-            'readonly'            => '0',
-            'homepage_alert'      => '',
-            'show_registry'       => '1',
-            'registry_label'      => 'Shelter Check-In',
-            'registry_checkin'    => '1',
-            'registry_statuses'   => 'Checked In, Discharged, Transferred',
-            'registry_skills'     => '0',
-            'registry_supplies'   => '0',
-            'registry_missing'    => '0',
+            'instance_tagline'     => 'Shelter check-in and management',
+            'readonly'             => '0',
+            'homepage_alert'       => '',
+            'show_registry'        => '1',
+            'registry_label'       => 'Shelter Check-In',
+            'registry_checkin'     => '1',
+            'registry_statuses'    => 'Checked In, Discharged, Transferred',
+            'registry_fields'      => _rf(['bunk','dietary','next_of_kin']),
             'registry_found_person'=> '0',
-            'registry_shelter'    => '1',
-            'shelter_name'        => 'Shelter',
-            'shelter_capacity'    => '100',
-            'show_chat'           => '1',
-            'show_forum'          => '1',
-            'forum_categories'    => $event_cats,
-            'show_files'          => '1',
-            'show_library'        => '0',
-            'show_maps'           => '0',
-            'show_calendar'       => '1',
+            'registry_shelter'     => '1',
+            'shelter_name'         => 'Shelter',
+            'shelter_capacity'     => '100',
+            'show_chat'            => '1',
+            'show_forum'           => '1',
+            'forum_categories'     => $event_cats,
+            'show_files'           => '1',
+            'show_library'         => '0',
+            'show_maps'            => '0',
+            'show_calendar'        => '1',
         ],
         'kiosk' => [
-            'instance_tagline'    => 'Community information kiosk',
-            'readonly'            => '1',
-            'homepage_alert'      => '',
-            'show_registry'       => '0',
-            'registry_label'      => 'Registry',
-            'registry_checkin'    => '0',
-            'registry_statuses'   => 'OK, Need Help, Checking In',
-            'registry_skills'     => '0',
-            'registry_supplies'   => '0',
-            'registry_missing'    => '0',
+            'instance_tagline'     => 'Community information kiosk',
+            'readonly'             => '1',
+            'homepage_alert'       => '',
+            'show_registry'        => '0',
+            'registry_label'       => 'Registry',
+            'registry_checkin'     => '0',
+            'registry_statuses'    => 'OK, Need Help, Checking In',
+            'registry_fields'      => _rf([]),
             'registry_found_person'=> '0',
-            'registry_shelter'    => '0',
-            'shelter_name'        => '',
-            'shelter_capacity'    => '0',
-            'show_chat'           => '0',
-            'show_forum'          => '1',
-            'forum_categories'    => $full_cats,
-            'show_files'          => '0',
-            'show_library'        => '1',
-            'show_maps'           => '1',
-            'show_calendar'       => '1',
+            'registry_shelter'     => '0',
+            'shelter_name'         => '',
+            'shelter_capacity'     => '0',
+            'show_chat'            => '0',
+            'show_forum'           => '1',
+            'forum_categories'     => $full_cats,
+            'show_files'           => '0',
+            'show_library'         => '1',
+            'show_maps'            => '1',
+            'show_calendar'        => '1',
         ],
         'resource' => [
-            'instance_tagline'    => 'Community resource coordination hub',
-            'readonly'            => '0',
-            'homepage_alert'      => '',
-            'show_registry'       => '1',
-            'registry_label'      => 'Registry',
-            'registry_checkin'    => '1',
-            'registry_statuses'   => 'OK, Need Help, Checking In',
-            'registry_skills'     => '1',
-            'registry_supplies'   => '1',
-            'registry_missing'    => '0',
+            'instance_tagline'     => 'Community resource coordination hub',
+            'readonly'             => '0',
+            'homepage_alert'       => '',
+            'show_registry'        => '1',
+            'registry_label'       => 'Registry',
+            'registry_checkin'     => '1',
+            'registry_statuses'    => 'OK, Need Help, Checking In',
+            'registry_fields'      => _rf(['skills','have','need']),
             'registry_found_person'=> '0',
-            'registry_shelter'    => '0',
-            'shelter_name'        => '',
-            'shelter_capacity'    => '0',
-            'show_chat'           => '1',
-            'show_forum'          => '1',
-            'forum_categories'    => $res_cats,
-            'show_files'          => '1',
-            'show_library'        => '1',
-            'show_maps'           => '1',
-            'show_calendar'       => '1',
+            'registry_shelter'     => '0',
+            'shelter_name'         => '',
+            'shelter_capacity'     => '0',
+            'show_chat'            => '1',
+            'show_forum'           => '1',
+            'forum_categories'     => $res_cats,
+            'show_files'           => '1',
+            'show_library'         => '1',
+            'show_maps'            => '1',
+            'show_calendar'        => '1',
         ],
     ];
 }
