@@ -54,7 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
     $pw   = $_POST['password'] ?? '';
     $name = trim($_POST['reg_name'] ?? '');
 
-    if ($pw === ADMIN_PASS) {
+    $stored_hash = get_setting('admin_password_hash', '');
+if ($stored_hash ? password_verify($pw, $stored_hash) : ($pw === ADMIN_PASS)) {
         $_SESSION['admin']      = true;
         $_SESSION['admin_name'] = '(bootstrap)';
         rate_reset('admin_login');
@@ -178,6 +179,25 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $cdb->prepare('INSERT INTO events (title,event_date,event_time,location,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?)')
                 ->execute([$title, $date, $time, $loc, $notes, $_SESSION['admin_name'], time()]);
             $msg = 'Event added.';
+        }
+    }
+
+    // --- Change admin password ---
+    if ($act === 'change_password') {
+        $cur = $_POST['cur_pw'] ?? '';
+        $new = $_POST['new_pw'] ?? '';
+        $con = $_POST['con_pw'] ?? '';
+        $stored_hash = get_setting('admin_password_hash', '');
+        $cur_ok = $stored_hash ? password_verify($cur, $stored_hash) : ($cur === ADMIN_PASS);
+        if (!$cur_ok) {
+            $msg = 'Current password is incorrect.';
+        } elseif (strlen($new) < 6) {
+            $msg = 'New password must be at least 6 characters.';
+        } elseif ($new !== $con) {
+            $msg = 'New passwords do not match.';
+        } else {
+            set_setting('admin_password_hash', password_hash($new, PASSWORD_DEFAULT));
+            $msg = 'Password changed.';
         }
     }
 
@@ -989,6 +1009,22 @@ foreach ($simple_mods as [$key, $id, $label]):
 </div>
 
 </form>
+
+<!-- Change Password -->
+<details style="margin:16px 0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:0">
+  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F512; Change system password</summary>
+  <form method="post" style="padding:0 16px 16px">
+    <?= csrf_field() ?>
+    <input type="hidden" name="act" value="change_password">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <div style="flex:1;min-width:140px"><label class="field-label">Current password</label><input type="password" name="cur_pw" required></div>
+      <div style="flex:1;min-width:140px"><label class="field-label">New password</label><input type="password" name="new_pw" required minlength="6"></div>
+      <div style="flex:1;min-width:140px"><label class="field-label">Confirm new</label><input type="password" name="con_pw" required minlength="6"></div>
+    </div>
+    <button type="submit" class="btn" style="margin-top:12px;width:auto;padding:8px 20px">Update Password</button>
+    <div style="font-size:11px;color:#555;margin-top:8px">Registry admin users can always log in with their registry PIN regardless of this password.</div>
+  </form>
+</details>
 
 <!-- Quick Start Presets -->
 <details class="quick-start">
