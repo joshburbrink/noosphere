@@ -10,15 +10,7 @@ if (get_setting('show_registry','1')==='1') {
     $label = get_setting('registry_label', 'Registry');
     if (!$label) $label = 'Registry';
 
-    // Build description from active options
-    $reg_parts = [];
-    if (get_setting('registry_checkin','1')==='1')      $reg_parts[] = 'check in';
-    if (get_setting('registry_found_person','1')==='1') $reg_parts[] = 'found persons';
-    foreach (get_registry_fields() as $f) {
-        if ($f['enabled']) $reg_parts[] = strtolower($f['label']);
-    }
-    if (get_setting('registry_shelter','0')==='1')      $reg_parts[] = 'shelter tracking';
-    $desc = $reg_parts ? ucfirst(implode(', ', $reg_parts)) : 'Community registry';
+    $desc = get_registry_description();
 
     // Shelter capacity badge
     $cap_badge = '';

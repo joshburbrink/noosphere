@@ -95,6 +95,39 @@ function _default_forum_cats() {
     ];
 }
 
+// Returns the registry tile description — custom override if set, otherwise auto-generated
+function get_registry_description() {
+    $custom = get_setting('registry_description', '');
+    if ($custom !== '') return $custom;
+
+    $checkin = get_setting('registry_checkin','1') === '1';
+    $found   = get_setting('registry_found_person','1') === '1';
+    $shelter = get_setting('registry_shelter','0') === '1';
+    $enabled = array_column(array_filter(get_registry_fields(), function($f){ return $f['enabled']; }), 'key');
+
+    $has_skills   = in_array('skills',      $enabled);
+    $has_supply   = in_array('have',        $enabled) || in_array('need', $enabled);
+    $has_shelter_fields = in_array('bunk',  $enabled) || in_array('dietary', $enabled) || in_array('next_of_kin', $enabled);
+
+    if (!$checkin && $found)  return 'Report and track found persons';
+    if (!$checkin && !$found) return 'Community registry';
+
+    if ($shelter || $has_shelter_fields) {
+        $parts = ['Shelter check-in'];
+        if ($has_shelter_fields) $parts[] = 'room and dietary tracking';
+        if ($found) $parts[] = 'found person reports';
+        return implode(' · ', $parts);
+    }
+
+    $desc = 'Sign in and share your status';
+    $extras = [];
+    if ($has_skills) $extras[] = 'skills';
+    if ($has_supply) $extras[] = 'resources';
+    if ($extras) $desc .= ' — list ' . implode(' and ', $extras);
+    if ($found)  $desc .= ' · report found persons';
+    return $desc;
+}
+
 function _rf($enabled_keys) {
     $all = _default_registry_fields();
     foreach ($all as &$f) $f['enabled'] = in_array($f['key'], $enabled_keys);
@@ -114,6 +147,7 @@ function _presets() {
             'homepage_alert'       => '',
             'show_registry'        => '1',
             'registry_label'       => 'Registry',
+            'registry_description' => '',
             'registry_checkin'     => '1',
             'registry_statuses'    => 'OK, Need Help, Checking In',
             'registry_fields'      => _rf(['skills']),
@@ -219,6 +253,7 @@ function _presets() {
             'homepage_alert'       => '',
             'show_registry'        => '1',
             'registry_label'       => 'Registry',
+            'registry_description' => '',
             'registry_checkin'     => '1',
             'registry_statuses'    => 'OK, Need Help, Checking In',
             'registry_fields'      => _rf(['skills','have','need']),

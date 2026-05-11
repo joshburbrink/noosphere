@@ -170,7 +170,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- Settings: save all settings ---
     if ($act === 'save_settings') {
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
-                      'registry_label','registry_statuses','shelter_name','shelter_capacity'];
+                      'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
@@ -773,8 +773,12 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
       <span class="field-label" style="margin:0;flex:1;font-size:13px;color:#ccc">Tile label on homepage</span>
       <input type="text" name="registry_label" value="<?= esc(get_setting('registry_label','Registry')) ?>" placeholder="Registry" style="width:180px">
     </div>
+    <div style="margin-top:8px">
+      <label class="field-label">Tile description <span style="color:#555;font-weight:normal">— leave blank to auto-generate from enabled options</span></label>
+      <input type="text" name="registry_description" value="<?= esc(get_setting('registry_description','')) ?>" placeholder="Auto: Sign in and share your status — list skills">
+    </div>
 
-    <div class="sub-row">
+    <div class="sub-row" style="margin-top:10px">
       <input type="checkbox" class="sub-toggle" id="t_checkin" name="registry_checkin" <?= get_setting('registry_checkin','1')==='1'?'checked':'' ?>>
       <label for="t_checkin">Check-In form</label>
     </div>
