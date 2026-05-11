@@ -107,8 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photo    = save_photo('photo');
         $extra_json = ($entry_type === 'checkin') ? collect_extra_fields() : '{}';
 
-        if (!$name || !$location || strlen($pin) < 4) {
-            $error = 'Name, location, and a 4+ digit PIN are required.';
+        if (!$name || ($loc_required && !$location) || strlen($pin) < 4) {
+            $error = 'Name' . ($loc_required ? ', location,' : '') . ' and a 4+ digit PIN are required.';
         } else {
             $pin_hash = password_hash($pin, PASSWORD_DEFAULT);
             $now = time();
@@ -163,7 +163,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $filter = $_GET['filter'] ?? 'all';
 $search = trim($_GET['q'] ?? '');
 $where  = '1=1';
-if ($filter === 'help')         $where .= " AND status='Need Help'";
+$loc_required = get_setting('registry_location_required','1') === '1';
+$help_status_val = '';
+foreach (get_status_options() as $so) {
+    if (stripos($so, 'help') !== false) { $help_status_val = $so; break; }
+}
+$has_help_status = $help_status_val !== '';
+if ($filter === 'help' && $has_help_status) $where .= " AND status='" . SQLite3::escapeString($help_status_val) . "'";
 if ($filter === 'found_person') $where .= " AND entry_type='found_person'";
 if ($filter === 'checkin')      $where .= " AND (entry_type='checkin' OR entry_type IS NULL)";
 if ($filter === 'children')     $where .= " AND is_child=1";
@@ -183,7 +189,7 @@ if ($search) {
 $all        = [];
 while ($r = $res->fetchArray(SQLITE3_ASSOC)) $all[] = $r;
 $total      = $db->querySingle("SELECT COUNT(*) FROM registry");
-$need_help  = $db->querySingle("SELECT COUNT(*) FROM registry WHERE status='Need Help'");
+$need_help  = $has_help_status ? $db->querySingle("SELECT COUNT(*) FROM registry WHERE status='" . SQLite3::escapeString($help_status_val) . "'") : 0;
 $children   = $db->querySingle("SELECT COUNT(*) FROM registry WHERE is_child=1");
 $fnd_person = $db->querySingle("SELECT COUNT(*) FROM registry WHERE entry_type='found_person'");
 
@@ -282,7 +288,7 @@ function ago($ts) {
   </div>
   <div class="stats">
     <div><span><?= $total ?></span> total</div>
-    <div><span style="color:<?= $need_help > 0 ? 'var(--accent)' : 'var(--green)' ?>"><?= $need_help ?></span> need help</div>
+    <?php if ($has_help_status): ?><div><span style="color:<?= $need_help > 0 ? 'var(--accent)' : 'var(--green)' ?>"><?= $need_help ?></span> need help</div><?php endif; ?>
     <?php if ($children > 0): ?><div><span style="color:#f39c12"><?= $children ?></span> children</div><?php endif; ?>
     <?php if ($fnd_person > 0): ?><div><span style="color:#4a9eff"><?= $fnd_person ?></span> found persons</div><?php endif; ?>
     <?php if (!empty($_SESSION['reg_admin'])): ?><div><span style="color:#f39c12">Admin mode</span></div><?php endif; ?>
@@ -331,8 +337,8 @@ function ago($ts) {
             </div>
           </div>
 
-          <label id="loc-label">Location *</label>
-          <input type="text" name="location" value="<?= esc($edit_row['location'] ?? '') ?>" required id="loc-field" placeholder="123 Oak St / Shelter B / Near the dam">
+          <label id="loc-label">Location <?= $loc_required ? '*' : '' ?></label>
+          <input type="text" name="location" value="<?= esc($edit_row['location'] ?? '') ?>" <?= $loc_required ? 'required' : '' ?> id="loc-field" placeholder="123 Oak St / Shelter B / Near the dam">
 
           <div id="status-section">
             <label>Status</label>
@@ -396,8 +402,12 @@ function ago($ts) {
       <div class="filters">
         <a href="/registry/"                           class="<?= $filter==='all'?'active':'' ?>">All (<?= $total ?>)</a>
         <a href="/registry/?filter=checkin"            class="<?= $filter==='checkin'?'active':'' ?>">Check-ins</a>
+        <?php if ($has_help_status): ?>
         <a href="/registry/?filter=help"               class="<?= $filter==='help'?'active':'' ?>">Need Help (<?= $need_help ?>)</a>
+        <?php endif; ?>
+        <?php if ($children > 0): ?>
         <a href="/registry/?filter=children"           class="<?= $filter==='children'?'active':'' ?>">Children (<?= $children ?>)</a>
+        <?php endif; ?>
         <?php if ($fnd_person): ?>
         <a href="/registry/?filter=found_person"       class="<?= $filter==='found_person'?'active':'' ?>">Found Persons (<?= $fnd_person ?>)</a>
         <?php endif; ?>
@@ -487,8 +497,9 @@ function ago($ts) {
 </div>
 
 <script>
+var locRequired = <?= $loc_required ? 'true' : 'false' ?>;
 var typeLabels = {
-  checkin:      { name:'Your Name *',               loc:'Where can you be found? *',    nameHint:'Jane Smith' },
+  checkin:      { name:'Your Name *', loc:'Where can you be found?' + (locRequired ? ' *' : ''), nameHint:'Jane Smith' },
   found_person: { name:"Person's name (or Unknown)", loc:'Where was this person found?', nameHint:'Unknown' }
 };
 function setType(t) {
@@ -497,6 +508,7 @@ function setType(t) {
   document.getElementById('name-label').textContent = lbl.name;
   document.getElementById('name-field').placeholder = lbl.nameHint;
   document.getElementById('loc-label').textContent  = lbl.loc;
+  document.getElementById('loc-field').required = (t !== 'checkin') || locRequired;
   document.getElementById('checkin-section').style.display = (t === 'checkin') ? '' : 'none';
   document.getElementById('status-section').style.display  = (t === 'checkin') ? '' : 'none';
   document.querySelectorAll('.type-tab').forEach(function(el) {

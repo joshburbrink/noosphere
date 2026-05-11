@@ -115,18 +115,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $body  = trim($_POST['body']  ?? '');
         $post_cat = $_POST['cat'];
 
-        // Announcements require admin
         if ($post_cat === 'announcements' && !$is_admin_post) {
             $error_msg = 'Posting to Announcements requires an admin PIN.';
+        } elseif (!$reg) {
+            $error_msg = 'You must be signed in to the registry to post. Enter your registry name and PIN.';
         } elseif ($title && $body) {
             $now = time();
             $db->prepare('INSERT INTO threads (category,title,author,reg_status,reg_location,created_at,last_at) VALUES(?,?,?,?,?,?,?)')
-               ->execute([$post_cat, $title, $reg ? $reg['name'] : $author,
-                          $reg ? $reg['status'] : null, $reg ? $reg['location'] : null, $now, $now]);
+               ->execute([$post_cat, $title, $reg['name'],
+                          $reg['status'], $reg['location'], $now, $now]);
             $new_tid = $db->lastInsertId();
             $db->prepare('INSERT INTO posts (thread_id,author,body,reg_status,reg_location,created_at) VALUES(?,?,?,?,?,?)')
-               ->execute([$new_tid, $reg ? $reg['name'] : $author, $body,
-                          $reg ? $reg['status'] : null, $reg ? $reg['location'] : null, $now]);
+               ->execute([$new_tid, $reg['name'], $body,
+                          $reg['status'], $reg['location'], $now]);
             header('Location: /forum/?view=thread&thread=' . $new_tid);
             exit;
         }
@@ -134,11 +135,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'reply' && $tid && $author) {
         $body = trim($_POST['body'] ?? '');
-        if ($body) {
+        if (!$reg) {
+            $error_msg = 'You must be signed in to the registry to post. Enter your registry name and PIN.';
+        } elseif ($body) {
             $now = time();
             $db->prepare('INSERT INTO posts (thread_id,author,body,reg_status,reg_location,created_at) VALUES(?,?,?,?,?,?)')
-               ->execute([$tid, $reg ? $reg['name'] : $author, $body,
-                          $reg ? $reg['status'] : null, $reg ? $reg['location'] : null, $now]);
+               ->execute([$tid, $reg['name'], $body,
+                          $reg['status'], $reg['location'], $now]);
             $db->prepare('UPDATE threads SET reply_count=reply_count+1, last_at=? WHERE id=?')->execute([$now, $tid]);
             header('Location: /forum/?view=thread&thread=' . $tid . '#bottom');
             exit;
@@ -338,8 +341,8 @@ textarea { resize:vertical; min-height:80px; }
       <input type="hidden" name="act" value="reply">
       <?= csrf_field() ?>
       <div class="form-row">
-        <div><label>Your name</label><input type="text" name="author" required maxlength="60" value="<?= esc($_SESSION['fname'] ?? '') ?>"></div>
-        <div><label>Registry PIN <span class="pin-note">(optional — adds status badge)</span></label><input type="password" name="pin" placeholder="Leave blank to post as guest"></div>
+        <div><label>Registry name</label><input type="text" name="author" required maxlength="60" value="<?= esc($_SESSION['fname'] ?? '') ?>" placeholder="As entered in the Registry"></div>
+        <div><label>Registry PIN <span class="pin-note">(required)</span></label><input type="password" name="pin" required placeholder="Your registry PIN"></div>
       </div>
       <div style="margin-bottom:10px"><label>Reply</label><textarea name="body" required maxlength="2000"></textarea></div>
       <button type="submit" class="btn">Post Reply</button>
@@ -358,8 +361,8 @@ textarea { resize:vertical; min-height:80px; }
       <input type="hidden" name="act" value="new_thread">
       <?= csrf_field() ?>
       <div class="form-row">
-        <div><label>Your name</label><input type="text" name="author" required maxlength="60"></div>
-        <div><label>Registry PIN <span class="pin-note">(optional<?= $c === 'announcements' ? ' — admin PIN required for Announcements' : '' ?>)</span></label><input type="password" name="pin" placeholder="Leave blank to post as guest"></div>
+        <div><label>Registry name</label><input type="text" name="author" required maxlength="60" placeholder="As entered in the Registry"></div>
+        <div><label>Registry PIN <?php if ($c === 'announcements'): ?><span class="pin-note">(admin PIN required)</span><?php else: ?><span class="pin-note">(required)</span><?php endif; ?></label><input type="password" name="pin" required placeholder="Your registry PIN"></div>
       </div>
       <div style="margin-bottom:10px">
         <label>Category</label>

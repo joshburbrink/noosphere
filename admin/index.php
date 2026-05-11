@@ -7,6 +7,38 @@ define('ADMIN_PASS', 'admin'); // fallback bootstrap password
 define('FORUM_DB',    '/var/lib/noosphere/forum.db');
 define('FILES_DIR',   '/var/lib/noosphere/files/');
 define('PHOTOS_DIR',  '/var/lib/noosphere/registry_photos/');
+define('ZIM_DIR',     '/var/lib/kiwix/zim/');
+define('ZIM_DIS_DIR', '/var/lib/kiwix/zim/disabled/');
+define('KIWIX_LIB',   '/var/lib/kiwix/library.xml');
+
+function get_zim_info() {
+    $lib = [];
+    $xml = @simplexml_load_file(KIWIX_LIB);
+    if ($xml) {
+        foreach ($xml->book as $book) {
+            $fname = basename((string)$book['path']);
+            $lib[$fname] = ['id' => (string)$book['id'], 'title' => (string)$book['title']];
+        }
+    }
+    $zims = [];
+    foreach (glob(ZIM_DIR . '*.zim') ?: [] as $p) {
+        $f = basename($p);
+        $zims[$f] = ['path'=>$p,'enabled'=>true,'size'=>filesize($p),'title'=>$lib[$f]['title']??'','id'=>$lib[$f]['id']??''];
+    }
+    foreach (is_dir(ZIM_DIS_DIR) ? (glob(ZIM_DIS_DIR . '*.zim') ?: []) : [] as $p) {
+        $f = basename($p);
+        $zims[$f] = ['path'=>$p,'enabled'=>false,'size'=>filesize($p),'title'=>$lib[$f]['title']??'','id'=>$lib[$f]['id']??''];
+    }
+    ksort($zims);
+    return $zims;
+}
+
+function zim_display_name($fname, $title) {
+    if ($title) return $title;
+    $n = preg_replace('/[_-](\d{4}-\d{2})\.zim$/', '', $fname);
+    $n = preg_replace('/_(en|all|maxi|nopic|mini)/', ' ', $n);
+    return ucwords(trim(str_replace('_', ' ', $n)));
+}
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 if (isset($_POST['logout'])) {
@@ -157,6 +189,40 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = 'Event deleted.';
     }
 
+    // --- Kiwix: toggle ZIM module ---
+    if ($act === 'kiwix_toggle') {
+        $zim    = $_POST['zim'] ?? '';
+        $enable = ($_POST['enable'] ?? '0') === '1';
+        if (!preg_match('/^[a-zA-Z0-9._\-]+\.zim$/', $zim)) {
+            $msg = 'Invalid filename.';
+        } else {
+            $src = $enable ? ZIM_DIS_DIR . $zim : ZIM_DIR . $zim;
+            $dst = $enable ? ZIM_DIR . $zim      : ZIM_DIS_DIR . $zim;
+            if (file_exists($src)) {
+                if (!$enable && !is_dir(ZIM_DIS_DIR)) mkdir(ZIM_DIS_DIR, 0755, true);
+                rename($src, $dst);
+                if ($enable) {
+                    shell_exec('kiwix-manage ' . escapeshellarg(KIWIX_LIB) . ' add ' . escapeshellarg($dst) . ' 2>&1');
+                } else {
+                    $xml = @simplexml_load_file(KIWIX_LIB);
+                    if ($xml) {
+                        foreach ($xml->book as $book) {
+                            if (basename((string)$book['path']) === $zim) {
+                                shell_exec('kiwix-manage ' . escapeshellarg(KIWIX_LIB) . ' remove ' . escapeshellarg((string)$book['id']) . ' 2>&1');
+                                break;
+                            }
+                        }
+                    }
+                }
+                shell_exec('chown www-data:www-data ' . escapeshellarg(KIWIX_LIB));
+                shell_exec('systemctl restart kiwix 2>&1');
+                $msg = $enable ? 'Module enabled.' : 'Module disabled.';
+            } else {
+                $msg = 'ZIM file not found.';
+            }
+        }
+    }
+
     // --- Settings: apply quick-start preset ---
     if ($act === 'apply_preset') {
         $preset = $_POST['preset'] ?? '';
@@ -174,7 +240,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
-        $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_shelter',
+        $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_calendar','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
@@ -786,6 +852,10 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
       <input type="checkbox" class="sub-toggle" id="t_found" name="registry_found_person" <?= get_setting('registry_found_person','1')==='1'?'checked':'' ?>>
       <label for="t_found">Found Person report</label>
     </div>
+    <div class="sub-row">
+      <input type="checkbox" class="sub-toggle" id="t_loc_req" name="registry_location_required" <?= get_setting('registry_location_required','1')==='1'?'checked':'' ?>>
+      <label for="t_loc_req">Location field is required <span style="color:#555;font-weight:normal">— uncheck for events where location doesn't apply</span></label>
+    </div>
 
     <div class="field-label" style="margin-top:14px">Status options <span style="color:#555;font-weight:normal">— comma-separated, shown in the status dropdown</span></div>
     <input type="text" name="registry_statuses" value="<?= esc(get_setting('registry_statuses','OK, Need Help, Checking In')) ?>" placeholder="OK, Need Help, Checking In" style="margin-bottom:4px">
@@ -867,11 +937,45 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
 $simple_mods = [
     ['show_chat',     't_chat',     'Chat'],
     ['show_files',    't_files',    'Files'],
-    ['show_library',  't_library',  'Library (Kiwix)'],
     ['show_maps',     't_maps',     'Maps'],
     ['show_calendar', 't_calendar', 'Calendar'],
 ];
-foreach ($simple_mods as [$key, $id, $label]):
+<!-- Library (Kiwix) -->
+<div class="mod-section">
+  <div class="mod-header" onclick="modToggle('library',document.getElementById('t_library').checked)" style="cursor:default">
+    <input type="checkbox" class="mod-toggle" id="t_library" name="show_library" <?= get_setting('show_library','1')==='1'?'checked':'' ?> onchange="modToggle('library',this.checked)">
+    <label for="t_library" style="cursor:pointer">Library (Kiwix)</label>
+  </div>
+  <div class="mod-body<?= get_setting('show_library','1')!=='1'?' off':'' ?>" id="body_library" style="padding:12px 0 4px">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Enable or disable individual content modules. Changes take effect immediately.</div>
+    <?php
+    $all_zims = get_zim_info();
+    if (!$all_zims):
+    ?>
+      <div style="font-size:12px;color:#555;padding:8px 0">No ZIM files found in <?= ZIM_DIR ?></div>
+    <?php else: foreach ($all_zims as $fname => $z):
+      $display = zim_display_name($fname, $z['title']);
+      $size_mb  = round($z['size'] / 1048576);
+      $enabled  = $z['enabled'];
+    ?>
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1a1a2e">
+        <span style="flex:1;font-size:13px;color:<?= $enabled ? '#e0e0e0' : '#555' ?>"><?= esc($display) ?></span>
+        <span style="font-size:11px;color:#555;flex-shrink:0"><?= $size_mb ?> MB</span>
+        <form method="post" style="flex-shrink:0">
+          <?= csrf_field() ?>
+          <input type="hidden" name="act" value="kiwix_toggle">
+          <input type="hidden" name="zim" value="<?= esc($fname) ?>">
+          <input type="hidden" name="enable" value="<?= $enabled ? '0' : '1' ?>">
+          <button type="submit" style="padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid <?= $enabled ? '#3a2a2a' : '#1a3a1a' ?>;background:none;color:<?= $enabled ? '#e94560' : '#2ecc71' ?>;cursor:pointer">
+            <?= $enabled ? 'Disable' : 'Enable' ?>
+          </button>
+        </form>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+</div>
+
+<?php foreach ($simple_mods as [$key, $id, $label]):
 ?>
 <div class="mod-section">
   <div class="mod-header">
