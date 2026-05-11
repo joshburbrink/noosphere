@@ -182,6 +182,30 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- Change Linux system credentials ---
+    if ($act === 'change_linux_pw') {
+        $target   = $_POST['linux_target'] ?? '';  // 'user' or 'root'
+        $new_pw   = $_POST['linux_new_pw']   ?? '';
+        $con_pw   = $_POST['linux_con_pw']   ?? '';
+        $linux_user = trim(shell_exec("awk -F: '\$3==1000{print \$1}' /etc/passwd | head -1") ?: 'cogitator');
+        $change_user = ($target === 'root') ? 'root' : $linux_user;
+        if (strlen($new_pw) < 6) {
+            $msg = 'Password must be at least 6 characters.';
+        } elseif ($new_pw !== $con_pw) {
+            $msg = 'Passwords do not match.';
+        } else {
+            $proc = proc_open(
+                'sudo /usr/local/bin/noosphere-chpasswd.sh ' . escapeshellarg($change_user),
+                [0 => ['pipe','r'], 1 => ['pipe','w'], 2 => ['pipe','w']],
+                $pipes
+            );
+            fwrite($pipes[0], $new_pw . "\n");
+            fclose($pipes[0]);
+            proc_close($proc);
+            $msg = 'Linux ' . esc($change_user) . ' password updated.';
+        }
+    }
+
     // --- Change admin password ---
     if ($act === 'change_password') {
         $cur = $_POST['cur_pw'] ?? '';
@@ -1010,9 +1034,34 @@ foreach ($simple_mods as [$key, $id, $label]):
 
 </form>
 
-<!-- Change Password -->
+<!-- System Credentials -->
+<?php $linux_user = trim(shell_exec("awk -F: '\$3==1000{print \$1}' /etc/passwd | head -1") ?: 'cogitator'); ?>
 <details style="margin:16px 0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:0">
-  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F512; Change system password</summary>
+  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F5A5; Linux system credentials</summary>
+  <div style="padding:0 16px 16px">
+    <div style="font-size:11px;color:#555;margin:10px 0 12px">Current Linux user: <strong style="color:#aaa"><?= esc($linux_user) ?></strong> — change passwords for SSH/console login. These persist when cloning the drive.</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <?php foreach ([['user', "User ($linux_user)"], ['root', 'Root']] as [$target, $label]): ?>
+      <form method="post" style="flex:1;min-width:200px;background:#111126;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+        <?= csrf_field() ?>
+        <input type="hidden" name="act" value="change_linux_pw">
+        <input type="hidden" name="linux_target" value="<?= $target ?>">
+        <div style="font-size:12px;font-weight:bold;color:#aaa;margin-bottom:10px"><?= $label ?></div>
+        <label class="field-label">New password</label>
+        <input type="password" name="linux_new_pw" required minlength="6" style="margin-bottom:8px">
+        <label class="field-label">Confirm</label>
+        <input type="password" name="linux_con_pw" required minlength="6" style="margin-bottom:10px">
+        <button type="submit" class="btn" style="width:100%;margin-top:0;padding:7px">Set <?= $label ?> Password</button>
+      </form>
+      <?php endforeach; ?>
+    </div>
+    <div style="font-size:11px;color:#555;margin-top:10px">To rename the Linux user or set credentials before imaging, run: <code style="color:#aaa">sudo setup-credentials.sh</code></div>
+  </div>
+</details>
+
+<!-- Change Admin Panel Password -->
+<details style="margin:16px 0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:0">
+  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F512; Change admin panel password</summary>
   <form method="post" style="padding:0 16px 16px">
     <?= csrf_field() ?>
     <input type="hidden" name="act" value="change_password">
