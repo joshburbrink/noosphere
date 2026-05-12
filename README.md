@@ -26,7 +26,8 @@ Tested on HP 3105m. Any x86_64 laptop with 2GB+ RAM will work.
 - **Offline Library** — Wikipedia, WikiMed, iFixit repair guides, and other ZIM content via Kiwix
 - **Topo PDFs** — USGS topographic maps for local counties
 - **Calendar** — shared event calendar
-- **Admin Panel** — configure all features, apply deployment presets, monitor system resources, manage bans
+- **Admin Panel** — 6-tab control panel (Dashboard, Network, Community, Content, System, Settings) with collapsible panels, deployment presets, system monitoring, ban management, DB backup
+- **Registration controls** — optionally require registration to post/chat/upload; optionally disable public self-registration (admin-managed entries only)
 - **Captive Portal** — anyone connecting to the WiFi is automatically redirected to the hub
 - **No accounts required** — no signup, no passwords for basic access; optional PIN for registry profile linking
 - **No internet required** — fully self-contained
@@ -156,9 +157,21 @@ Plug an ethernet cable from the laptop's `eno1` port into any LAN port on the GL
 
 ## Admin Access
 
+- Click the **Admin** button at the bottom of the homepage
 - From a keyboard: type `aaa` quickly on the homepage
 - From a phone or tablet: navigate to `/admin/` directly
-- Admin wiki with full operator documentation available at `/admin/wiki/`
+- Operator documentation (setup, settings reference, troubleshooting) at `/admin/wiki.php`
+
+---
+
+## Known Issues
+
+See [GitHub Issues](https://github.com/joshburbrink/noosphere/issues) for the full tracker.
+
+| # | Summary |
+|---|---------|
+| [#1](https://github.com/joshburbrink/noosphere/issues/1) | Map pins cannot be placed in desktop/mouse mode — `index.html` is served instead of the full-featured `index.php` |
+| [#2](https://github.com/joshburbrink/noosphere/issues/2) | Map street names not shown — VectorGrid label layer not yet implemented |
 
 ---
 
