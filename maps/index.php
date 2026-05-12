@@ -95,7 +95,6 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
   <div class="theme-bar">
     <button class="theme-btn" data-theme="dark"  onclick="setTheme('dark')">Dark</button>
     <button class="theme-btn" data-theme="light" onclick="setTheme('light')">Light</button>
-    <button class="theme-btn" data-theme="topo"  onclick="setTheme('topo')">Topo</button>
     <button class="theme-btn" data-theme="hc"    onclick="setTheme('hc')">Hi-Vis</button>
   </div>
   <a class="topo-link" href="/maps/topo/">Topo PDFs →</a>
@@ -158,25 +157,9 @@ var THEMES = {
         bldg: '#d8cce8',  bldgB: '#c0b0d0',
         bdy: '#c0b8d0',
     },
-    topo: {
-        mapBg: '#e8e0c8',
-        land:  '#e8e0c8', water: '#9ab8d0', waterway: '#6898b8',
-        park: '#b0c890',  res: '#e0d8c0',   comm: '#d8d0b0', indus: '#d0c8a8',
-        road: '#b09878',  major: '#c0a050', hwy: '#c88020',
-        bldg: '#c0a880',  bldgB: '#a89060',
-        bdy: '#a08060',
-    },
-    hc: {
-        mapBg: '#000000',
-        land:  '#000000', water: '#0033cc', waterway: '#0055ff',
-        park: '#003300',  res: '#080808',   comm: '#080008', indus: '#080600',
-        road: '#555555',  major: '#cccc00', hwy: '#ffff00',
-        bldg: '#220022',  bldgB: '#ff00ff',
-        bdy: '#00cccc',
-    },
 };
 
-var currentTheme = localStorage.getItem('map_theme') || 'dark';
+var currentTheme = localStorage.getItem('map_theme') || 'dark'; if (currentTheme === 'topo') currentTheme = 'dark';
 
 // ── Map ───────────────────────────────────────────────────────────────────────
 var map = L.map('map', {
