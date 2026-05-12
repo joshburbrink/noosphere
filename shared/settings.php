@@ -163,6 +163,8 @@ function _presets() {
             'show_library'         => '1',
             'show_maps'            => '1',
             'show_calendar'        => '1',
+            'registry_allow_self_register' => '1',
+            'require_registration'        => '0',
         ],
         'event' => [
             'instance_tagline'          => 'Event check-in and information hub',
@@ -185,6 +187,8 @@ function _presets() {
             'show_library'         => '0',
             'show_maps'            => '1',
             'show_calendar'        => '1',
+            'registry_allow_self_register' => '1',
+            'require_registration'        => '0',
         ],
         'sar' => [
             'instance_tagline'          => 'Search & Rescue Operations',
@@ -207,6 +211,8 @@ function _presets() {
             'show_library'         => '0',
             'show_maps'            => '1',
             'show_calendar'        => '0',
+            'registry_allow_self_register' => '1',
+            'require_registration'        => '0',
         ],
         'shelter' => [
             'instance_tagline'          => 'Shelter check-in and management',
@@ -229,6 +235,8 @@ function _presets() {
             'show_library'         => '0',
             'show_maps'            => '0',
             'show_calendar'        => '1',
+            'registry_allow_self_register' => '1',
+            'require_registration'        => '1',
         ],
         'kiosk' => [
             'instance_tagline'          => 'Community information kiosk',
@@ -251,6 +259,8 @@ function _presets() {
             'show_library'         => '1',
             'show_maps'            => '1',
             'show_calendar'        => '1',
+            'registry_allow_self_register' => '0',
+            'require_registration'        => '0',
         ],
         'resource' => [
             'instance_tagline'          => 'Community resource coordination hub',
@@ -274,6 +284,8 @@ function _presets() {
             'show_library'         => '1',
             'show_maps'            => '1',
             'show_calendar'        => '1',
+            'registry_allow_self_register' => '1',
+            'require_registration'        => '0',
         ],
     ];
 }

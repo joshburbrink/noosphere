@@ -47,6 +47,16 @@ if ($action === 'verify' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($action === 'send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     if (is_readonly()) { header('Content-Type: application/json'); echo json_encode(['ok'=>false,'err'=>'readonly']); exit; }
+    if (get_setting('require_registration','0') === '1') {
+        $cname_post = trim($_POST['name'] ?? '');
+        $verified = !empty($_SESSION['cverified']) && ($_SESSION['cname'] ?? '') === $cname_post;
+        $reg_session = !empty($_SESSION['reg_name']) && strtolower($_SESSION['reg_name']) === strtolower($cname_post);
+        if (!$verified && !$reg_session) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok'=>false,'err'=>'You must be verified in the registry to chat. Click the "Verify" button to link your registry name.']);
+            exit;
+        }
+    }
     $name = trim($_POST['name'] ?? '');
     ban_check_or_die($name);
     $body = trim($_POST['body'] ?? '');

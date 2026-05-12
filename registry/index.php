@@ -93,6 +93,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'register') {
+        if (get_setting('registry_allow_self_register','1') !== '1' &&
+            empty($_SESSION['admin']) && empty($_SESSION['reg_admin'])) {
+            http_response_code(403);
+            $error = 'Self-registration is currently disabled.';
+            goto skip_register;
+        }
         ban_check_or_die();
         $entry_type = in_array($_POST['entry_type'] ?? '', ['checkin','found_person'])
                       ? $_POST['entry_type'] : 'checkin';
@@ -124,11 +130,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $s->execute();
             if ($entry_type === 'checkin') {
                 mark_registered($name);
+                $_SESSION['reg_name'] = $name;
                 $msg = 'Registered. Remember your PIN to update later.';
             } else {
                 $msg = 'Found person reported. Thank you.';
             }
         }
+        skip_register:;
     }
 
     if ($action === 'update') {
@@ -197,9 +205,11 @@ $need_help  = $has_help_status ? $db->querySingle("SELECT COUNT(*) FROM registry
 $children   = $db->querySingle("SELECT COUNT(*) FROM registry WHERE is_child=1");
 $fnd_person = $db->querySingle("SELECT COUNT(*) FROM registry WHERE entry_type='found_person'");
 
-$edit_id  = intval($_GET['edit'] ?? 0);
-$edit_row = $edit_id ? $db->querySingle("SELECT * FROM registry WHERE id=$edit_id", true) : null;
+$edit_id   = intval($_GET['edit'] ?? 0);
+$edit_row  = $edit_id ? $db->querySingle("SELECT * FROM registry WHERE id=$edit_id", true) : null;
 $entry_type_default = $_GET['type'] ?? 'checkin';
+$self_reg  = get_setting('registry_allow_self_register','1') === '1';
+$is_admin  = !empty($_SESSION['admin']) || !empty($_SESSION['reg_admin']);
 $reg_fields = get_registry_fields();
 
 function esc($s) { return htmlspecialchars($s ?? '', ENT_QUOTES); }
@@ -306,6 +316,7 @@ function ago($ts) {
   <div class="grid">
     <!-- FORM -->
     <div>
+      <?php if ($self_reg || $is_admin || $edit_row): ?>
       <div class="panel">
         <h2><?= $edit_row ? 'Update Entry' : 'Add Entry' ?></h2>
         <?php $cur_type = $edit_row['entry_type'] ?? $entry_type_default; ?>
@@ -399,6 +410,11 @@ function ago($ts) {
           <?php endif; ?>
         </form>
       </div>
+      <?php else: ?>
+      <div class="panel">
+        <div style="color:#888;font-size:13px;padding:8px 0">Registration is currently managed by administrators.</div>
+      </div>
+      <?php endif; ?>
     </div>
 
     <!-- LIST -->

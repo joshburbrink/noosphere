@@ -182,6 +182,86 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- External drive: mount ---
+    if ($act === 'ext_mount') {
+        $dev = $_POST['ext_device'] ?? '';
+        if (!preg_match('#^/dev/(sd[b-z][0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$#', $dev)) {
+            $msg = 'Invalid device.';
+        } else {
+            $out = shell_exec('sudo /usr/local/bin/external-mount.sh ' . escapeshellarg($dev) . ' 2>&1');
+            if (strpos($out, 'Error') !== false) {
+                $msg = trim($out);
+            } else {
+                set_setting('ext_drive_mounted', '1');
+                set_setting('ext_drive_device', $dev);
+                set_setting('ext_zims_loaded', '[]');
+                $msg = 'Drive mounted.';
+            }
+        }
+    }
+
+    // --- External drive: unmount ---
+    if ($act === 'ext_umount') {
+        // Unregister any loaded external ZIMs from Kiwix library first
+        $ext_zims = json_decode(get_setting('ext_zims_loaded','[]'), true) ?: [];
+        $xml = @simplexml_load_file('/var/lib/kiwix/library.xml');
+        if ($xml && $ext_zims) {
+            foreach ($xml->book as $book) {
+                $path = (string)$book['path'];
+                if (strpos($path, '/media/noosphere-ext/') === 0) {
+                    shell_exec('kiwix-manage /var/lib/kiwix/library.xml remove ' . escapeshellarg((string)$book['id']) . ' 2>&1');
+                }
+            }
+            shell_exec('chown www-data:www-data /var/lib/kiwix/library.xml');
+            shell_exec('systemctl restart kiwix 2>&1');
+        }
+        shell_exec('sudo /usr/local/bin/external-umount.sh 2>&1');
+        set_setting('ext_drive_mounted', '0');
+        set_setting('ext_drive_device', '');
+        set_setting('ext_zims_loaded', '[]');
+        $msg = 'Drive unmounted.';
+    }
+
+    // --- External drive: load ZIM into Kiwix ---
+    if ($act === 'ext_load_zim') {
+        $zim = $_POST['ext_zim'] ?? '';
+        if (!preg_match('/^[a-zA-Z0-9._\-]+\.zim$/', $zim)) {
+            $msg = 'Invalid ZIM filename.';
+        } else {
+            $out = shell_exec('sudo /usr/local/bin/external-load-zim.sh ' . escapeshellarg($zim) . ' 2>&1');
+            if (strpos($out ?? '', 'Error') !== false) {
+                $msg = trim($out);
+            } else {
+                $loaded = json_decode(get_setting('ext_zims_loaded','[]'), true) ?: [];
+                if (!in_array($zim, $loaded)) $loaded[] = $zim;
+                set_setting('ext_zims_loaded', json_encode($loaded));
+                $msg = 'ZIM loaded: ' . esc($zim);
+            }
+        }
+    }
+
+    // --- External drive: unload ZIM from Kiwix ---
+    if ($act === 'ext_unload_zim') {
+        $zim = $_POST['ext_zim'] ?? '';
+        if (preg_match('/^[a-zA-Z0-9._\-]+\.zim$/', $zim)) {
+            $zim_path = '/media/noosphere-ext/kiwix/' . $zim;
+            $xml = @simplexml_load_file('/var/lib/kiwix/library.xml');
+            if ($xml) {
+                foreach ($xml->book as $book) {
+                    if ((string)$book['path'] === $zim_path) {
+                        shell_exec('kiwix-manage /var/lib/kiwix/library.xml remove ' . escapeshellarg((string)$book['id']) . ' 2>&1');
+                        shell_exec('chown www-data:www-data /var/lib/kiwix/library.xml');
+                        shell_exec('systemctl restart kiwix 2>&1');
+                        break;
+                    }
+                }
+            }
+            $loaded = json_decode(get_setting('ext_zims_loaded','[]'), true) ?: [];
+            set_setting('ext_zims_loaded', json_encode(array_values(array_diff($loaded, [$zim]))));
+            $msg = 'ZIM unloaded.';
+        }
+    }
+
     // --- Clear analytics ---
     if ($act === 'clear_stats') {
         try {
@@ -341,6 +421,82 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = 'Settings saved.';
     }
 
+    // --- Post announcement to forum ---
+    if ($act === 'post_announcement') {
+        $ann_title = trim($_POST['ann_title'] ?? '');
+        $ann_body  = trim($_POST['ann_body']  ?? '');
+        if ($ann_title && $ann_body) {
+            try {
+                $fdb    = new PDO('sqlite:' . FORUM_DB);
+                $author = $_SESSION['admin_name'] ?? 'Admin';
+                $now    = time();
+                $fdb->prepare('INSERT INTO threads (category,title,author,pinned,created_at,last_at,reply_count) VALUES(?,?,?,1,?,?,0)')
+                    ->execute(['announcements', $ann_title, $author, $now, $now]);
+                $tid = $fdb->lastInsertId();
+                $fdb->prepare('INSERT INTO posts (thread_id,author,body,created_at) VALUES(?,?,?,?)')
+                    ->execute([$tid, $author, $ann_body, $now]);
+                $fdb->prepare('UPDATE threads SET reply_count=1 WHERE id=?')->execute([$tid]);
+                $msg = 'Announcement posted.';
+            } catch (Exception $e) { $msg = 'Forum database error.'; }
+        }
+    }
+
+    // --- Broadcast message to chat ---
+    if ($act === 'broadcast_chat') {
+        $bcast = trim($_POST['broadcast_body'] ?? '');
+        if ($bcast && mb_strlen($bcast) <= 1000) {
+            try {
+                $cdb    = new PDO('sqlite:/var/lib/noosphere/chat.db');
+                $author = '📢 ' . ($_SESSION['admin_name'] ?? 'Admin');
+                $cdb->exec("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, body TEXT NOT NULL, reg_status TEXT, reg_location TEXT, created_at INTEGER NOT NULL)");
+                $cdb->prepare('INSERT INTO messages (name,body,created_at) VALUES(?,?,?)')
+                    ->execute([$author, $bcast, time()]);
+                $msg = 'Message broadcast to chat.';
+            } catch (Exception $e) { $msg = 'Chat database error.'; }
+        }
+    }
+
+    // --- Delete registry photo ---
+    if ($act === 'del_photo') {
+        $fname = basename($_POST['fname'] ?? '');
+        $path  = realpath(PHOTOS_DIR . $fname);
+        if ($path && strpos($path, realpath(PHOTOS_DIR)) === 0 && file_exists($path)) {
+            unlink($path); $msg = 'Photo deleted.';
+        }
+    }
+
+    // --- Delete map marker ---
+    if ($act === 'del_marker') {
+        $mid = (int)($_POST['marker_id'] ?? 0);
+        if ($mid) {
+            try {
+                $mdb = new PDO('sqlite:/var/lib/noosphere/markers.db');
+                $mdb->prepare('DELETE FROM markers WHERE id=?')->execute([$mid]);
+                $msg = 'Marker deleted.';
+            } catch (Exception $e) {}
+        }
+    }
+
+    // --- Download DB backup ---
+    if ($act === 'backup_db') {
+        $zip_file = sys_get_temp_dir() . '/noosphere_backup_' . date('Ymd_His') . '.zip';
+        $zip = new ZipArchive();
+        if ($zip->open($zip_file, ZipArchive::CREATE) === true) {
+            foreach (['/var/lib/noosphere/registry.db','/var/lib/noosphere/settings.db',
+                      '/var/lib/noosphere/forum.db','/var/lib/noosphere/calendar.db',
+                      '/var/lib/noosphere/analytics.db'] as $db_path) {
+                if (file_exists($db_path)) $zip->addFile($db_path, basename($db_path));
+            }
+            $zip->close();
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="noosphere_backup_' . date('Ymd_His') . '.zip"');
+            header('Content-Length: ' . filesize($zip_file));
+            readfile($zip_file);
+            @unlink($zip_file);
+            exit;
+        }
+    }
+
     // --- Settings: reset instance ---
     if ($act === 'reset_instance') {
         $confirm = trim($_POST['reset_confirm'] ?? '');
@@ -379,6 +535,51 @@ function svc_status($name) {
     return trim(shell_exec("systemctl is-active " . escapeshellarg($name) . " 2>/dev/null") ?? '');
 }
 function esc($s) { return htmlspecialchars($s ?? '', ENT_QUOTES); }
+
+function get_connected_devices() {
+    $arp = shell_exec('arp -n 2>/dev/null') ?: '';
+    $devices = [];
+    foreach (explode("\n", $arp) as $line) {
+        if (preg_match('/^(\d+\.\d+\.\d+\.\d+)\s+\S+\s+([0-9a-f:]{17})\s+\S+\s+(\S+)/i', $line, $m)) {
+            $mac = strtoupper($m[2]);
+            if ($mac === '00:00:00:00:00:00') continue;
+            $devices[$mac] = ['ip'=>$m[1],'mac'=>$mac,'iface'=>$m[3],'hostname'=>''];
+        }
+    }
+    foreach (['/var/lib/misc/dnsmasq.leases','/var/lib/dnsmasq/dnsmasq.leases','/tmp/dnsmasq.leases'] as $lf) {
+        if (!file_exists($lf)) continue;
+        foreach (file($lf) as $line) {
+            $p = preg_split('/\s+/', trim($line));
+            if (count($p) >= 4) {
+                $mac  = strtoupper($p[1]);
+                $host = ($p[3] !== '*') ? $p[3] : '';
+                if (isset($devices[$mac]))  $devices[$mac]['hostname'] = $host;
+                elseif ($p[2] && $p[2] !== '0.0.0.0') $devices[$mac] = ['ip'=>$p[2],'mac'=>$mac,'iface'=>'','hostname'=>$host];
+            }
+        }
+        break;
+    }
+    return array_values($devices);
+}
+
+function get_iface_stats() {
+    $stats = [];
+    if (!file_exists('/proc/net/dev')) return $stats;
+    foreach (array_slice(file('/proc/net/dev'), 2) as $line) {
+        $p = preg_split('/\s+/', trim($line));
+        $iface = rtrim($p[0], ':');
+        if ($iface === 'lo') continue;
+        $stats[$iface] = ['rx'=>(int)$p[1], 'tx'=>(int)$p[9]];
+    }
+    return $stats;
+}
+
+function fmt_bytes($b) {
+    if ($b < 1024) return $b . ' B';
+    if ($b < 1048576) return round($b/1024,1) . ' KB';
+    if ($b < 1073741824) return round($b/1048576,1) . ' MB';
+    return round($b/1073741824,1) . ' GB';
+}
 
 $scripts = [
     ['name'=>'restart-wireless',  'file'=>'restart-wireless.sh',  'desc'=>'Restart wireless interface',          'runnable'=>true],
@@ -452,6 +653,27 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
 .tab.active { color:#e94560; border-color:#e94560; background:#1a1a2e; }
 .tab-content { display:none; }
 .tab-content.active { display:block; }
+.sub-tab-bar { display:flex; gap:2px; margin-bottom:18px; border-bottom:1px solid #2a2a4a; }
+.sub-tab { padding:6px 14px; font-size:12px; cursor:pointer; color:#666; border-radius:6px 6px 0 0; border:1px solid transparent; border-bottom:none; margin-bottom:-1px; }
+.sub-tab.active { color:#e0e0e0; background:#1a1a2e; border-color:#2a2a4a; }
+.sub-tab:hover:not(.active) { color:#aaa; }
+.sub-tab-content { display:none; }
+.sub-tab-content.active { display:block; }
+/* Collapsible panels */
+details.cpanel { background:#1a1a2e; border:1px solid #2a2a4a; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+details.cpanel > summary { padding:12px 16px; cursor:pointer; font-size:13px; font-weight:bold; color:#ccc; list-style:none; display:flex; align-items:center; justify-content:space-between; user-select:none; }
+details.cpanel > summary::-webkit-details-marker { display:none; }
+details.cpanel > summary::after { content:'▾'; font-size:11px; color:#555; transition:.15s; }
+details.cpanel[open] > summary::after { transform:rotate(180deg); }
+details.cpanel > summary .badge { font-size:10px; color:#888; font-weight:normal; background:#111126; padding:2px 8px; border-radius:10px; margin-left:6px; }
+details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; }
+/* Device / process tables */
+.dtable { width:100%; border-collapse:collapse; font-size:12px; }
+.dtable th { color:#555; font-weight:normal; text-align:left; padding:6px 8px; border-bottom:1px solid #2a2a4a; white-space:nowrap; }
+.dtable td { padding:6px 8px; border-bottom:1px solid #111126; vertical-align:middle; }
+.dtable tr:last-child td { border-bottom:none; }
+/* Log / code output */
+.logbox { background:#0a0a14; border:1px solid #1e1e38; border-radius:6px; padding:10px 12px; font-family:monospace; font-size:11px; color:#777; max-height:220px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
 .event-list { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
 .event-row { background:#1a1a2e; border:1px solid #2a2a4a; border-radius:6px; padding:10px 14px; display:flex; align-items:center; gap:12px; }
 .event-date { font-size:13px; font-weight:bold; color:#e94560; flex-shrink:0; width:90px; }
@@ -528,20 +750,20 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
 <?php if ($msg): ?><div class="msg-ok"><?= esc($msg) ?></div><?php endif; ?>
 
 <div class="tab-bar">
-  <div class="tab active" onclick="showTab('status')">Status</div>
-  <div class="tab" onclick="showTab('stats')">Stats</div>
-  <div class="tab" onclick="showTab('scripts')">Scripts</div>
-  <div class="tab" onclick="showTab('users')">Users</div>
-  <div class="tab" onclick="showTab('bans')">Bans</div>
-  <div class="tab" onclick="showTab('moderation')">Moderation</div>
-  <div class="tab" onclick="showTab('calendar')">Calendar</div>
+  <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
+  <div class="tab" onclick="showTab('network')">Network</div>
+  <div class="tab" onclick="showTab('community')">Community</div>
+  <div class="tab" onclick="showTab('content')">Content</div>
+  <div class="tab" onclick="showTab('system')">System</div>
   <div class="tab" onclick="showTab('settings')">Settings</div>
 </div>
 
-<!-- STATUS -->
-<div id="tab-status" class="tab-content active">
-  <section>
-    <h2>Services</h2>
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-content active">
+
+<details class="cpanel" open>
+  <summary>Services</summary>
+  <div class="cpbody">
     <div class="svc-grid">
     <?php foreach (['nginx','php8.4-fpm','kiwix','mbtileserver'] as $svc):
       $st = svc_status($svc); ?>
@@ -551,9 +773,12 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
       </div>
     <?php endforeach; ?>
     </div>
-  </section>
-  <section>
-    <h2>System Resources</h2>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>System Resources</summary>
+  <div class="cpbody">
     <?php
     // Load average
     $loadavg = file_exists('/proc/loadavg') ? explode(' ', trim(file_get_contents('/proc/loadavg'))) : [];
@@ -609,11 +834,101 @@ label { font-size:11px; color:#888; display:block; margin-bottom:3px; }
         <div class="svc-state" style="color:#e0e0e0;font-size:12px;margin-top:2px"><?= $uptime_str ?></div>
       </div>
     </div>
-  </section>
-</div>
+  </div>
+</details>
+
+<?php
+  $ext_mounted = get_setting('ext_drive_mounted','0') === '1';
+  if ($ext_mounted && !is_dir('/media/noosphere-ext')) { set_setting('ext_drive_mounted','0'); $ext_mounted = false; }
+  $ext_device      = get_setting('ext_drive_device','');
+  $ext_zims_loaded = json_decode(get_setting('ext_zims_loaded','[]'), true) ?: [];
+  $sys_disk = trim(shell_exec("findmnt -n -o SOURCE / 2>/dev/null | xargs lsblk -no pkname 2>/dev/null") ?: '');
+  $lsblk_data = json_decode(shell_exec('lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,LABEL 2>/dev/null') ?: '{}', true);
+  $avail_drives = [];
+  foreach ($lsblk_data['blockdevices'] ?? [] as $disk) {
+      if ($disk['name'] === $sys_disk) continue;
+      foreach ($disk['children'] ?? [] as $part) {
+          if ($part['mountpoint'] ?? null) continue;
+          if (!($part['fstype'] ?? '')) continue;
+          $avail_drives[] = ['device'=>'/dev/'.$part['name'],'size'=>$part['size'],'fstype'=>$part['fstype'],'label'=>$part['label']??''];
+      }
+  }
+  $ext_files = $ext_zims = [];
+  if ($ext_mounted) {
+      $ext_files = array_map('basename', glob('/media/noosphere-ext/files/*') ?: []);
+      $ext_zims  = array_map('basename', glob('/media/noosphere-ext/kiwix/*.zim') ?: []);
+  }
+  ?>
+
+<details class="cpanel" open>
+  <summary>External Drive</summary>
+  <div class="cpbody">
+    <?php if ($ext_mounted): ?>
+      <div style="background:#1a3a1a;border:1px solid #2ecc71;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+        <span style="color:#2ecc71;font-weight:bold">&#x2714; Mounted</span>
+        <span style="color:#888;margin-left:10px"><?= esc($ext_device) ?></span>
+      </div>
+      <div class="svc-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:14px">
+        <div class="svc-card"><div class="svc-name">Files available</div><div class="svc-state" style="color:#e0e0e0"><?= count($ext_files) ?></div></div>
+        <div class="svc-card"><div class="svc-name">ZIMs on drive</div><div class="svc-state" style="color:#e0e0e0"><?= count($ext_zims) ?></div></div>
+        <div class="svc-card"><div class="svc-name">ZIMs loaded</div><div class="svc-state" style="color:#2ecc71"><?= count($ext_zims_loaded) ?></div></div>
+      </div>
+      <?php if ($ext_zims): ?>
+        <div style="font-size:12px;color:#888;margin-bottom:8px">ZIM files found in <code>kiwix/</code> on drive</div>
+        <div style="display:flex;flex-direction:column;margin-bottom:14px">
+        <?php foreach ($ext_zims as $zim):
+          $zloaded = in_array($zim, $ext_zims_loaded);
+          $zmb     = file_exists('/media/noosphere-ext/kiwix/'.$zim) ? round(filesize('/media/noosphere-ext/kiwix/'.$zim)/1048576) : 0;
+        ?>
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #111126;font-size:13px">
+            <span style="flex:1;color:<?= $zloaded?'#e0e0e0':'#555' ?>"><?= esc($zim) ?></span>
+            <span style="color:#555;font-size:11px"><?= $zmb ?> MB</span>
+            <?php if ($zloaded): ?>
+              <span style="font-size:11px;color:#2ecc71">&#x2714; In Kiwix</span>
+              <form method="post"><?= csrf_field() ?><input type="hidden" name="act" value="ext_unload_zim"><input type="hidden" name="ext_zim" value="<?= esc($zim) ?>">
+                <button type="submit" style="padding:3px 10px;font-size:11px;border:1px solid #3a2a2a;background:none;color:#e94560;border-radius:4px;cursor:pointer">Unload</button>
+              </form>
+            <?php else: ?>
+              <form method="post"><?= csrf_field() ?><input type="hidden" name="act" value="ext_load_zim"><input type="hidden" name="ext_zim" value="<?= esc($zim) ?>">
+                <button type="submit" style="padding:3px 10px;font-size:11px;border:1px solid #1a3a1a;background:none;color:#2ecc71;border-radius:4px;cursor:pointer">Load into Kiwix</button>
+              </form>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div style="font-size:12px;color:#555;margin-bottom:12px">No ZIM files found in <code>kiwix/</code> on drive.</div>
+      <?php endif; ?>
+      <?php if ($ext_files): ?>
+        <div style="font-size:12px;color:#888;margin-bottom:12px"><?= count($ext_files) ?> file(s) available in the <a href="/files/" style="color:#4a9eff">Files</a> section from <code>files/</code> on drive.</div>
+      <?php else: ?>
+        <div style="font-size:12px;color:#555;margin-bottom:12px">No files found in <code>files/</code> on drive.</div>
+      <?php endif; ?>
+      <form method="post" onsubmit="return confirm('Unmount? Loaded Kiwix ZIMs will be unregistered.')">
+        <?= csrf_field() ?><input type="hidden" name="act" value="ext_umount">
+        <button type="submit" class="btn-red" style="font-size:12px;padding:7px 18px">Unmount Drive</button>
+      </form>
+    <?php else: ?>
+      <?php if (!$avail_drives): ?>
+        <div style="font-size:13px;color:#555;padding:8px 0">No external partitions detected. Plug in a drive and refresh.</div>
+      <?php else: ?>
+        <form method="post"><?= csrf_field() ?><input type="hidden" name="act" value="ext_mount">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select name="ext_device" style="flex:1;min-width:220px">
+              <?php foreach ($avail_drives as $d): ?>
+              <option value="<?= esc($d['device']) ?>"><?= esc($d['device']) ?> — <?= esc($d['size']) ?> (<?= esc($d['fstype']) ?><?= $d['label'] ? ', '.esc($d['label']) : '' ?>)</option>
+              <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn-green" style="padding:8px 18px;font-size:13px;white-space:nowrap">Mount (read-only)</button>
+          </div>
+          <div style="font-size:11px;color:#555;margin-top:8px">Prepare the drive with a <code>files/</code> folder for shared documents and a <code>kiwix/</code> folder for ZIM libraries.</div>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+</details>
 
 <!-- STATS -->
-<div id="tab-stats" class="tab-content">
 <?php
 require_once '/var/www/noosphere/shared/analytics.php';
 $st = analytics_stats();
@@ -626,13 +941,14 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
                'files'=>'Files','maps'=>'Maps','library'=>'Library','calendar'=>'Calendar'];
 ?>
 <?php if (!$st): ?>
-  <section><p style="color:#666;font-size:13px;padding:8px 0">No analytics data yet — visitors will be tracked automatically as they use the hub.</p></section>
+  <details class="cpanel" open><summary>Analytics</summary><div class="cpbody"><p style="color:#666;font-size:13px;padding:4px 0">No analytics data yet — visitors will be tracked automatically as they use the hub.</p></div></details>
 <?php else:
   $unreg = $st['total'] - $st['registered'];
   $reg_rate = $st['total'] ? round($st['registered'] / $st['total'] * 100) : 0;
 ?>
-<section>
-  <h2>Overview</h2>
+<details class="cpanel" open>
+  <summary>Analytics Overview</summary>
+  <div class="cpbody">
   <div class="svc-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:16px">
     <?php foreach ([
       ['Unique visitors',        $st['total'],      '#e0e0e0'],
@@ -649,11 +965,13 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     </div>
     <?php endforeach; ?>
   </div>
-</section>
+</div>
+</details>
 
-<section>
-  <h2>Module Popularity</h2>
-  <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+<details class="cpanel" open>
+  <summary>Module Popularity</summary>
+  <div class="cpbody">
+  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
   <?php foreach ($st['modules'] as $mod => $cnt):
     $pct = $st['max_hits'] ? round($cnt / $st['max_hits'] * 100) : 0;
     $lbl = $mod_labels[$mod] ?? ucfirst($mod);
@@ -668,11 +986,13 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   <?php endforeach; ?>
   <?php if (!$st['modules']): ?><div style="color:#555;font-size:13px">No hits recorded yet.</div><?php endif; ?>
   </div>
-</section>
+  </div>
+</details>
 
-<section>
-  <h2>Peak Activity Hours <span style="font-size:11px;color:#555;font-weight:normal">(last 7 days)</span></h2>
-  <div style="display:flex;align-items:flex-end;gap:2px;height:60px;margin-top:10px">
+<details class="cpanel">
+  <summary>Peak Activity Hours <span class="badge">last 7 days</span></summary>
+  <div class="cpbody">
+  <div style="display:flex;align-items:flex-end;gap:2px;height:60px;margin-top:6px">
   <?php for ($h = 0; $h < 24; $h++):
     $cnt = $st['hours'][$h];
     $pct = $st['max_hour'] ? round($cnt / $st['max_hour'] * 100) : 0;
@@ -686,11 +1006,13 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     </div>
   <?php endfor; ?>
   </div>
-</section>
+  </div>
+</details>
 
-<section>
-  <h2>Visitors — Last 7 Days</h2>
-  <div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">
+<details class="cpanel">
+  <summary>Visitors — Last 7 Days</summary>
+  <div class="cpbody">
+  <div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:6px">
   <?php foreach ($st['days'] as $date => $cnt):
     $pct = $st['max_day'] ? round($cnt / $st['max_day'] * 100) : 0;
     $dow = date('D', strtotime($date));
@@ -704,61 +1026,68 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     </div>
   <?php endforeach; ?>
   </div>
-</section>
+  </div>
+</details>
 
-<section style="margin-top:16px">
+<details class="cpanel">
+  <summary>Clear Analytics Data</summary>
+  <div class="cpbody">
   <form method="post" onsubmit="return confirm('Clear all stats? This cannot be undone.')">
     <?= csrf_field() ?>
     <input type="hidden" name="act" value="clear_stats">
     <button type="submit" class="btn-red" style="font-size:12px;padding:6px 16px">Clear All Stats</button>
     <span style="font-size:11px;color:#555;margin-left:8px">Useful when switching between deployments or events.</span>
   </form>
-</section>
+  </div>
+</details>
+
 <?php endif; ?>
 </div>
 
-<!-- SCRIPTS -->
-<div id="tab-scripts" class="tab-content">
-  <section>
-    <h2>Utility Scripts</h2>
-    <div class="script-list">
-    <?php foreach ($scripts as $s): ?>
-      <div class="script-row">
-        <div class="script-info">
-          <div class="script-name"><?= esc($s['file']) ?></div>
-          <div class="script-desc"><?= esc($s['desc']) ?></div>
-        </div>
-        <div class="script-actions">
-          <a href="/admin/scripts/<?= $s['file'] ?>" download class="btn-sm">Download</a>
-          <?php if ($s['runnable']): ?>
-          <form method="post" style="margin:0">
-            <?= csrf_field() ?>
-            <input type="hidden" name="act" value="run">
-            <input type="hidden" name="script" value="<?= $s['name'] ?>">
-            <button type="submit" class="btn-green">Run</button>
-          </form>
-          <?php endif; ?>
-        </div>
-      </div>
-    <?php endforeach; ?>
-    </div>
-    <?php if ($run_output): ?>
-    <div class="output-box"><h3><?= esc($run_name) ?>.sh</h3><?= esc($run_output) ?></div>
-    <?php endif; ?>
-  </section>
-</div>
+<!-- COMMUNITY -->
+<div id="tab-community" class="tab-content">
 
-<!-- USERS -->
-<div id="tab-users" class="tab-content">
-  <section>
-    <h2>Registry Users</h2>
+<details class="cpanel" open>
+  <summary>Post Announcement</summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Posts a pinned thread in the Announcements category on the Community Board.</div>
+    <form method="post">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="post_announcement">
+      <div style="margin-bottom:8px"><label class="field-label">Title</label><input type="text" name="ann_title" placeholder="Important update, supply distribution schedule…" required></div>
+      <div style="margin-bottom:10px"><label class="field-label">Body</label><textarea name="ann_body" rows="3" placeholder="Announcement text…" required></textarea></div>
+      <button type="submit" class="btn">Post Announcement</button>
+    </form>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Broadcast to Chat</summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Inserts a system message into the live chat visible to all users immediately.</div>
+    <form method="post">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="broadcast_chat">
+      <div style="margin-bottom:10px"><label class="field-label">Message</label><textarea name="broadcast_body" rows="2" placeholder="Message for all chat users…" required></textarea></div>
+      <button type="submit" class="btn">Broadcast</button>
+    </form>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>Registry Users</summary>
+  <div class="cpbody">
     <?php
     $rdb   = new SQLite3(REGISTRY_DB);
     $users = $rdb->query("SELECT id,name,location,status,is_admin FROM registry WHERE entry_type='checkin' OR entry_type IS NULL OR entry_type='' ORDER BY name ASC");
+    $user_rows = [];
+    while ($u = $users->fetchArray(SQLITE3_ASSOC)) $user_rows[] = $u;
     ?>
+    <?php if (!$user_rows): ?><div style="color:#555;font-size:13px">No registered users yet.</div>
+    <?php else: ?>
     <table>
       <tr><th>Name</th><th>Location</th><th>Status</th><th>Role</th><th>Actions</th></tr>
-      <?php while ($u = $users->fetchArray(SQLITE3_ASSOC)): ?>
+      <?php foreach ($user_rows as $u): ?>
       <tr>
         <td><?= esc($u['name']) ?></td>
         <td><?= esc($u['location']) ?></td>
@@ -782,28 +1111,27 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
           </form>
         </td>
       </tr>
-      <?php endwhile; ?>
+      <?php endforeach; ?>
     </table>
-  </section>
-</div>
+    <div style="font-size:11px;color:#555;margin-top:6px"><?= count($user_rows) ?> registered user(s)</div>
+    <?php endif; ?>
+  </div>
+</details>
 
-<!-- BANS -->
-<div id="tab-bans" class="tab-content">
-  <section>
-    <h2>Add Ban</h2>
-    <form method="post">
+<details class="cpanel" open>
+  <summary>Bans</summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#888;margin-bottom:12px">Add a ban by name, IP, or both. You can also ban by IP directly from the Network tab.</div>
+    <form method="post" style="margin-bottom:16px">
       <?= csrf_field() ?>
       <input type="hidden" name="act" value="ban">
       <div class="form-row">
-        <div><label>Registry Name (optional)</label><input type="text" name="ban_name" placeholder="Leave blank to ban by IP only"></div>
-        <div><label>IP Address (optional)</label><input type="text" name="ban_ip" placeholder="e.g. 192.168.8.42"></div>
+        <div><label>Registry Name <span style="color:#555">(optional)</span></label><input type="text" name="ban_name" placeholder="Leave blank to ban by IP only"></div>
+        <div><label>IP Address <span style="color:#555">(optional)</span></label><input type="text" name="ban_ip" placeholder="e.g. 192.168.8.42"></div>
       </div>
-      <div style="margin-bottom:8px"><label>Reason</label><input type="text" name="ban_reason" placeholder="Reason (shown to admins only)"></div>
+      <div style="margin-bottom:8px"><label>Reason <span style="color:#555">(internal, admin-only)</span></label><input type="text" name="ban_reason" placeholder="Reason"></div>
       <button type="submit" class="btn-red">Add Ban</button>
     </form>
-  </section>
-  <section>
-    <h2>Active Bans</h2>
     <?php $bans = get_bans(); ?>
     <?php if (!$bans): ?><p style="color:#666;font-size:13px">No active bans.</p>
     <?php else: ?>
@@ -812,9 +1140,9 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <?php foreach ($bans as $b): ?>
       <tr>
         <td><?= esc($b['name'] ?? '—') ?></td>
-        <td><?= esc($b['ip']   ?? '—') ?></td>
+        <td style="font-family:monospace;font-size:12px"><?= esc($b['ip'] ?? '—') ?></td>
         <td><?= esc($b['reason']) ?></td>
-        <td><?= esc($b['banned_by']) ?></td>
+        <td style="color:#555"><?= esc($b['banned_by']) ?></td>
         <td>
           <form method="post" style="margin:0">
             <?= csrf_field() ?>
@@ -827,92 +1155,79 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <?php endforeach; ?>
     </table>
     <?php endif; ?>
-  </section>
-</div>
+  </div>
+</details>
 
-<!-- MODERATION -->
-<div id="tab-moderation" class="tab-content">
-  <section>
-    <h2>Recent Forum Threads</h2>
+<details class="cpanel" open>
+  <summary>Forum Moderation</summary>
+  <div class="cpbody">
     <?php
     try {
         $fdb     = new PDO('sqlite:' . FORUM_DB);
         $threads = $fdb->query('SELECT * FROM threads ORDER BY last_at DESC LIMIT 40')->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) { $threads = []; }
     ?>
+    <?php if (!$threads): ?><div style="color:#555;font-size:13px">No forum threads yet.</div>
+    <?php else: ?>
     <table>
-      <tr><th>Title</th><th>Category</th><th>Author</th><th></th></tr>
+      <tr><th>Title</th><th>Category</th><th>Author</th><th>Replies</th><th></th></tr>
       <?php foreach ($threads as $t): ?>
       <tr>
-        <td><a href="/forum/?view=thread&thread=<?= $t['id'] ?>" style="color:#4a9eff;text-decoration:none"><?= esc($t['title']) ?></a></td>
-        <td><?= esc($t['category']) ?></td>
+        <td><a href="/forum/?view=thread&thread=<?= $t['id'] ?>" style="color:#4a9eff;text-decoration:none"><?= esc($t['title']) ?></a><?= $t['pinned'] ? ' <span style="font-size:10px;color:#e94560">📌</span>' : '' ?></td>
+        <td style="color:#555"><?= esc($t['category']) ?></td>
         <td><?= esc($t['author']) ?></td>
+        <td style="color:#555;text-align:center"><?= (int)($t['reply_count'] ?? 0) ?></td>
         <td>
           <form method="post" style="margin:0" onsubmit="return confirm('Delete this thread and all replies?')">
             <?= csrf_field() ?>
             <input type="hidden" name="act" value="del_thread">
             <input type="hidden" name="tid" value="<?= $t['id'] ?>">
-            <button type="submit" class="btn-red">Delete</button>
+            <button type="submit" class="btn-red" style="font-size:11px">Delete</button>
           </form>
         </td>
       </tr>
       <?php endforeach; ?>
     </table>
-  </section>
+    <?php endif; ?>
+  </div>
+</details>
 
-  <section>
-    <h2>Uploaded Files</h2>
-    <?php $ufiles = glob(FILES_DIR . '*') ?: []; ?>
-    <table>
-      <tr><th>Filename</th><th>Size</th><th></th></tr>
-      <?php foreach ($ufiles as $fp):
-        $fname = basename($fp); ?>
-      <tr>
-        <td><?= esc($fname) ?></td>
-        <td><?= round(filesize($fp)/1024) ?> KB</td>
-        <td>
-          <form method="post" style="margin:0" onsubmit="return confirm('Delete this file?')">
-            <?= csrf_field() ?>
-            <input type="hidden" name="act" value="del_file">
-            <input type="hidden" name="fname" value="<?= esc($fname) ?>">
-            <button type="submit" class="btn-red">Delete</button>
-          </form>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </table>
-  </section>
-
-  <section>
-    <h2>Registry Entries (Found Persons)</h2>
+<details class="cpanel">
+  <summary>Found Persons</summary>
+  <div class="cpbody">
     <?php
     $rdb2  = new SQLite3(REGISTRY_DB);
     $found = $rdb2->query("SELECT id,name,location,updated_at FROM registry WHERE entry_type='found_person' ORDER BY updated_at DESC");
+    $found_rows = [];
+    while ($f = $found->fetchArray(SQLITE3_ASSOC)) $found_rows[] = $f;
     ?>
+    <?php if (!$found_rows): ?><div style="color:#555;font-size:13px">No found person entries.</div>
+    <?php else: ?>
     <table>
-      <tr><th>Name</th><th>Location</th><th></th></tr>
-      <?php while ($f = $found->fetchArray(SQLITE3_ASSOC)): ?>
+      <tr><th>Name</th><th>Location</th><th>Reported</th><th></th></tr>
+      <?php foreach ($found_rows as $f): ?>
       <tr>
         <td><?= esc($f['name']) ?></td>
         <td><?= esc($f['location']) ?></td>
+        <td style="color:#555;font-size:11px"><?= $f['updated_at'] ? date('M j H:i', $f['updated_at']) : '—' ?></td>
         <td>
           <form method="post" style="margin:0" onsubmit="return confirm('Delete this entry?')">
             <?= csrf_field() ?>
             <input type="hidden" name="act" value="del_registry">
             <input type="hidden" name="uid" value="<?= $f['id'] ?>">
-            <button type="submit" class="btn-red">Delete</button>
+            <button type="submit" class="btn-red" style="font-size:11px">Delete</button>
           </form>
         </td>
       </tr>
-      <?php endwhile; ?>
+      <?php endforeach; ?>
     </table>
-  </section>
-</div>
+    <?php endif; ?>
+  </div>
+</details>
 
-<!-- CALENDAR -->
-<div id="tab-calendar" class="tab-content">
-  <section>
-    <h2>Upcoming Events</h2>
+<details class="cpanel" open>
+  <summary>Calendar Events</summary>
+  <div class="cpbody">
     <?php
     try {
         $cdb    = new PDO('sqlite:/var/lib/noosphere/calendar.db');
@@ -956,17 +1271,378 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <div style="margin-bottom:10px"><label>Notes</label><textarea name="enotes" rows="2" placeholder="Additional details…"></textarea></div>
       <button type="submit" class="btn">Add Event</button>
     </form>
-  </section>
-</div>
+  </div>
+</details>
+
+</div><!-- #tab-community -->
+
+<!-- NETWORK -->
+<div id="tab-network" class="tab-content">
+
+<details class="cpanel" open>
+  <summary>Connected Devices <span class="badge" id="dev-count"></span></summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Devices visible via ARP + DHCP leases. Refresh to update. Banning by IP blocks posts/chat.</div>
+    <?php $net_devices = get_connected_devices(); ?>
+    <?php if (!$net_devices): ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No devices found. Devices appear once they make a network request.</div>
+    <?php else: ?>
+    <table class="dtable">
+      <tr><th>IP</th><th>MAC</th><th>Hostname</th><th>Interface</th><th></th></tr>
+      <?php foreach ($net_devices as $dev): ?>
+      <tr>
+        <td style="font-family:monospace;font-size:12px"><?= esc($dev['ip']) ?></td>
+        <td style="font-family:monospace;font-size:11px;color:#888"><?= esc($dev['mac']) ?></td>
+        <td><?= esc($dev['hostname']) ?: '<span style="color:#555">—</span>' ?></td>
+        <td style="color:#555;font-size:11px"><?= esc($dev['iface']) ?></td>
+        <td>
+          <form method="post" style="margin:0;display:inline">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="ban">
+            <input type="hidden" name="ban_ip" value="<?= esc($dev['ip']) ?>">
+            <input type="hidden" name="ban_reason" value="Banned via Network tab">
+            <button type="submit" class="btn-red" style="font-size:11px;padding:3px 8px" onclick="return confirm('Ban IP <?= esc($dev['ip']) ?>?')">Ban IP</button>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <div style="font-size:11px;color:#555;margin-top:8px"><?= count($net_devices) ?> device(s) visible. Use Community tab to manage all active bans.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>Network Interfaces</summary>
+  <div class="cpbody">
+    <?php $iface_stats = get_iface_stats(); ?>
+    <?php if (!$iface_stats): ?>
+      <div style="color:#555;font-size:13px">No interface data available.</div>
+    <?php else: ?>
+    <table class="dtable">
+      <tr><th>Interface</th><th>IP Address</th><th>RX</th><th>TX</th><th>State</th></tr>
+      <?php foreach ($iface_stats as $iface => $s):
+        $ip_addr = trim(shell_exec("ip -4 addr show " . escapeshellarg($iface) . " 2>/dev/null | awk '/inet /{print \$2}' | head -1") ?: '');
+        $link    = trim(@file_get_contents("/sys/class/net/{$iface}/operstate") ?: 'unknown');
+      ?>
+      <tr>
+        <td><strong style="font-size:13px"><?= esc($iface) ?></strong></td>
+        <td style="font-family:monospace;font-size:12px;color:#aaa"><?= $ip_addr ? esc($ip_addr) : '<span style="color:#555">—</span>' ?></td>
+        <td style="font-family:monospace"><?= fmt_bytes($s['rx']) ?></td>
+        <td style="font-family:monospace"><?= fmt_bytes($s['tx']) ?></td>
+        <td style="color:<?= $link==='up'?'#2ecc71':'#555' ?>"><?= esc($link) ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>WiFi Details</summary>
+  <div class="cpbody">
+    <?php $iwinfo = shell_exec('iw dev 2>/dev/null') ?: (shell_exec('iwconfig 2>/dev/null') ?: ''); ?>
+    <?php if ($iwinfo): ?>
+      <div class="logbox"><?= esc($iwinfo) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No wireless interface info available.</div>
+    <?php endif; ?>
+    <form method="post" style="margin-top:12px">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="run">
+      <input type="hidden" name="script" value="restart-wireless">
+      <button type="submit" class="btn-sm">Restart Wireless</button>
+    </form>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>DHCP Leases</summary>
+  <div class="cpbody">
+    <?php
+    $leases_raw = '';
+    foreach (['/var/lib/misc/dnsmasq.leases','/var/lib/dnsmasq/dnsmasq.leases','/tmp/dnsmasq.leases'] as $lf) {
+        if (file_exists($lf)) { $leases_raw = file_get_contents($lf); break; }
+    }
+    ?>
+    <?php if ($leases_raw): ?>
+      <div class="logbox"><?= esc($leases_raw) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No DHCP lease file found.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+</div><!-- #tab-network -->
+
+<!-- CONTENT -->
+<div id="tab-content" class="tab-content">
+
+<details class="cpanel" open>
+  <summary>Uploaded Files</summary>
+  <div class="cpbody">
+    <?php $ct_files = glob(FILES_DIR . '*') ?: []; ?>
+    <?php if (!$ct_files): ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No files uploaded yet.</div>
+    <?php else: ?>
+    <table class="dtable">
+      <tr><th>Filename</th><th>Size</th><th>Type</th><th></th></tr>
+      <?php foreach ($ct_files as $fp): $fname = basename($fp); $ext = strtolower(pathinfo($fp, PATHINFO_EXTENSION)); ?>
+      <tr>
+        <td><?= esc($fname) ?></td>
+        <td><?= round(filesize($fp)/1024) ?> KB</td>
+        <td style="color:#555;font-size:11px"><?= esc($ext) ?></td>
+        <td>
+          <a href="/files/<?= esc($fname) ?>" target="_blank" class="btn-sm" style="text-decoration:none;font-size:11px;padding:3px 8px">View</a>
+          <form method="post" style="margin:0;display:inline" onsubmit="return confirm('Delete this file?')">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="del_file">
+            <input type="hidden" name="fname" value="<?= esc($fname) ?>">
+            <button type="submit" class="btn-red" style="font-size:11px;padding:3px 8px">Delete</button>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <div style="font-size:11px;color:#555;margin-top:8px"><?= count($ct_files) ?> file(s) · served from <a href="/files/" style="color:#4a9eff">/files/</a></div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Registry Photos</summary>
+  <div class="cpbody">
+    <?php $ct_photos = glob(PHOTOS_DIR . '*') ?: []; ?>
+    <?php if (!$ct_photos): ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No photos uploaded.</div>
+    <?php else: ?>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:8px">
+    <?php foreach ($ct_photos as $ph): $pfname = basename($ph); ?>
+      <div style="background:#111126;border:1px solid #2a2a4a;border-radius:6px;overflow:hidden;text-align:center">
+        <img src="/registry/photo/<?= esc($pfname) ?>" alt="" style="width:100%;height:90px;object-fit:cover;display:block" loading="lazy">
+        <div style="padding:4px 6px 0;font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= esc($pfname) ?></div>
+        <div style="padding:4px 6px 6px">
+        <form method="post" onsubmit="return confirm('Delete photo?')">
+          <?= csrf_field() ?>
+          <input type="hidden" name="act" value="del_photo">
+          <input type="hidden" name="fname" value="<?= esc($pfname) ?>">
+          <button type="submit" class="btn-red" style="width:100%;font-size:11px;padding:3px">Delete</button>
+        </form>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    </div>
+    <div style="font-size:11px;color:#555"><?= count($ct_photos) ?> photo(s)</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Map Markers</summary>
+  <div class="cpbody">
+    <?php
+    $ct_markers = [];
+    try {
+        $mdb = new PDO('sqlite:/var/lib/noosphere/markers.db');
+        $ct_markers = $mdb->query('SELECT * FROM markers ORDER BY created_at DESC LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
+    ?>
+    <?php if (!$ct_markers): ?>
+      <div style="color:#555;font-size:13px;padding:8px 0">No map markers placed yet.</div>
+    <?php else: ?>
+    <table class="dtable">
+      <tr><th>Title</th><th>Type</th><th>Notes</th><th>Author</th><th></th></tr>
+      <?php foreach ($ct_markers as $mk): ?>
+      <tr>
+        <td><?= esc($mk['title'] ?? '—') ?></td>
+        <td style="color:#888"><?= esc($mk['type'] ?? '—') ?></td>
+        <td style="color:#555;font-size:11px"><?= esc(mb_substr($mk['notes'] ?? '', 0, 50)) ?><?= mb_strlen($mk['notes'] ?? '') > 50 ? '…' : '' ?></td>
+        <td style="color:#555"><?= esc($mk['author'] ?? '—') ?></td>
+        <td>
+          <form method="post" style="margin:0" onsubmit="return confirm('Delete this marker?')">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="del_marker">
+            <input type="hidden" name="marker_id" value="<?= (int)$mk['id'] ?>">
+            <button type="submit" class="btn-red" style="font-size:11px;padding:3px 8px">Delete</button>
+          </form>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <div style="font-size:11px;color:#555;margin-top:6px"><?= count($ct_markers) ?> marker(s)</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Library — ZIM Modules</summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Enable or disable offline library modules. Changes take effect immediately (restarts Kiwix).</div>
+    <?php $ct_zims = get_zim_info(); ?>
+    <?php if (!$ct_zims): ?>
+      <div style="color:#555;font-size:13px">No ZIM files found in <?= ZIM_DIR ?>. Copy .zim files there to add them.</div>
+    <?php else: foreach ($ct_zims as $fname => $z):
+      $display = zim_display_name($fname, $z['title']);
+      $size_mb = round($z['size'] / 1048576);
+      $enabled = $z['enabled'];
+    ?>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #1a1a2e">
+        <div style="flex:1">
+          <div style="font-size:13px;color:<?= $enabled ? '#e0e0e0' : '#555' ?>"><?= esc($display) ?></div>
+          <div style="font-size:10px;color:#444;margin-top:1px"><?= esc($fname) ?></div>
+        </div>
+        <span style="font-size:11px;color:#555;flex-shrink:0"><?= $size_mb ?> MB</span>
+        <form method="post" style="flex-shrink:0">
+          <?= csrf_field() ?>
+          <input type="hidden" name="act" value="kiwix_toggle">
+          <input type="hidden" name="zim" value="<?= esc($fname) ?>">
+          <input type="hidden" name="enable" value="<?= $enabled ? '0' : '1' ?>">
+          <button type="submit" style="padding:4px 14px;font-size:11px;border-radius:4px;border:1px solid <?= $enabled ? '#3a2a2a' : '#1a3a1a' ?>;background:none;color:<?= $enabled ? '#e94560' : '#2ecc71' ?>;cursor:pointer">
+            <?= $enabled ? 'Disable' : 'Enable' ?>
+          </button>
+        </form>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+</details>
+
+</div><!-- #tab-content -->
+
+<!-- SYSTEM -->
+<div id="tab-system" class="tab-content">
+
+<details class="cpanel" open>
+  <summary>System Overview</summary>
+  <div class="cpbody">
+    <?php
+    $temp_raw = 0;
+    foreach (['/sys/class/thermal/thermal_zone0/temp','/sys/class/hwmon/hwmon0/temp1_input'] as $tf) {
+        if (file_exists($tf)) { $temp_raw = (int)file_get_contents($tf); break; }
+    }
+    $temp_c   = $temp_raw ? round($temp_raw / 1000, 1) : null;
+    $temp_col = $temp_c ? ($temp_c >= 75 ? '#e94560' : ($temp_c >= 60 ? '#f39c12' : '#2ecc71')) : '#888';
+    $procs     = (int)trim(shell_exec('ps aux --no-header 2>/dev/null | wc -l') ?: '0');
+    $php_procs = (int)trim(shell_exec('pgrep -c php-fpm 2>/dev/null') ?: '0');
+    $nginx_procs = (int)trim(shell_exec('pgrep -c nginx 2>/dev/null') ?: '0');
+    ?>
+    <div class="svc-grid" style="grid-template-columns:repeat(auto-fill,minmax(155px,1fr))">
+      <div class="svc-card">
+        <div class="svc-name">CPU Temperature</div>
+        <div class="svc-state" style="color:<?= $temp_col ?>"><?= $temp_c ? $temp_c . ' °C' : '—' ?></div>
+      </div>
+      <div class="svc-card">
+        <div class="svc-name">Total processes</div>
+        <div class="svc-state" style="color:#e0e0e0"><?= $procs ?></div>
+      </div>
+      <div class="svc-card">
+        <div class="svc-name">PHP-FPM workers</div>
+        <div class="svc-state" style="color:#e0e0e0"><?= $php_procs ?></div>
+      </div>
+      <div class="svc-card">
+        <div class="svc-name">Nginx workers</div>
+        <div class="svc-state" style="color:#e0e0e0"><?= $nginx_procs ?></div>
+      </div>
+    </div>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>Disk Usage</summary>
+  <div class="cpbody">
+    <?php $df_out = shell_exec('df -h 2>/dev/null') ?: ''; ?>
+    <div class="logbox"><?= esc($df_out) ?></div>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Top Processes (by CPU)</summary>
+  <div class="cpbody">
+    <?php $ps_out = shell_exec('ps aux --sort=-%cpu 2>/dev/null | head -15') ?: ''; ?>
+    <div class="logbox"><?= esc($ps_out) ?></div>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Recent System Log</summary>
+  <div class="cpbody">
+    <?php $journal = shell_exec('journalctl -n 80 --no-pager -q 2>/dev/null') ?: (shell_exec('tail -80 /var/log/syslog 2>/dev/null') ?: ''); ?>
+    <?php if ($journal): ?>
+      <div class="logbox"><?= esc($journal) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px">Journal not available.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Nginx Access Log</summary>
+  <div class="cpbody">
+    <?php $nginx_log = shell_exec('tail -60 /var/log/nginx/access.log 2>/dev/null') ?: ''; ?>
+    <?php if ($nginx_log): ?>
+      <div class="logbox"><?= esc($nginx_log) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px">Log not found or empty.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Nginx Error Log</summary>
+  <div class="cpbody">
+    <?php $nginx_err = shell_exec('tail -40 /var/log/nginx/error.log 2>/dev/null') ?: ''; ?>
+    <?php if ($nginx_err): ?>
+      <div class="logbox"><?= esc($nginx_err) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px">No recent errors.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>PHP-FPM Error Log</summary>
+  <div class="cpbody">
+    <?php $fpm_log = shell_exec('tail -40 /var/log/php8.4-fpm.log 2>/dev/null') ?: (shell_exec('tail -40 /var/log/php-fpm/error.log 2>/dev/null') ?: ''); ?>
+    <?php if ($fpm_log): ?>
+      <div class="logbox"><?= esc($fpm_log) ?></div>
+    <?php else: ?>
+      <div style="color:#555;font-size:13px">Log not found or empty.</div>
+    <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Database Backup</summary>
+  <div class="cpbody">
+    <div style="font-size:12px;color:#888;margin-bottom:12px">Downloads a .zip archive of all SQLite databases (registry, settings, forum, calendar, analytics).</div>
+    <form method="post">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="backup_db">
+      <button type="submit" class="btn-green" style="padding:8px 22px;font-size:13px">Download Backup (.zip)</button>
+    </form>
+    <div style="font-size:11px;color:#555;margin-top:8px">Backup does not include uploaded files or ZIM libraries — copy those manually.</div>
+  </div>
+</details>
+
+</div><!-- #tab-system -->
 
 <!-- SETTINGS -->
 <div id="tab-settings" class="tab-content">
 
+<div class="sub-tab-bar">
+  <div class="sub-tab active" onclick="showSubTab('stab-configure',this)">Configure</div>
+  <div class="sub-tab" onclick="showSubTab('stab-modules',this)">Modules</div>
+  <div class="sub-tab" onclick="showSubTab('stab-security',this)">Security</div>
+  <div class="sub-tab" onclick="showSubTab('stab-tools',this)">Tools</div>
+</div>
+
+<!-- The main settings form wraps Configure + Modules so all settings post together -->
 <form method="post" id="settings-form">
 <?= csrf_field() ?>
 <input type="hidden" name="act" value="save_settings">
 
-<!-- Identity -->
+<!-- ── CONFIGURE ─────────────────────────────────────────────────────────── -->
+<div id="stab-configure" class="sub-tab-content active">
+
 <div class="identity-section">
   <h3>Identity</h3>
   <div class="form-row">
@@ -977,7 +1653,6 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   <input type="text" name="homepage_alert" value="<?= esc(get_setting('homepage_alert','')) ?>" placeholder="e.g. Shelter at capacity — see staff"></div>
 </div>
 
-<!-- Access -->
 <div class="mod-section">
   <div class="mod-header">
     <input type="checkbox" class="mod-toggle" id="t_readonly" name="readonly" <?= get_setting('readonly','0')==='1'?'checked':'' ?>>
@@ -985,6 +1660,32 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     <span style="font-size:11px;color:#888">Blocks all writes system-wide</span>
   </div>
 </div>
+
+<div style="margin:14px 0 6px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.05em">Registration &amp; Access</div>
+
+<div class="mod-section">
+  <div class="mod-header">
+    <input type="checkbox" class="mod-toggle" id="t_self_reg" name="registry_allow_self_register" <?= get_setting('registry_allow_self_register','1')==='1'?'checked':'' ?>>
+    <label for="t_self_reg">Allow public self-registration</label>
+    <span style="font-size:11px;color:#888">Visitors can check themselves in. Uncheck to make the registry read-only for non-admins (admin-managed entries only).</span>
+  </div>
+</div>
+
+<div class="mod-section">
+  <div class="mod-header">
+    <input type="checkbox" class="mod-toggle" id="t_req_reg" name="require_registration" <?= get_setting('require_registration','0')==='1'?'checked':'' ?>>
+    <label for="t_req_reg">Require registration for actions</label>
+    <span style="font-size:11px;color:#888">Unregistered visitors can view everything but cannot post, send chat messages, or upload files.</span>
+  </div>
+</div>
+
+<div style="margin:16px 0">
+  <button type="submit" class="btn">Save</button>
+</div>
+</div><!-- #stab-configure -->
+
+<!-- ── MODULES ───────────────────────────────────────────────────────────── -->
+<div id="stab-modules" class="sub-tab-content">
 
 <!-- Registry -->
 <div class="mod-section">
@@ -1093,12 +1794,12 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
 
 <!-- Library (Kiwix) -->
 <div class="mod-section">
-  <div class="mod-header" onclick="modToggle('library',document.getElementById('t_library').checked)" style="cursor:default">
+  <div class="mod-header">
     <input type="checkbox" class="mod-toggle" id="t_library" name="show_library" <?= get_setting('show_library','1')==='1'?'checked':'' ?> onchange="modToggle('library',this.checked)">
-    <label for="t_library" style="cursor:pointer">Library (Kiwix)</label>
+    <label for="t_library">Library (Kiwix)</label>
   </div>
   <div class="mod-body<?= get_setting('show_library','1')!=='1'?' off':'' ?>" id="body_library" style="padding:12px 0 4px">
-    <div style="font-size:11px;color:#555;margin-bottom:10px">Enable or disable individual content modules. Changes take effect immediately.</div>
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Enable or disable individual ZIM modules. Changes take effect immediately.</div>
     <?php
     $all_zims = get_zim_info();
     if (!$all_zims):
@@ -1144,55 +1845,65 @@ foreach ($simple_mods as [$key, $id, $label]):
 <?php endforeach; ?>
 
 <div style="margin:16px 0">
-  <button type="submit" class="btn">Save Settings</button>
+  <button type="submit" class="btn">Save</button>
 </div>
+</div><!-- #stab-modules -->
 
 </form>
 
-<!-- System Credentials -->
+<!-- ── SECURITY ──────────────────────────────────────────────────────────── -->
+<div id="stab-security" class="sub-tab-content">
+
 <?php $linux_user = trim(shell_exec("awk -F: '\$3==1000{print \$1}' /etc/passwd | head -1") ?: 'cogitator'); ?>
-<details style="margin:16px 0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:0">
-  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F5A5; Linux system credentials</summary>
-  <div style="padding:0 16px 16px">
-    <div style="font-size:11px;color:#555;margin:10px 0 12px">Current Linux user: <strong style="color:#aaa"><?= esc($linux_user) ?></strong> — change passwords for SSH/console login. These persist when cloning the drive.</div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <?php foreach ([['user', "User ($linux_user)"], ['root', 'Root']] as [$target, $label]): ?>
-      <form method="post" style="flex:1;min-width:200px;background:#111126;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
-        <?= csrf_field() ?>
-        <input type="hidden" name="act" value="change_linux_pw">
-        <input type="hidden" name="linux_target" value="<?= $target ?>">
-        <div style="font-size:12px;font-weight:bold;color:#aaa;margin-bottom:10px"><?= $label ?></div>
-        <label class="field-label">New password</label>
-        <input type="password" name="linux_new_pw" required minlength="6" style="margin-bottom:8px">
-        <label class="field-label">Confirm</label>
-        <input type="password" name="linux_con_pw" required minlength="6" style="margin-bottom:10px">
-        <button type="submit" class="btn" style="width:100%;margin-top:0;padding:7px">Set <?= $label ?> Password</button>
-      </form>
-      <?php endforeach; ?>
-    </div>
-    <div style="font-size:11px;color:#555;margin-top:10px">To rename the Linux user or set credentials before imaging, run: <code style="color:#aaa">sudo setup-credentials.sh</code></div>
+<details class="cpanel" open>
+  <summary>Linux System Credentials</summary>
+  <div class="cpbody">
+  <div style="font-size:12px;color:#555;margin-bottom:14px">Current Linux user: <strong style="color:#aaa"><?= esc($linux_user) ?></strong> — passwords for SSH/console login. Persist when cloning the drive.</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <?php foreach ([['user', "User ($linux_user)"], ['root', 'Root']] as [$target, $lbl]): ?>
+    <form method="post" style="flex:1;min-width:200px;background:#111126;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="change_linux_pw">
+      <input type="hidden" name="linux_target" value="<?= $target ?>">
+      <div style="font-size:12px;font-weight:bold;color:#aaa;margin-bottom:10px"><?= $lbl ?></div>
+      <label class="field-label">New password</label>
+      <input type="password" name="linux_new_pw" required minlength="6" style="margin-bottom:8px">
+      <label class="field-label">Confirm</label>
+      <input type="password" name="linux_con_pw" required minlength="6" style="margin-bottom:10px">
+      <button type="submit" class="btn" style="width:100%;margin-top:0;padding:7px">Set <?= $lbl ?> Password</button>
+    </form>
+    <?php endforeach; ?>
+  </div>
+  <div style="font-size:11px;color:#555;margin-top:10px">To rename the Linux user or set credentials before imaging, run: <code style="color:#aaa">sudo setup-credentials.sh</code></div>
   </div>
 </details>
 
-<!-- Change Admin Panel Password -->
-<details style="margin:16px 0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:0">
-  <summary style="padding:12px 16px;cursor:pointer;font-size:13px;color:#888;list-style:none">&#x1F512; Change admin panel password</summary>
-  <form method="post" style="padding:0 16px 16px">
+<details class="cpanel" open>
+  <summary>Admin Panel Password</summary>
+  <div class="cpbody">
+  <form method="post">
     <?= csrf_field() ?>
     <input type="hidden" name="act" value="change_password">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
       <div style="flex:1;min-width:140px"><label class="field-label">Current password</label><input type="password" name="cur_pw" required></div>
       <div style="flex:1;min-width:140px"><label class="field-label">New password</label><input type="password" name="new_pw" required minlength="6"></div>
       <div style="flex:1;min-width:140px"><label class="field-label">Confirm new</label><input type="password" name="con_pw" required minlength="6"></div>
     </div>
-    <button type="submit" class="btn" style="margin-top:12px;width:auto;padding:8px 20px">Update Password</button>
+    <button type="submit" class="btn" style="margin-top:12px;padding:8px 20px">Update Password</button>
     <div style="font-size:11px;color:#555;margin-top:8px">Registry admin users can always log in with their registry PIN regardless of this password.</div>
   </form>
+  </div>
 </details>
 
-<!-- Quick Start Presets -->
-<details class="quick-start">
-  <summary>Quick Start Presets <span style="font-size:11px;margin-left:6px">(overwrites all settings above)</span></summary>
+</div><!-- #stab-security -->
+
+<!-- ── TOOLS ─────────────────────────────────────────────────────────────── -->
+<div id="stab-tools" class="sub-tab-content">
+
+<details class="cpanel" open>
+  <summary>Quick Start Presets</summary>
+  <div class="cpbody">
+  <div style="font-size:12px;color:#555;margin-bottom:12px">Applies a full configuration preset — overwrites all settings in Configure and Modules.</div>
   <?php
   $preset_info = [
       'emergency' => ['Full / Emergency',         'All modules on, emergency status set'],
@@ -1217,9 +1928,42 @@ foreach ($simple_mods as [$key, $id, $label]):
   </div>
   <?php endforeach; ?>
   </div>
+  </div>
 </details>
 
-<!-- Reset Instance -->
+<details class="cpanel" open>
+  <summary>Utility Scripts</summary>
+  <div class="cpbody">
+  <div class="script-list">
+  <?php foreach ($scripts as $s): ?>
+    <div class="script-row">
+      <div class="script-info">
+        <div class="script-name"><?= esc($s['file']) ?></div>
+        <div class="script-desc"><?= esc($s['desc']) ?></div>
+      </div>
+      <div class="script-actions">
+        <a href="/admin/scripts/<?= $s['file'] ?>" download class="btn-sm">Download</a>
+        <?php if ($s['runnable']): ?>
+        <form method="post" style="margin:0">
+          <?= csrf_field() ?>
+          <input type="hidden" name="act" value="run">
+          <input type="hidden" name="script" value="<?= $s['name'] ?>">
+          <button type="submit" class="btn-green">Run</button>
+        </form>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endforeach; ?>
+  </div>
+  <?php if ($run_output): ?>
+  <div class="output-box" style="margin-top:10px"><h3><?= esc($run_name) ?>.sh</h3><?= esc($run_output) ?></div>
+  <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Reset Instance</summary>
+  <div class="cpbody">
 <div class="reset-zone">
   <h3>Reset Instance</h3>
   <p>Permanently deletes all registry entries, chat messages, forum posts, calendar events, uploaded files, and photos. Settings and admin accounts are preserved. Cannot be undone.</p>
@@ -1232,6 +1976,10 @@ foreach ($simple_mods as [$key, $id, $label]):
     </div>
   </form>
 </div>
+  </div>
+</details>
+
+</div><!-- #stab-tools -->
 
 </div><!-- #tab-settings -->
 
@@ -1244,6 +1992,12 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(function(el){ el.classList.remove('active'); });
   document.getElementById('tab-' + name).classList.add('active');
   event.target.classList.add('active');
+}
+function showSubTab(id, el) {
+  document.querySelectorAll('.sub-tab-content').forEach(function(e){ e.classList.remove('active'); });
+  document.querySelectorAll('.sub-tab').forEach(function(e){ e.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
 }
 
 function modToggle(name, on) {

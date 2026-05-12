@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($post_cat === 'announcements' && !$is_admin_post) {
             $error_msg = 'Posting to Announcements requires an admin PIN.';
-        } elseif (!$reg) {
+        } elseif (!$reg && get_setting('require_registration','0') === '1') {
             $error_msg = 'You must be signed in to the registry to post. Enter your registry name and PIN.';
         } elseif ($title && $body) {
             $now = time();
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'reply' && $tid && $author) {
         $body = trim($_POST['body'] ?? '');
-        if (!$reg) {
+        if (!$reg && get_setting('require_registration','0') === '1') {
             $error_msg = 'You must be signed in to the registry to post. Enter your registry name and PIN.';
         } elseif ($body) {
             $now = time();

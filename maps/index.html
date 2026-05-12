@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Maps — Noosphere</title>
+<link rel="stylesheet" href="/maps/lib/leaflet.css">
+<script src="/maps/lib/leaflet.js"></script>
+<script src="/maps/lib/Leaflet.VectorGrid.bundled.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; }
+  body { color:#e0e0e0; font-family:system-ui,sans-serif; display:flex; flex-direction:column; background:#0f0f1a; }
+  header { background:#1a1a2e; border-bottom:2px solid #e94560; padding:10px 16px; display:flex; align-items:center; gap:16px; flex-shrink:0; z-index:1001; }
+  header h1 { font-size:16px; color:#e94560; }
+  header a { color:#888; text-decoration:none; font-size:13px; }
+  header a:hover { color:#e94560; }
+  .controls { margin-left:auto; display:flex; gap:8px; }
+  .btn-layer { background:#16213e; border:1px solid #2a2a4a; color:#e0e0e0; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:12px; }
+  .btn-layer.active { border-color:#e94560; color:#e94560; }
+  #map { flex:1; background:#1e2d1e; }
+  .leaflet-container { background:#1e2d1e !important; }
+  .topo-panel { position:absolute; bottom:24px; right:10px; z-index:1000; background:rgba(26,26,46,0.97); border:1px solid #2a2a4a; border-radius:8px; padding:14px; font-size:13px; color:#e0e0e0; min-width:220px; max-height:65vh; overflow-y:auto; display:none; }
+  .topo-panel h3 { color:#e94560; font-size:13px; margin-bottom:10px; }
+  .topo-panel a { display:block; margin:5px 0; color:#4a9eff; text-decoration:none; }
+  .topo-note { color:#666; font-size:11px; margin-top:10px; }
+  .county-label { background:rgba(233,69,96,0.15); border:1px solid #e94560; color:#e94560; font-size:11px; font-weight:bold; padding:2px 6px; border-radius:3px; white-space:nowrap; }
+  #debug { position:absolute; top:60px; left:10px; z-index:9999; background:rgba(0,0,0,0.9); color:#ff0; font-size:11px; padding:8px 12px; border-radius:4px; display:none; max-width:500px; max-height:50vh; overflow-y:auto; white-space:pre-wrap; }
+  #btn-debug { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← Home</a>
+  <h1>Bartholomew &amp; Brown County — Offline Map</h1>
+  <div class="controls">
+    <button class="btn-layer active" id="btn-streets" onclick="showStreets()">Streets</button>
+    <button class="btn-layer" id="btn-topo" onclick="showTopo()">Topo PDFs</button>
+    <button class="btn-layer" id="btn-debug" onclick="toggleDebug()" title="Toggle debug log">⚠ Log</button>
+  </div>
+</header>
+<div id="map"></div>
+<div id="debug"></div>
+
+<div class="topo-panel" id="topo-panel">
+  <h3>USGS 1:24,000 Topo Quads</h3>
+  <div id="topo-list">Loading...</div>
+  <div class="topo-note">Opens PDF in browser — printable at 1:24,000 scale</div>
+</div>
+
+<script>
+var debugVisible = false;
+function dbg(msg) {
+  var d = document.getElementById('debug');
+  var btn = document.getElementById('btn-debug');
+  d.innerHTML += msg + '\n';
+  btn.style.display = 'block';
+  btn.classList.add('active');
+  if (debugVisible) d.style.display = 'block';
+}
+function toggleDebug() {
+  var d = document.getElementById('debug');
+  debugVisible = !debugVisible;
+  d.style.display = debugVisible ? 'block' : 'none';
+  document.getElementById('btn-debug').classList.toggle('active', debugVisible);
+}
+
+var map = L.map('map', {
+  center: [39.20, -86.10],
+  zoom: 14,
+  maxZoom: 19,
+  minZoom: 7
+});
+
+// Styles — flat objects (NOT functions) to avoid any rendering issues
+var vtStyles = {
+  transportation: {
+    color: '#cccccc',
+    weight: 1.5,
+    opacity: 0.9,
+    fill: false
+  },
+  transportation_name: {
+    weight: 0,
+    opacity: 0,
+    fill: false
+  },
+  water: {
+    fill: true,
+    fillColor: '#1a4a8a',
+    fillOpacity: 0.8,
+    color: '#4a9eff',
+    weight: 1,
+    opacity: 1
+  },
+  waterway: {
+    color: '#4a9eff',
+    weight: 2,
+    opacity: 0.9,
+    fill: false
+  },
+  building: {
+    fill: true,
+    fillColor: "#3a3560",
+    fillOpacity: 0.5,
+    color: "#a090ff",
+    weight: 1.5,
+    opacity: 1
+  },
+  place: {
+    weight: 0,
+    opacity: 0,
+    fill: false
+  },
+  poi: {
+    weight: 0,
+    opacity: 0,
+    fill: false
+  }
+};
+
+try {
+  var vt = L.vectorGrid.protobuf('/tiles/counties/tiles/{z}/{x}/{y}.pbf', {
+    vectorTileLayerStyles: vtStyles,
+    maxZoom: 19,
+    maxNativeZoom: 14,
+    minZoom: 4,
+    interactive: false,
+    getFeatureId: null
+  });
+
+  vt.on('tileerror', function(e) {
+    dbg('TILE ERROR: ' + e.error);
+  });
+
+  vt.addTo(map);
+
+} catch(err) {
+  dbg('ERROR: ' + err.message);
+}
+
+// County labels
+L.marker([39.20, -85.91], {
+  icon: L.divIcon({ className: 'county-label', html: 'Bartholomew Co.', iconAnchor: [60, 10] })
+}).addTo(map);
+L.marker([39.22, -86.24], {
+  icon: L.divIcon({ className: 'county-label', html: 'Brown Co.', iconAnchor: [40, 10] })
+}).addTo(map);
+
+function showStreets() {
+  document.getElementById('btn-streets').classList.add('active');
+  document.getElementById('btn-topo').classList.remove('active');
+  document.getElementById('topo-panel').style.display = 'none';
+}
+function showTopo() {
+  document.getElementById('btn-topo').classList.add('active');
+  document.getElementById('btn-streets').classList.remove('active');
+  document.getElementById('topo-panel').style.display = 'block';
+  loadTopoList();
+}
+
+var topoLoaded = false;
+function loadTopoList() {
+  if (topoLoaded) return;
+  fetch('/maps/topo/index.php')
+    .then(function(r) { return r.json(); })
+    .then(function(pdfs) {
+      var html = '';
+      pdfs.forEach(function(p) {
+        html += '<a href="' + p.url + '" target="_blank">📄 ' + p.name + '</a>';
+      });
+      if (!html) html = '<div style="color:#888">Downloading — check back soon.</div>';
+      document.getElementById('topo-list').innerHTML = html;
+      topoLoaded = true;
+    });
+}
+</script>
+</body>
+</html>

@@ -75,6 +75,9 @@ if (get_setting('show_calendar','1')==='1')
         </a>
         <?php endforeach; ?>
     </div>
+    <div style="margin-top:2.5rem">
+        <a href="/admin/" style="font-size:12px;color:#333;text-decoration:none;padding:6px 14px;border:1px solid #333;border-radius:5px;transition:.15s" onmouseover="this.style.color='#e94560';this.style.borderColor='#e94560'" onmouseout="this.style.color='#333';this.style.borderColor='#333'">Admin</a>
+    </div>
 <script>
 (function(){
   var seq=[],t=0;
