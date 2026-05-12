@@ -12,7 +12,7 @@ $is_readonly = is_readonly();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Map — Noosphere</title>
 <?= csrf_js() ?>
-<link rel="stylesheet" href="/maps/leaflet/leaflet.css">
+<link rel="stylesheet" href="/maps/lib/leaflet.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
@@ -134,8 +134,8 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
   </div>
 </div>
 
-<script src="/maps/leaflet/leaflet.js"></script>
-<script src="/maps/leaflet/leaflet.vectorgrid.bundled.min.js"></script>
+<script src="/maps/lib/leaflet.js"></script>
+<script src="/maps/lib/Leaflet.VectorGrid.bundled.js"></script>
 <script>
 var IS_ADMIN    = <?= $is_admin    ? 'true' : 'false' ?>;
 var IS_READONLY = <?= $is_readonly ? 'true' : 'false' ?>;
