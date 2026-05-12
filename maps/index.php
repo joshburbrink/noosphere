@@ -251,7 +251,7 @@ function setTheme(name) {
     var t = THEMES[name];
     document.getElementById('map').style.background = t.mapBg;
 
-    vtLayer = L.vectorGrid.protobuf('/tiles/{z}/{x}/{y}.pbf', {
+    vtLayer = L.vectorGrid.protobuf('/tiles/counties/tiles/{z}/{x}/{y}.pbf', {
         vectorTileLayerStyles: buildStyles(name),
         maxNativeZoom: 14,
         maxZoom: 19,
