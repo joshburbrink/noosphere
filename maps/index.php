@@ -101,6 +101,9 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <textarea id="mk-note" placeholder="Optional details…"></textarea>
     <label>Your name (optional)</label>
     <input type="text" id="mk-by" placeholder="Leave blank to stay anonymous" maxlength="40">
+    <label>Photo <span style="font-size:10px;color:#555">(optional — auto-resized)</span></label>
+    <input type="file" id="mk-photo" accept="image/*" capture="environment"
+           style="padding:5px 0;background:none;border:none;color:#888;font-size:12px;cursor:pointer">
     <div class="modal-btns">
       <button class="btn-red" onclick="submitMarker()">Add Marker</button>
       <button class="btn-cancel" onclick="closeMkDialog()">Cancel</button>
@@ -352,11 +355,17 @@ function popupHtml(row, myToken) {
           'style="margin-top:10px;background:#e94560;color:#fff;border:none;' +
           'padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">Delete</button>'
         : '';
-    return '<div style="min-width:160px">' +
+    var photoHtml = row.photo
+        ? '<a href="/marker-photos/' + encodeURIComponent(row.photo) + '" target="_blank">' +
+          '<img src="/marker-photos/' + encodeURIComponent(row.photo) + '" ' +
+          'style="width:100%;max-height:180px;object-fit:cover;border-radius:5px;margin-top:10px;display:block;cursor:zoom-in"></a>'
+        : '';
+    return '<div style="min-width:180px;max-width:260px">' +
         '<b style="display:block;margin-bottom:4px">' + esc(row.title) + '</b>' +
         '<span style="font-size:11px;color:#888">' + cfg.name + ' · ' + ts + '</span>' +
         (row.note       ? '<p style="margin:6px 0 0;font-size:12px">'                 + esc(row.note)       + '</p>' : '') +
         (row.created_by ? '<p style="margin:4px 0 0;font-size:11px;color:#888">By: ' + esc(row.created_by) + '</p>' : '') +
+        photoHtml +
         deleteBtn +
         '</div>';
 }
@@ -421,6 +430,7 @@ map.on('click', function(e) {
 
 function closeMkDialog() {
     document.getElementById('mk-veil').classList.remove('open');
+    document.getElementById('mk-photo').value = '';
     pendingLL = null;
 }
 
@@ -434,23 +444,26 @@ function submitMarker() {
     var by    = document.getElementById('mk-by').value.trim();
     if (by) localStorage.setItem('mk_name', by);
     closeMkDialog();
-    fetch('/maps/markers.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=add' +
-              '&lat='        + encodeURIComponent(ll.lat) +
-              '&lng='        + encodeURIComponent(ll.lng) +
-              '&title='      + encodeURIComponent(title) +
-              '&note='       + encodeURIComponent(note) +
-              '&mtype='      + encodeURIComponent(mtype) +
-              '&created_by=' + encodeURIComponent(by) +
-              '&_csrf='      + encodeURIComponent(CSRF_TOKEN),
-    }).then(function(r) { return r.json(); }).then(function(d) {
+    var fd = new FormData();
+    fd.append('action',     'add');
+    fd.append('lat',        ll.lat);
+    fd.append('lng',        ll.lng);
+    fd.append('title',      title);
+    fd.append('note',       note);
+    fd.append('mtype',      mtype);
+    fd.append('created_by', by);
+    fd.append('_csrf',      CSRF_TOKEN);
+    var photoFile = document.getElementById('mk-photo').files[0];
+    if (photoFile) fd.append('photo', photoFile);
+
+    fetch('/maps/markers.php', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); }).then(function(d) {
         if (!d.ok) return;
         saveToken(d.id, d.token);
         addMarkerToMap({ id: d.id, lat: ll.lat, lng: ll.lng, title: title,
                          note: note, mtype: mtype, created_by: by,
-                         created_at: Math.floor(Date.now() / 1000), my_token: d.token });
+                         created_at: Math.floor(Date.now() / 1000),
+                         my_token: d.token, photo: d.photo || null });
     }).catch(function(e) { console.warn('marker add failed:', e); });
 }
 
