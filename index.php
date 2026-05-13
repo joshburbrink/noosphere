@@ -36,6 +36,8 @@ if (get_setting('show_library','1')==='1')
     $tiles[] = ['href'=>'/kiwix/',    'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
 if (get_setting('show_maps','1')==='1')
     $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Bartholomew &amp; Brown County — offline topo &amp; roads'];
+if (get_setting('show_topo','1')==='1')
+    $tiles[] = ['href'=>'/topo/',      'icon'=>'🗾',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads — Bartholomew &amp; Brown County'];
 if (get_setting('show_calendar','1')==='1')
     $tiles[] = ['href'=>'/calendar/', 'icon'=>'📅', 'label'=>'Calendar',        'desc'=>'Community events &amp; schedules'];
 ?>
