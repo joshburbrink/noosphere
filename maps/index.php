@@ -324,6 +324,14 @@ var MTYPE = {
     blocked:  { color: '#e67e22', glyph: '✖',  name: 'Blocked' },
 };
 
+function mkTokens() {
+    try { return JSON.parse(localStorage.getItem('mk_tokens') || '{}'); } catch(e) { return {}; }
+}
+function saveToken(id, token) {
+    var t = mkTokens(); t[id] = token;
+    localStorage.setItem('mk_tokens', JSON.stringify(t));
+}
+
 function mkEl(mtype) {
     var cfg = MTYPE[mtype] || MTYPE.pin;
     var el = document.createElement('div');
@@ -333,28 +341,33 @@ function mkEl(mtype) {
     return el;
 }
 
-function popupHtml(row) {
+function popupHtml(row, myToken) {
     var cfg = MTYPE[row.mtype] || MTYPE.pin;
     var d = new Date(parseInt(row.created_at) * 1000);
     var ts = d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' +
              d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    var canDelete = IS_ADMIN || !!myToken;
+    var deleteBtn = canDelete
+        ? '<button onclick="deleteMarker(' + parseInt(row.id) + ')" ' +
+          'style="margin-top:10px;background:#e94560;color:#fff;border:none;' +
+          'padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">Delete</button>'
+        : '';
     return '<div style="min-width:160px">' +
         '<b style="display:block;margin-bottom:4px">' + esc(row.title) + '</b>' +
         '<span style="font-size:11px;color:#888">' + cfg.name + ' · ' + ts + '</span>' +
         (row.note       ? '<p style="margin:6px 0 0;font-size:12px">'                 + esc(row.note)       + '</p>' : '') +
         (row.created_by ? '<p style="margin:4px 0 0;font-size:11px;color:#888">By: ' + esc(row.created_by) + '</p>' : '') +
-        (IS_ADMIN ? '<button onclick="deleteMarker(' + parseInt(row.id) + ')" ' +
-            'style="margin-top:10px;background:#e94560;color:#fff;border:none;' +
-            'padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">Delete</button>' : '') +
+        deleteBtn +
         '</div>';
 }
 
 function addMarkerToMap(row) {
     var id = parseInt(row.id);
     if (mlMarkers[id]) return;
+    var myToken = row.my_token || mkTokens()[id] || null;
     var el = mkEl(row.mtype);
     el.addEventListener('click', function(e) { e.stopPropagation(); });
-    var popup = new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(row));
+    var popup = new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(row, myToken));
     var marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([parseFloat(row.lng), parseFloat(row.lat)])
         .setPopup(popup)
@@ -372,13 +385,15 @@ function loadMarkers() {
 
 function deleteMarker(id) {
     if (!confirm('Delete this marker?')) return;
+    var token = IS_ADMIN ? '' : (mkTokens()[id] || '');
     fetch('/maps/markers.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=delete&id=' + id + '&_csrf=' + encodeURIComponent(CSRF_TOKEN),
+        body: 'action=delete&id=' + id + '&token=' + encodeURIComponent(token) + '&_csrf=' + encodeURIComponent(CSRF_TOKEN),
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (!d.ok) return;
         if (mlMarkers[id]) { mlMarkers[id].remove(); delete mlMarkers[id]; }
+        var t = mkTokens(); delete t[id]; localStorage.setItem('mk_tokens', JSON.stringify(t));
     });
 }
 
@@ -424,9 +439,10 @@ function submitMarker() {
               '&_csrf='      + encodeURIComponent(CSRF_TOKEN),
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (!d.ok) return;
+        saveToken(d.id, d.token);
         addMarkerToMap({ id: d.id, lat: ll.lat, lng: ll.lng, title: title,
                          note: note, mtype: mtype, created_by: by,
-                         created_at: Math.floor(Date.now() / 1000) });
+                         created_at: Math.floor(Date.now() / 1000), my_token: d.token });
     }).catch(function(e) { console.warn('marker add failed:', e); });
 }
 
