@@ -366,13 +366,20 @@ function addMarkerToMap(row) {
     if (mlMarkers[id]) return;
     var myToken = row.my_token || mkTokens()[id] || null;
     var el = mkEl(row.mtype);
-    el.addEventListener('click', function(e) { e.stopPropagation(); });
     var popup = new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(row, myToken));
+    el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (popup.isOpen()) {
+            popup.remove();
+        } else {
+            popup.setLngLat([parseFloat(row.lng), parseFloat(row.lat)]).addTo(map);
+        }
+    });
     var marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([parseFloat(row.lng), parseFloat(row.lat)])
-        .setPopup(popup)
         .addTo(map);
     marker._mkId = id;
+    marker._popup = popup;
     mlMarkers[id] = marker;
 }
 
@@ -392,7 +399,7 @@ function deleteMarker(id) {
         body: 'action=delete&id=' + id + '&token=' + encodeURIComponent(token) + '&_csrf=' + encodeURIComponent(CSRF_TOKEN),
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (!d.ok) return;
-        if (mlMarkers[id]) { mlMarkers[id].remove(); delete mlMarkers[id]; }
+        if (mlMarkers[id]) { mlMarkers[id]._popup.remove(); mlMarkers[id].remove(); delete mlMarkers[id]; }
         var t = mkTokens(); delete t[id]; localStorage.setItem('mk_tokens', JSON.stringify(t));
     });
 }
@@ -402,6 +409,7 @@ var pendingLL = null;
 
 map.on('click', function(e) {
     if (IS_READONLY) return;
+    if (e.originalEvent && e.originalEvent.target.closest && e.originalEvent.target.closest('.mk-icon')) return;
     pendingLL = e.lngLat;
     document.getElementById('mk-type').value  = 'pin';
     document.getElementById('mk-title').value = '';
