@@ -111,6 +111,7 @@ pre {
     <li><a href="#backup">Backup & Restore</a></li>
     <li><a href="#services">Service Reference</a></li>
     <li><a href="#zim">Offline Library (Kiwix)</a></li>
+    <li><a href="#map">Offline Map</a></li>
   </ol>
 </div>
 
@@ -201,7 +202,7 @@ pre {
   <ol>
     <li>Boot laptop from the USB drive (press F9 or F10 on HP 3105m for boot menu)</li>
     <li>Login: <code>root</code> / <em>password set during install</em></li>
-    <li>Verify services are running: <code>systemctl status nginx php8.4-fpm mbtileserver kiwix-serve</code></li>
+    <li>Verify services are running: <code>systemctl status nginx php8.4-fpm mbtileserver kiwix mariadb</code></li>
     <li>Check IP address: <code>ip addr show</code> — look for <code>192.168.2.x</code> (WiFi) or <code>192.168.8.2</code> (eth)</li>
     <li>Open a browser to <code>http://192.168.2.167</code> (or <code>http://192.168.8.2</code>) to verify the hub loads</li>
     <li>Log in to admin panel (keyboard shortcut <kbd>aaa</kbd> on the homepage, or go to <code>/admin/</code>)</li>
@@ -311,13 +312,13 @@ tail -50 /var/log/nginx/error.log</pre>
 systemctl restart mbtileserver
 # Check tile server is responding:
 curl -s http://localhost:8889/services | head</pre>
-  <p>Tiles are at <code>/var/lib/noosphere/tiles/bartholomew-brown.mbtiles</code>. Verify the file exists and is not 0 bytes.</p>
+  <p>Tiles are at <code>/var/www/noosphere/maps/counties.mbtiles</code> and <code>/var/www/noosphere/maps/satellite.mbtiles</code>. Verify files exist and are not 0 bytes.</p>
 
   <h3>Library (Kiwix) not loading</h3>
-  <pre>systemctl status kiwix-serve
-systemctl restart kiwix-serve
+  <pre>systemctl status kiwix
+systemctl restart kiwix
 # List registered ZIM files:
-ls /var/lib/kiwix/
+ls /var/lib/kiwix/zim/
 # kiwix-watch auto-registers new ZIMs dropped in that directory</pre>
 
   <h3>Wireless interface not coming up</h3>
@@ -456,17 +457,18 @@ systemctl restart nginx php8.4-fpm</pre>
     <tr><td>nginx</td><td>Web server — routes all HTTP traffic</td><td><code>systemctl restart nginx</code></td></tr>
     <tr><td>php8.4-fpm</td><td>PHP process manager — runs all app logic</td><td><code>systemctl restart php8.4-fpm</code></td></tr>
     <tr><td>mbtileserver</td><td>Serves vector map tiles on port 8889</td><td><code>systemctl restart mbtileserver</code></td></tr>
-    <tr><td>kiwix-serve</td><td>Serves offline Wikipedia/library on port 8080</td><td><code>systemctl restart kiwix-serve</code></td></tr>
+    <tr><td>kiwix</td><td>Serves offline Wikipedia/library on port 8888</td><td><code>systemctl restart kiwix</code></td></tr>
+    <tr><td>mariadb</td><td>MySQL-compatible database (registry, forum, chat, calendar)</td><td><code>systemctl restart mariadb</code></td></tr>
     <tr><td>kiwix-watch</td><td>Auto-registers new ZIM files dropped in /var/lib/kiwix/</td><td><code>systemctl restart kiwix-watch</code></td></tr>
     <tr><td>dnsmasq</td><td>DNS + DHCP for captive portal</td><td><code>systemctl restart dnsmasq</code></td></tr>
     <tr><td>NetworkManager</td><td>WiFi management (if used)</td><td><code>systemctl restart NetworkManager</code></td></tr>
   </table>
 
   <h3>Check all at once</h3>
-  <pre>systemctl status nginx php8.4-fpm mbtileserver kiwix-serve kiwix-watch dnsmasq --no-pager</pre>
+  <pre>systemctl status nginx php8.4-fpm mbtileserver kiwix mariadb dnsmasq --no-pager</pre>
 
   <h3>Enable auto-start on boot</h3>
-  <pre>systemctl enable nginx php8.4-fpm mbtileserver kiwix-serve kiwix-watch</pre>
+  <pre>systemctl enable nginx php8.4-fpm mbtileserver kiwix mariadb</pre>
 
   <h3>Nginx config location</h3>
   <pre>/etc/nginx/sites-available/noosphere  (symlinked to sites-enabled/)
@@ -502,6 +504,49 @@ nginx -t && systemctl reload nginx</pre>
   </table>
 
   <div class="note">The 64GB USB drive is sufficient for the OS + essential ZIMs. For the full library (~31 GB of ZIMs), use a 128GB or larger drive.</div>
+</div>
+
+
+<!-- ── 11. Offline Map ───────────────────────────────────────────────────── -->
+<div class=section id=map>
+  <h2>11. Offline Map</h2>
+  <p>The map is built on <b>MapLibre GL JS</b> with offline vector tiles covering Bartholomew and Brown County, Indiana. Everything — tiles, fonts, satellite imagery — is served from the server with no internet dependency.</p>
+
+  <h3>Features</h3>
+  <ul>
+    <li><b>Street names</b> — rendered from the <code>transportation_name</code> vector layer at zoom 11+</li>
+    <li><b>Themes</b> — Dark, Light, Hi-Vis (toggle in header)</li>
+    <li><b>Satellite</b> — USGS NAIP aerial imagery layer (toggle in header); overlays road labels for context</li>
+    <li><b>Pins</b> — any user can drop a pin (type, title, note, name); creator sees a Delete button in the popup via a localStorage token; admins can delete any pin</li>
+    <li><b>Topo PDFs</b> — 28 USGS 1:24,000 quad sheets for both counties, downloadable from the Topo PDFs link</li>
+  </ul>
+
+  <h3>Tile files</h3>
+  <table class=setting-table>
+    <tr><th>File</th><th>Contents</th></tr>
+    <tr><td><code>/var/www/noosphere/maps/counties.mbtiles</code></td><td>Vector tiles — roads, buildings, water, labels (zoom 4–14)</td></tr>
+    <tr><td><code>/var/www/noosphere/maps/satellite.mbtiles</code></td><td>Raster satellite imagery — USGS NAIP (zoom 10–16)</td></tr>
+  </table>
+
+  <h3>Glyph fonts</h3>
+  <p>Street name rendering requires offline PBF font files. Noto Sans Regular is pre-installed:</p>
+  <pre>/var/www/noosphere/maps/fonts/Noto Sans Regular/*.pbf</pre>
+
+  <h3>Satellite tile download</h3>
+  <p>The satellite layer downloads USGS NAIP imagery for both counties (~1–3 GB). Run once while the server has internet access:</p>
+  <pre>python3 /usr/local/bin/download-satellite.py</pre>
+  <p>Monitor progress:</p>
+  <pre>tail -f /var/log/satellite-download.log</pre>
+  <p>Once <code>satellite.mbtiles</code> exists, mbtileserver auto-detects it. The Satellite button in the map will start working immediately — no service restart needed.</p>
+
+  <h3>Pin ownership</h3>
+  <p>When a pin is created, the server returns a one-time 32-character token stored in the browser's <code>localStorage</code>. That browser can delete its own pins. Tokens do not transfer across devices — if you need to delete a pin from a different device, use an admin account.</p>
+
+  <h3>Adding / rebuilding tiles</h3>
+  <p>The vector tiles were built with <code>tilemaker</code> from an OSM extract of Indiana. Config files are in <code>/var/www/noosphere/maps/tilemaker/</code>.</p>
+  <pre># Re-generate from a fresh OSM extract (requires tilemaker installed):
+tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --output /var/www/noosphere/maps/counties.mbtiles           --config  /var/www/noosphere/maps/tilemaker/config-openmaptiles.json           --process /var/www/noosphere/maps/tilemaker/process-openmaptiles.lua</pre>
+  <div class=note>Tile generation can take 5–20 minutes depending on hardware. The existing <code>counties.mbtiles</code> is sufficient for normal use.</div>
 </div>
 
 </div><!-- /container -->
