@@ -76,7 +76,7 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <button class="theme-btn" data-theme="hc"    onclick="setTheme('hc')">Hi-Vis</button>
     <button class="theme-btn" id="btn-satellite" onclick="toggleSatellite()">Satellite</button>
   </div>
-  <a class="topo-link" href="/maps/topo/">Topo PDFs →</a>
+<?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs →</a><?php endif; ?>
 </header>
 <?php if (!$is_readonly): ?>
 <div class="tap-hint">Tap map to add a marker</div>
