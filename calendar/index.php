@@ -17,7 +17,7 @@ try {
         created_by TEXT, created_at INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT 'approved'
     )");
-    @$cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+    try { $cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'"); } catch (Exception $e) {}
     $cdb->exec("UPDATE events SET status='approved' WHERE status IS NULL OR status=''");
 } catch (Exception $e) { $cdb = null; }
 
