@@ -157,7 +157,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // --- Calendar: add event ---
+    // --- Calendar: add event (admin — auto-approved) ---
     if ($act === 'add_event') {
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->exec("CREATE TABLE IF NOT EXISTS events (
@@ -168,18 +168,37 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             location TEXT,
             notes TEXT,
             created_by TEXT,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'approved'
         )");
+        @$cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+        $cdb->exec("UPDATE events SET status='approved' WHERE status IS NULL OR status=''");
         $title  = trim($_POST['title']  ?? '');
         $date   = trim($_POST['edate']  ?? '');
         $time   = trim($_POST['etime']  ?? '');
         $loc    = trim($_POST['eloc']   ?? '');
         $notes  = trim($_POST['enotes'] ?? '');
         if ($title && $date) {
-            $cdb->prepare('INSERT INTO events (title,event_date,event_time,location,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?)')
-                ->execute([$title, $date, $time, $loc, $notes, $_SESSION['admin_name'], time()]);
+            $cdb->prepare('INSERT INTO events (title,event_date,event_time,location,notes,created_by,created_at,status) VALUES (?,?,?,?,?,?,?,?)')
+                ->execute([$title, $date, $time, $loc, $notes, $_SESSION['admin_name'], time(), 'approved']);
             $msg = 'Event added.';
         }
+    }
+
+    // --- Calendar: approve submission ---
+    if ($act === 'approve_event') {
+        $eid = (int)($_POST['eid'] ?? 0);
+        $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
+        $cdb->prepare("UPDATE events SET status='approved' WHERE id=?")->execute([$eid]);
+        $msg = 'Event approved — now visible on the calendar.';
+    }
+
+    // --- Calendar: reject submission ---
+    if ($act === 'reject_event') {
+        $eid = (int)($_POST['eid'] ?? 0);
+        $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
+        $cdb->prepare('DELETE FROM events WHERE id=?')->execute([$eid]);
+        $msg = 'Submission rejected and removed.';
     }
 
     // --- External drive: mount ---
@@ -929,6 +948,24 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
   </div>
 </details>
 
+<!-- Pending calendar submissions count for dashboard badge -->
+<?php
+$dash_pending_events = 0;
+try {
+    $cdb_dash = new PDO('sqlite:/var/lib/noosphere/calendar.db');
+    $dash_pending_events = (int)$cdb_dash->query("SELECT COUNT(*) FROM events WHERE status='pending'")->fetchColumn();
+} catch (Exception $e) {}
+?>
+<?php if ($dash_pending_events > 0): ?>
+<details class="cpanel" open>
+  <summary>Pending Event Submissions <span class="badge" style="background:#f39c12;color:#000"><?= $dash_pending_events ?></span></summary>
+  <div class="cpbody">
+    <p style="font-size:13px;color:#c8a040;margin-bottom:10px"><?= $dash_pending_events ?> event suggestion<?= $dash_pending_events !== 1 ? 's' : '' ?> waiting for review.</p>
+    <a href="#" onclick="showTab('community');document.querySelector('[onclick*=community]').click();return false" class="btn" style="font-size:12px;padding:7px 16px;text-decoration:none">Review in Community tab →</a>
+  </div>
+</details>
+<?php endif; ?>
+
 <!-- STATS -->
 <?php
 require_once '/var/www/noosphere/shared/analytics.php';
@@ -1230,16 +1267,54 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   <summary>Calendar Events</summary>
   <div class="cpbody">
     <?php
+    $pending_events = $upcoming_events = [];
     try {
-        $cdb    = new PDO('sqlite:/var/lib/noosphere/calendar.db');
-        $cdb->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, event_date TEXT NOT NULL, event_time TEXT, location TEXT, notes TEXT, created_by TEXT, created_at INTEGER NOT NULL)");
-        $events = $cdb->query("SELECT * FROM events WHERE event_date >= date('now') ORDER BY event_date ASC, event_time ASC")->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) { $events = []; }
+        $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
+        $cdb->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, event_date TEXT NOT NULL, event_time TEXT, location TEXT, notes TEXT, created_by TEXT, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'approved')");
+        @$cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+        $cdb->exec("UPDATE events SET status='approved' WHERE status IS NULL OR status=''");
+        $pending_events  = $cdb->query("SELECT * FROM events WHERE status='pending' ORDER BY created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
+        $upcoming_events = $cdb->query("SELECT * FROM events WHERE status='approved' AND event_date >= date('now') ORDER BY event_date ASC, event_time ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
     ?>
-    <?php if (!$events): ?><p style="color:#666;font-size:13px;margin-bottom:16px">No upcoming events.</p>
+
+    <?php if ($pending_events): ?>
+    <h2 style="color:#f39c12;border-color:#f39c12;margin-bottom:10px">Pending Submissions (<?= count($pending_events) ?>)</h2>
+    <div class="event-list" style="margin-bottom:24px">
+    <?php foreach ($pending_events as $ev): ?>
+      <div class="event-row" style="border-left:3px solid #f39c12;padding-left:10px">
+        <div class="event-date"><?= esc($ev['event_date']) ?><?= $ev['event_time'] ? '<br><span style="font-size:11px;color:#888">'.esc($ev['event_time']).'</span>' : '' ?></div>
+        <div class="event-info">
+          <div class="event-title"><?= esc($ev['title']) ?></div>
+          <div class="event-meta">
+            <?= $ev['location'] ? '📍 '.esc($ev['location']).' · ' : '' ?>
+            Submitted by <?= esc($ev['created_by'] ?: 'Anonymous') ?><?= $ev['notes'] ? ' · '.esc($ev['notes']) : '' ?>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <form method="post" style="margin:0">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="approve_event">
+            <input type="hidden" name="eid" value="<?= $ev['id'] ?>">
+            <button type="submit" class="btn-green">Approve</button>
+          </form>
+          <form method="post" style="margin:0" onsubmit="return confirm('Reject and delete this submission?')">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="reject_event">
+            <input type="hidden" name="eid" value="<?= $ev['id'] ?>">
+            <button type="submit" class="btn-red">Reject</button>
+          </form>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <h2>Upcoming Events</h2>
+    <?php if (!$upcoming_events): ?><p style="color:#666;font-size:13px;margin-bottom:16px">No upcoming events.</p>
     <?php else: ?>
     <div class="event-list">
-    <?php foreach ($events as $ev): ?>
+    <?php foreach ($upcoming_events as $ev): ?>
       <div class="event-row">
         <div class="event-date"><?= esc($ev['event_date']) ?><?= $ev['event_time'] ? '<br><span style="font-size:11px;color:#888">'.esc($ev['event_time']).'</span>' : '' ?></div>
         <div class="event-info">
@@ -1257,7 +1332,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     </div>
     <?php endif; ?>
 
-    <h2>Add Event</h2>
+    <h2 style="margin-top:20px">Add Event</h2>
     <form method="post">
       <?= csrf_field() ?>
       <input type="hidden" name="act" value="add_event">
