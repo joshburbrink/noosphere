@@ -36,7 +36,7 @@ $db->exec("CREATE TABLE IF NOT EXISTS tasks (
     updated_at   INTEGER NOT NULL
 )");
 // Migrate existing tables
-foreach (['reward_type TEXT NOT NULL DEFAULT \'none\'','reward_desc TEXT'] as $col) {
+foreach (['reward_type TEXT NOT NULL DEFAULT \'none\'','reward_desc TEXT','group_name TEXT'] as $col) {
     @$db->exec("ALTER TABLE tasks ADD COLUMN $col");
 }
 
@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $priority    = $is_admin && in_array($_POST['priority'] ?? '', $PRIORITIES) ? $_POST['priority'] : 'normal';
         $location    = trim($_POST['location'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
+        $group_name  = trim($_POST['group_name'] ?? '');
         $by          = trim($_POST['created_by'] ?? '') ?: ($session_name ?: ($is_admin ? 'Operator' : 'Community'));
         $rtype       = ($show_rewards && array_key_exists($_POST['reward_type'] ?? '', $REWARD_TYPES))
                        ? $_POST['reward_type'] : 'none';
@@ -80,12 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         else {
             $now = time();
             $s = $db->prepare("INSERT INTO tasks
-                (title,category,priority,status,location,notes,created_by,reward_type,reward_desc,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+                (title,category,priority,status,location,notes,group_name,created_by,reward_type,reward_desc,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
             $s->bindValue(1,$title); $s->bindValue(2,$category); $s->bindValue(3,$priority);
             $s->bindValue(4,$new_status); $s->bindValue(5,$location); $s->bindValue(6,$notes);
-            $s->bindValue(7,$by); $s->bindValue(8,$rtype); $s->bindValue(9,$rdesc);
-            $s->bindValue(10,$now,SQLITE3_INTEGER); $s->bindValue(11,$now,SQLITE3_INTEGER);
+            $s->bindValue(7,$group_name ?: null, $group_name ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s->bindValue(8,$by); $s->bindValue(9,$rtype); $s->bindValue(10,$rdesc);
+            $s->bindValue(11,$now,SQLITE3_INTEGER); $s->bindValue(12,$now,SQLITE3_INTEGER);
             $s->execute();
             $msg = $is_admin ? 'Task created.' : 'Task request submitted — awaiting operator approval.';
         }
@@ -157,22 +159,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'edit' && $is_admin) {
-        $id       = (int)($_POST['id'] ?? 0);
-        $title    = trim($_POST['title'] ?? '');
-        $category = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : $CATEGORIES[0];
-        $priority = in_array($_POST['priority'] ?? '', $PRIORITIES) ? $_POST['priority'] : 'normal';
-        $location = trim($_POST['location'] ?? '');
-        $notes    = trim($_POST['notes'] ?? '');
-        $rtype    = ($show_rewards && array_key_exists($_POST['reward_type'] ?? '', $REWARD_TYPES))
-                    ? $_POST['reward_type'] : 'none';
-        $rdesc    = $show_rewards ? trim($_POST['reward_desc'] ?? '') : '';
+        $id         = (int)($_POST['id'] ?? 0);
+        $title      = trim($_POST['title'] ?? '');
+        $category   = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : $CATEGORIES[0];
+        $priority   = in_array($_POST['priority'] ?? '', $PRIORITIES) ? $_POST['priority'] : 'normal';
+        $location   = trim($_POST['location'] ?? '');
+        $notes      = trim($_POST['notes'] ?? '');
+        $group_name = trim($_POST['group_name'] ?? '');
+        $rtype      = ($show_rewards && array_key_exists($_POST['reward_type'] ?? '', $REWARD_TYPES))
+                      ? $_POST['reward_type'] : 'none';
+        $rdesc      = $show_rewards ? trim($_POST['reward_desc'] ?? '') : '';
         if ($id && $title) {
             $now = time();
-            $s = $db->prepare("UPDATE tasks SET title=?,category=?,priority=?,location=?,notes=?,reward_type=?,reward_desc=?,updated_at=? WHERE id=?");
+            $s = $db->prepare("UPDATE tasks SET title=?,category=?,priority=?,location=?,notes=?,group_name=?,reward_type=?,reward_desc=?,updated_at=? WHERE id=?");
             $s->bindValue(1,$title); $s->bindValue(2,$category); $s->bindValue(3,$priority);
-            $s->bindValue(4,$location); $s->bindValue(5,$notes); $s->bindValue(6,$rtype);
-            $s->bindValue(7,$rdesc); $s->bindValue(8,$now,SQLITE3_INTEGER);
-            $s->bindValue(9,$id,SQLITE3_INTEGER);
+            $s->bindValue(4,$location); $s->bindValue(5,$notes);
+            $s->bindValue(6,$group_name ?: null, $group_name ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s->bindValue(7,$rtype); $s->bindValue(8,$rdesc);
+            $s->bindValue(9,$now,SQLITE3_INTEGER); $s->bindValue(10,$id,SQLITE3_INTEGER);
             $s->execute();
             $msg = 'Task updated.';
         }
@@ -226,6 +230,7 @@ function task_card($row, $is_admin, $is_readonly, $show_rewards, $require_login,
     $pcolor     = $PRIO_COLOR[$pri] ?? '#555';
     $plabel     = $PRIO_LABEL[$pri] ?? $pri;
     $claimed_by = htmlspecialchars($row['claimed_by'] ?? '');
+    $group_name = htmlspecialchars($row['group_name'] ?? '');
     $status     = $row['status'];
     $rtype      = $row['reward_type'] ?? 'none';
     $rdesc      = htmlspecialchars($row['reward_desc'] ?? '');
@@ -242,6 +247,7 @@ function task_card($row, $is_admin, $is_readonly, $show_rewards, $require_login,
         <span class="card-title"><?= $title ?></span>
         <span class="pri-badge" style="background:<?= $pcolor ?>"><?= $plabel ?></span>
       </div>
+      <?php if ($group_name): ?><div class="card-group">👥 <?= $group_name ?></div><?php endif ?>
       <?php if ($loc): ?><div class="card-loc">📍 <?= $loc ?></div><?php endif ?>
       <?php if ($notes): ?><div class="card-notes"><?= $notes ?></div><?php endif ?>
       <?php if ($show_rewards && $rtype !== 'none'): ?>
@@ -349,6 +355,7 @@ header h1{font-size:15px;color:#e94560;flex:1}
 .cat-icon{font-size:16px;flex-shrink:0;line-height:1.3}
 .card-title{font-size:13px;font-weight:bold;flex:1;line-height:1.3}
 .pri-badge{font-size:10px;padding:2px 6px;border-radius:3px;color:#fff;font-weight:bold;flex-shrink:0}
+.card-group{font-size:11px;color:#a78bfa;margin-bottom:4px}
 .card-loc{font-size:11px;color:#4a9eff;margin-bottom:4px}
 .card-notes{font-size:12px;color:#888;margin-bottom:4px;line-height:1.4}
 .card-reward{font-size:11px;color:#f5a623;background:#1a1500;border:1px solid #3a3000;border-radius:4px;padding:3px 7px;margin-bottom:5px;display:inline-block}
@@ -408,6 +415,10 @@ header h1{font-size:15px;color:#e94560;flex:1}
   <?php foreach ($CAT_ICONS as $k => $icon): ?>
     <a href="/tasks/?cat=<?= urlencode($k) ?>" class="filter-btn <?= $cat_filter===$k?'active':'' ?>"><?= $icon ?> <?= htmlspecialchars($k) ?></a>
   <?php endforeach ?>
+  <input type="text" id="task-search" placeholder="Search tasks..." oninput="filterTasks()"
+         style="margin-left:auto;background:#0f0f1a;border:1px solid #2a2a4a;color:#eee;border-radius:4px;padding:4px 10px;font-size:12px;width:180px">
+  <input type="text" id="group-search" placeholder="Group..." oninput="filterTasks()"
+         style="background:#0f0f1a;border:1px solid #2a2a4a;color:#eee;border-radius:4px;padding:4px 10px;font-size:12px;width:120px">
 </div>
 
 <div class="board">
@@ -488,6 +499,8 @@ header h1{font-size:15px;color:#e94560;flex:1}
       <?php endif ?>
       <label>Location / Address</label>
       <input type="text" name="location" placeholder="Optional" maxlength="120">
+      <label>Group / Team <span style="color:#555;font-weight:normal">(optional)</span></label>
+      <input type="text" name="group_name" placeholder="e.g. Team Alpha, Medical, Crew 3" maxlength="60">
       <label>Notes</label>
       <textarea name="notes" placeholder="Additional details…"></textarea>
       <label><?= $is_admin ? 'Created by' : 'Your name' ?></label>
@@ -539,6 +552,8 @@ header h1{font-size:15px;color:#e94560;flex:1}
       </select>
       <label>Location / Address</label>
       <input type="text" name="location" id="edit-location" maxlength="120">
+      <label>Group / Team <span style="color:#555;font-weight:normal">(optional)</span></label>
+      <input type="text" name="group_name" id="edit-group-name" maxlength="60" placeholder="e.g. Team Alpha">
       <label>Notes</label>
       <textarea name="notes" id="edit-notes"></textarea>
       <?php if ($show_rewards): ?>
@@ -583,11 +598,12 @@ function openCreate() {
 }
 function openEdit(id, row) {
   document.getElementById('edit-id').value       = id;
-  document.getElementById('edit-title').value    = row.title;
-  document.getElementById('edit-category').value = row.category;
-  document.getElementById('edit-priority').value = row.priority;
-  document.getElementById('edit-location').value = row.location || '';
-  document.getElementById('edit-notes').value    = row.notes || '';
+  document.getElementById('edit-title').value      = row.title;
+  document.getElementById('edit-category').value   = row.category;
+  document.getElementById('edit-priority').value   = row.priority;
+  document.getElementById('edit-location').value   = row.location || '';
+  document.getElementById('edit-notes').value      = row.notes || '';
+  document.getElementById('edit-group-name').value = row.group_name || '';
   if (SHOW_REWARDS) {
     document.getElementById('edit-reward-type').value = row.reward_type || 'none';
     document.getElementById('edit-reward-desc').value = row.reward_desc || '';
@@ -597,6 +613,18 @@ function openEdit(id, row) {
 }
 function closeModals() {
   document.querySelectorAll('.veil').forEach(v => v.classList.remove('open'));
+}
+
+function filterTasks() {
+  var q  = (document.getElementById('task-search').value  || '').toLowerCase();
+  var gq = (document.getElementById('group-search').value || '').toLowerCase();
+  document.querySelectorAll('.card[id^="task-"]').forEach(function(card) {
+    var text  = card.textContent.toLowerCase();
+    var group = (card.querySelector('.card-group') || {textContent:''}).textContent.toLowerCase();
+    var matchQ = !q  || text.includes(q);
+    var matchG = !gq || group.includes(gq);
+    card.style.display = (matchQ && matchG) ? '' : 'none';
+  });
 }
 document.querySelectorAll('.veil').forEach(v => {
   v.addEventListener('click', e => { if (e.target === v) closeModals(); });
