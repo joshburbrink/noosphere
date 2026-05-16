@@ -388,12 +388,12 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- Settings: save all settings ---
     if ($act === 'save_settings') {
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
-                      'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity'];
+                      'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity','tasks_categories'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
         $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
-                        'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar','readonly'];
+                        'show_tasks','show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -1903,6 +1903,20 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   </div>
 </div>
 
+<?php
+    
+?>
+<div class="mod-section">
+  <div class="mod-header">
+    <input type="checkbox" class="mod-toggle" id="t_tasks" name="show_tasks" <?= get_setting('show_tasks','1')==='1'?'checked':'' ?>>
+    <label for="t_tasks">Tasks</label>
+  </div>
+  <div class="mod-body">
+    <div class="field-label" style="margin-top:8px">Categories <span style="color:#555;font-weight:normal">&mdash; comma-separated, shown as filter tabs on the task board</span></div>
+    <input type="text" name="tasks_categories" value="<?= esc(get_setting('tasks_categories','Rescue,Logistics,Medical,Maintenance,Other')) ?>" placeholder="Rescue,Logistics,Medical,Other">
+    <div style="font-size:11px;color:#555;margin-top:4px">Suggested &mdash; Emergency: Rescue,Logistics,Medical,Maintenance,Communications,Other &middot; SAR: Search,Rescue,Medical,Logistics,Command,Other &middot; Shelter: Intake,Logistics,Medical,Maintenance,Staffing,Other</div>
+  </div>
+</div>
 <?php
 $simple_mods = [
     ['show_chat',     't_chat',     'Chat'],

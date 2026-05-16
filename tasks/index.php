@@ -25,7 +25,11 @@ $db->exec("CREATE TABLE IF NOT EXISTS tasks (
     updated_at   INTEGER NOT NULL
 )");
 
-$CATEGORIES = ['rescue','logistics','medical','maintenance','other'];
+// Categories loaded from settings — comma-separated display labels
+$_raw_cats = get_setting('tasks_categories', 'Rescue,Logistics,Medical,Maintenance,Other');
+$CATEGORIES = array_values(array_filter(array_map('trim', explode(',', $_raw_cats))));
+if (!$CATEGORIES) $CATEGORIES = ['Other'];
+
 $PRIORITIES = ['urgent','normal','low'];
 $msg = ''; $error = '';
 
@@ -36,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'create' && $is_admin) {
         $title    = trim($_POST['title'] ?? '');
-        $category = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : 'other';
+        $category = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : $CATEGORIES[0];
         $priority = in_array($_POST['priority'] ?? '', $PRIORITIES) ? $_POST['priority'] : 'normal';
         $location = trim($_POST['location'] ?? '');
         $notes    = trim($_POST['notes'] ?? '');
@@ -106,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'edit' && $is_admin) {
         $id       = (int)($_POST['id'] ?? 0);
         $title    = trim($_POST['title'] ?? '');
-        $category = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : 'other';
+        $category = in_array($_POST['category'] ?? '', $CATEGORIES) ? $_POST['category'] : $CATEGORIES[0];
         $priority = in_array($_POST['priority'] ?? '', $PRIORITIES) ? $_POST['priority'] : 'normal';
         $location = trim($_POST['location'] ?? '');
         $notes    = trim($_POST['notes'] ?? '');
@@ -142,7 +146,18 @@ while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
 
 $PRIO_COLOR  = ['urgent'=>'#e94560','normal'=>'#4a9eff','low'=>'#555'];
 $PRIO_LABEL  = ['urgent'=>'URGENT','normal'=>'Normal','low'=>'Low'];
-$CAT_ICONS   = ['rescue'=>'🚨','logistics'=>'📦','medical'=>'🏥','maintenance'=>'🔧','other'=>'📋'];
+// Icon map — keyed by lowercase label, falls back to 📋
+$_ICON_MAP = [
+    'rescue'=>'🚨','search'=>'🔍','medical'=>'🏥','logistics'=>'📦',
+    'maintenance'=>'🔧','communications'=>'📻','command'=>'⭐',
+    'staffing'=>'👥','intake'=>'📝','cleanup'=>'🧹','setup'=>'🏗',
+    'distribution'=>'📤','collection'=>'📥','volunteers'=>'🙋',
+    'other'=>'📋','general'=>'📋',
+];
+$CAT_ICONS = [];
+foreach ($CATEGORIES as $cat) {
+    $CAT_ICONS[$cat] = $_ICON_MAP[strtolower($cat)] ?? '📋';
+}
 
 function task_card($row, $is_admin, $is_readonly, $PRIO_COLOR, $PRIO_LABEL, $CAT_ICONS) {
     $id    = (int)$row['id'];
