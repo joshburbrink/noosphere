@@ -5,7 +5,7 @@ echo "  $(date)"
 echo "==============================="
 echo ""
 echo "--- Services ---"
-for svc in nginx php8.4-fpm mariadb kiwix mbtileserver; do
+for svc in nginx php8.4-fpm mariadb kiwix mbtileserver wifi-reconnect; do
     STATUS=$(systemctl is-active "$svc" 2>/dev/null)
     MARK=$( [ "$STATUS" = "active" ] && echo "OK" || echo "!!")
     printf "  [%s] %-20s %s\n" "$MARK" "$svc" "$STATUS"
