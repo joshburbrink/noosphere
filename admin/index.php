@@ -1891,15 +1891,11 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1a1a2e">
         <span style="flex:1;font-size:13px;color:<?= $enabled ? '#e0e0e0' : '#555' ?>"><?= esc($display) ?></span>
         <span style="font-size:11px;color:#555;flex-shrink:0"><?= $size_mb ?> MB</span>
-        <form method="post" style="flex-shrink:0">
-          <?= csrf_field() ?>
-          <input type="hidden" name="act" value="kiwix_toggle">
-          <input type="hidden" name="zim" value="<?= esc($fname) ?>">
-          <input type="hidden" name="enable" value="<?= $enabled ? '0' : '1' ?>">
-          <button type="submit" style="padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid <?= $enabled ? '#3a2a2a' : '#1a3a1a' ?>;background:none;color:<?= $enabled ? '#e94560' : '#2ecc71' ?>;cursor:pointer">
-            <?= $enabled ? 'Disable' : 'Enable' ?>
-          </button>
-        </form>
+        <button type="button"
+                onclick="zimToggle(<?= htmlspecialchars(json_encode($fname)) ?>,<?= $enabled ? '0' : '1' ?>)"
+                style="flex-shrink:0;padding:4px 12px;font-size:11px;border-radius:4px;border:1px solid <?= $enabled ? '#3a2a2a' : '#1a3a1a' ?>;background:none;color:<?= $enabled ? '#e94560' : '#2ecc71' ?>;cursor:pointer">
+          <?= $enabled ? 'Disable' : 'Enable' ?>
+        </button>
       </div>
     <?php endforeach; endif; ?>
   </div>
@@ -2116,6 +2112,13 @@ function modToggle(name, on) {
   if (body) { if (on) body.classList.remove('off'); else body.classList.add('off'); }
 }
 
+function zimToggle(fname, enable) {
+  var f = document.getElementById('zim-action-form');
+  f.querySelector('[name=zim]').value = fname;
+  f.querySelector('[name=enable]').value = enable;
+  f.submit();
+}
+
 function shelterToggle(on) {
   var body = document.getElementById('body_shelter');
   if (body) { if (on) body.classList.remove('off'); else body.classList.add('off'); }
@@ -2177,5 +2180,11 @@ document.getElementById('new-rf-label') && document.getElementById('new-rf-label
   if (e.key === 'Enter') { e.preventDefault(); addField(); }
 });
 </script>
+<form id="zim-action-form" method="post" style="display:none">
+  <?= csrf_field() ?>
+  <input type="hidden" name="act" value="kiwix_toggle">
+  <input type="hidden" name="zim" value="">
+  <input type="hidden" name="enable" value="">
+</form>
 </body>
 </html>

@@ -71,9 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $location    = trim($_POST['location'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
         $by          = trim($_POST['created_by'] ?? '') ?: ($session_name ?: ($is_admin ? 'Operator' : 'Community'));
-        $rtype       = ($show_rewards && $is_admin && array_key_exists($_POST['reward_type'] ?? '', $REWARD_TYPES))
+        $rtype       = ($show_rewards && array_key_exists($_POST['reward_type'] ?? '', $REWARD_TYPES))
                        ? $_POST['reward_type'] : 'none';
-        $rdesc       = ($show_rewards && $is_admin) ? trim($_POST['reward_desc'] ?? '') : '';
+        $rdesc       = $show_rewards ? trim($_POST['reward_desc'] ?? '') : '';
         $new_status  = $is_admin ? 'open' : 'pending';
 
         if (!$title) { $error = 'Title is required.'; }
@@ -493,7 +493,7 @@ header h1{font-size:15px;color:#e94560;flex:1}
       <label><?= $is_admin ? 'Created by' : 'Your name' ?></label>
       <input type="text" name="created_by" value="<?= htmlspecialchars($session_name) ?>"
              placeholder="<?= $is_admin ? 'Operator name' : 'Your name (optional)' ?>" maxlength="60">
-      <?php if ($show_rewards && $is_admin): ?>
+      <?php if ($show_rewards): ?>
       <label>Reward</label>
       <select name="reward_type" id="create-reward-type" onchange="toggleRewardDesc('create')">
         <?php foreach ($REWARD_TYPES as $rk => $rl): ?>
