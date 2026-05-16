@@ -388,12 +388,14 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- Settings: save all settings ---
     if ($act === 'save_settings') {
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
-                      'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity','tasks_categories'];
+                      'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
+                      'tasks_categories','tasks_auto_close_hours'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
         $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
-                        'show_tasks','show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar','readonly'];
+                        'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
+                        'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -1915,6 +1917,24 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     <div class="field-label" style="margin-top:8px">Categories <span style="color:#555;font-weight:normal">&mdash; comma-separated, shown as filter tabs on the task board</span></div>
     <input type="text" name="tasks_categories" value="<?= esc(get_setting('tasks_categories','Rescue,Logistics,Medical,Maintenance,Other')) ?>" placeholder="Rescue,Logistics,Medical,Other">
     <div style="font-size:11px;color:#555;margin-top:4px">Suggested &mdash; Emergency: Rescue,Logistics,Medical,Maintenance,Communications,Other &middot; SAR: Search,Rescue,Medical,Logistics,Command,Other &middot; Shelter: Intake,Logistics,Medical,Maintenance,Staffing,Other</div>
+
+    <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:14px 28px;align-items:center">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" name="tasks_show_rewards" <?= get_setting('tasks_show_rewards','0')==='1'?'checked':'' ?>>
+        <span>Show reward / payment field on tasks</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" name="tasks_require_login" <?= get_setting('tasks_require_login','0')==='1'?'checked':'' ?>>
+        <span>Require registry login to claim tasks</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" name="tasks_allow_self_create" <?= get_setting('tasks_allow_self_create','0')==='1'?'checked':'' ?>>
+        <span>Allow anyone to submit task requests</span>
+      </label>
+    </div>
+    <div style="margin-top:10px">
+      <label class="field-label" style="display:inline">Auto-close completed tasks after <input type="number" name="tasks_auto_close_hours" value="<?= esc(get_setting('tasks_auto_close_hours','0')) ?>" min="0" style="width:64px;margin:0 4px"> hours <span style="color:#555;font-weight:normal">(0 = never)</span></label>
+    </div>
   </div>
 </div>
 <?php
