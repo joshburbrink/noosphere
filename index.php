@@ -32,6 +32,8 @@ if (get_setting('show_forum','1')==='1')
     $tiles[] = ['href'=>'/forum/',    'icon'=>'📋', 'label'=>'Community Board', 'desc'=>'Announcements, coordination &amp; discussion'];
 if (get_setting('show_files','1')==='1')
     $tiles[] = ['href'=>'/files/',    'icon'=>'📁', 'label'=>'Files',           'desc'=>'Share documents, notices &amp; resources'];
+if (get_setting('show_tasks','1')==='1')
+    $tiles[] = ['href'=>'/tasks/',    'icon'=>'📋', 'label'=>'Tasks',            'desc'=>'Volunteer jobs — claim a task and help out'];
 if (get_setting('show_library','1')==='1')
     $tiles[] = ['href'=>'/library/',  'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
 if (get_setting('show_maps','1')==='1')
