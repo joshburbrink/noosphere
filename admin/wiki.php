@@ -168,6 +168,9 @@ pre {
     <tr><td>registry_shelter</td><td>Enable shelter-specific fields (bunk number, dietary needs, next of kin)</td></tr>
     <tr><td>shelter_name</td><td>Name of the shelter, shown in the header when registry_shelter is on</td></tr>
     <tr><td>shelter_capacity</td><td>Maximum occupancy for capacity badge on homepage</td></tr>
+    <tr><td>registry_allow_self_register</td><td>When <b>1</b> (default), visitors can check themselves in. Uncheck to make the registry admin-managed only.</td></tr>
+    <tr><td>registry_location_required</td><td>When <b>1</b> (default), the location field is required on check-in. Uncheck for events where location doesn't apply.</td></tr>
+    <tr><td>registry_description</td><td>Custom description for the Registry tile on the homepage. Leave blank to auto-generate from enabled options.</td></tr>
   </table>
 
   <h3>Features</h3>
@@ -180,6 +183,8 @@ pre {
     <tr><td>show_library</td><td>Enable the Kiwix offline library link</td></tr>
     <tr><td>show_maps</td><td>Enable the offline map</td></tr>
     <tr><td>show_calendar</td><td>Enable the shared calendar</td></tr>
+    <tr><td>show_topo</td><td>Enable the Topo PDFs page (USGS topographic maps)</td></tr>
+    <tr><td>require_registration</td><td>When <b>1</b>, unregistered visitors can view content but cannot post, send chat messages, or upload files.</td></tr>
   </table>
 
   <h3>Quick Start Presets</h3>
@@ -282,15 +287,38 @@ systemctl status dnsmasq</pre>
   <h3>From phone or tablet</h3>
   <p>Navigate directly to <code>http://192.168.8.2/admin/</code> (on router network) or <code>http://192.168.2.167/admin/</code> (on laptop WiFi). Enter your admin username and password.</p>
 
+  <h3>Admin panel tabs</h3>
+  <table class="setting-table">
+    <tr><th>Tab</th><th>What it contains</th></tr>
+    <tr><td>Dashboard</td><td>Service status cards, disk usage, registry/chat/forum/map quick stats, active bans count</td></tr>
+    <tr><td>Network</td><td>Connected devices list with IP/MAC — ban by IP directly from here</td></tr>
+    <tr><td>Community</td><td>Registry entries, forum threads/posts, bans (add/remove by name or IP), calendar events, uploaded files</td></tr>
+    <tr><td>Content</td><td>Uploaded files, registry photos, map markers, ZIM library enable/disable — all deletable</td></tr>
+    <tr><td>System</td><td>CPU temp, disk usage, top processes, nginx/php/system logs, database backup download</td></tr>
+    <tr><td>Settings</td><td>Four sub-tabs: <b>Configure</b> (identity, read-only, registration access), <b>Modules</b> (per-feature toggles, custom registry fields, forum categories), <b>Security</b> (change Linux and admin passwords), <b>Tools</b> (presets, utility scripts, Reset Instance)</td></tr>
+  </table>
+
   <h3>Changing the admin password</h3>
-  <pre># On the server, edit the admin credentials in the database:
-sqlite3 /var/lib/noosphere/admin.db
-UPDATE admins SET password_hash = lower(hex(sha256('your-new-password'))) WHERE username='admin';</pre>
-  <div class="warn">The default admin credentials are set during setup. Change them before deploying in a real scenario.</div>
+  <p>Use the admin panel: <b>Settings → Security → Admin Panel Password</b>. Enter your current password and set a new one.</p>
+  <p>Command-line fallback (if locked out):</p>
+  <pre># Generate a bcrypt hash:
+NEW_HASH=$(php -r "echo password_hash('your-new-password', PASSWORD_DEFAULT);")
+# Store it in the settings database:
+sqlite3 /var/lib/noosphere/settings.db \
+  "INSERT OR REPLACE INTO settings (key,value) VALUES ('admin_password_hash','$NEW_HASH');"</pre>
+  <div class="warn">Change the admin password before deploying in a real scenario. Registry users with admin privilege can also log in with their registry PIN.</div>
+
+  <h3>Changing Linux system passwords</h3>
+  <p>Use <b>Settings → Security → Linux System Credentials</b> to change the password for the Linux user and/or root. These passwords control SSH and console access and persist when cloning the drive.</p>
 
   <h3>Banning a user</h3>
-  <p>From Admin → Registry, click any entry to view it, then use the Ban button. Banned IPs are blocked from chat and posting. Ban list is managed in Admin → Security (if visible) or directly:</p>
-  <pre>sqlite3 /var/lib/noosphere/admin.db "SELECT * FROM bans";</pre>
+  <p>Two ways to ban from the admin panel:</p>
+  <ul>
+    <li><b>Network tab</b> — shows all connected devices by IP/MAC. Click Ban next to a device to ban by IP immediately.</li>
+    <li><b>Community tab</b> — add a ban by name, IP, or both, with an optional reason. Also shows the full ban list for removal.</li>
+  </ul>
+  <p>Banned IPs are blocked from chat, posting, and file uploads. To inspect bans directly:</p>
+  <pre>sqlite3 /var/lib/noosphere/admin.db "SELECT * FROM bans;"</pre>
 </div>
 
 <!-- ── 6. Troubleshooting ──────────────────────────────────────────────────── -->
