@@ -171,7 +171,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             created_at INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'approved'
         )");
-        @$cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+        try { $cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'"); } catch (Exception $e) {}
         $cdb->exec("UPDATE events SET status='approved' WHERE status IS NULL OR status=''");
         $title  = trim($_POST['title']  ?? '');
         $date   = trim($_POST['edate']  ?? '');
@@ -1271,7 +1271,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     try {
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->exec("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, event_date TEXT NOT NULL, event_time TEXT, location TEXT, notes TEXT, created_by TEXT, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'approved')");
-        @$cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'");
+        try { $cdb->exec("ALTER TABLE events ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'"); } catch (Exception $e) {}
         $cdb->exec("UPDATE events SET status='approved' WHERE status IS NULL OR status=''");
         $pending_events  = $cdb->query("SELECT * FROM events WHERE status='pending' ORDER BY created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
         $upcoming_events = $cdb->query("SELECT * FROM events WHERE status='approved' AND event_date >= date('now') ORDER BY event_date ASC, event_time ASC")->fetchAll(PDO::FETCH_ASSOC);
