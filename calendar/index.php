@@ -28,19 +28,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act'] ?? '') === 'submit_e
         $err = 'The hub is currently in read-only mode.';
     } else {
         rate_limit('calendar_submit', 5, 600);
-        $title = trim($_POST['title']       ?? '');
-        $date  = trim($_POST['edate']       ?? '');
-        $time  = trim($_POST['etime']       ?? '');
-        $loc   = trim($_POST['eloc']        ?? '');
-        $notes = trim($_POST['enotes']      ?? '');
-        $name  = trim($_POST['submitted_by'] ?? '');
+        $title  = trim($_POST['title']  ?? '');
+        $date   = trim($_POST['edate']  ?? '');
+        $time   = trim($_POST['etime']  ?? '');
+        $loc    = trim($_POST['eloc']   ?? '');
+        $notes  = trim($_POST['enotes'] ?? '');
+        $name   = trim($_POST['author'] ?? '');
+        $pin    = trim($_POST['pin']    ?? '');
+
+        $reg          = ($name && $pin) ? verify_pin($name, $pin, false) : null;
+        $require_reg  = get_setting('require_registration','0') === '1';
+
         if (!$title) {
             $err = 'A title is required.';
         } elseif (!$date || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             $err = 'A valid date is required.';
+        } elseif ($require_reg && !$reg) {
+            $err = 'You must be signed in to the registry to suggest an event. Enter your registry name and PIN.';
         } elseif ($cdb) {
+            $display_name = $reg ? $reg['name'] : ($name ?: 'Anonymous');
             $cdb->prepare('INSERT INTO events (title,event_date,event_time,location,notes,created_by,created_at,status) VALUES (?,?,?,?,?,?,?,?)')
-                ->execute([$title, $date, $time ?: null, $loc ?: null, $notes ?: null, $name ?: 'Anonymous', time(), 'pending']);
+                ->execute([$title, $date, $time ?: null, $loc ?: null, $notes ?: null, $display_name, time(), 'pending']);
             $msg = 'Your event suggestion has been submitted for review. An admin will approve it before it appears on the calendar.';
         } else {
             $err = 'Database unavailable. Please try again.';
@@ -165,12 +173,16 @@ textarea { resize:vertical; }
     <?php if ($msg): ?><div class="msg-ok"><?= esc($msg) ?></div><?php endif; ?>
     <?php if ($err): ?><div class="msg-err"><?= esc($err) ?></div><?php endif; ?>
     <?php if (!$msg): ?>
+    <?php $require_reg = get_setting('require_registration','0') === '1'; ?>
     <form method="post">
       <?= csrf_field() ?>
       <input type="hidden" name="act" value="submit_event">
       <div class="form-row">
         <div style="flex:2"><label>Event title *</label><input type="text" name="title" required maxlength="120" placeholder="Community meeting, supply run…"></div>
-        <div><label>Your name</label><input type="text" name="submitted_by" maxlength="60" placeholder="Optional"></div>
+        <div><label>Your name<?= $require_reg ? ' *' : '' ?></label><input type="text" name="author" maxlength="60" <?= $require_reg ? 'required' : '' ?> placeholder="<?= $require_reg ? 'Registry name' : 'Optional' ?>"></div>
+        <?php if ($require_reg): ?>
+        <div><label>Registry PIN *</label><input type="password" name="pin" required placeholder="Your PIN"></div>
+        <?php endif; ?>
       </div>
       <div class="form-row">
         <div><label>Date *</label><input type="date" name="edate" required></div>
