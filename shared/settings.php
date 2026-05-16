@@ -174,6 +174,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '1',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '1',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '1',
             'require_registration'        => '0',
         ],
@@ -209,6 +211,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '0',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '0',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '1',
             'require_registration'        => '0',
         ],
@@ -244,6 +248,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '1',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '1',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '1',
             'require_registration'        => '0',
         ],
@@ -279,6 +285,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '1',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '1',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '1',
             'require_registration'        => '1',
         ],
@@ -314,6 +322,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '0',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '0',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '0',
             'require_registration'        => '0',
         ],
@@ -350,6 +360,8 @@ function _presets() {
             'weather_label'        => 'Weather Log',
             'show_radio'           => '0',
             'radio_label'          => 'Radio Net Log',
+            'show_runners'         => '0',
+            'runners_label'        => 'Runner Board',
             'registry_allow_self_register' => '1',
             'require_registration'        => '0',
         ],
@@ -366,7 +378,7 @@ register_shutdown_function(function() {
     $module = 'home';
     foreach (['/registry'=>'registry','/forum'=>'forum','/chat'=>'chat',
               '/files'=>'files','/maps'=>'maps','/library'=>'library',
-              '/calendar'=>'calendar','/weather'=>'weather','/radio'=>'radio'] as $path => $mod) {
+              '/calendar'=>'calendar','/weather'=>'weather','/radio'=>'radio','/runners'=>'runners'] as $path => $mod) {
         if (strpos($uri, $path) !== false) { $module = $mod; break; }
     }
     $af = __DIR__ . '/analytics.php';

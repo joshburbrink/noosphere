@@ -396,7 +396,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','readonly'];
+                        'show_weather','show_radio','show_runners','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -1943,6 +1943,7 @@ $simple_mods = [
     ['show_calendar', 't_calendar', 'Calendar'],
     ['show_weather',  't_weather',  'Weather Log'],
     ['show_radio',    't_radio',    'Radio Net Log'],
+    ['show_runners',  't_runners',  'Runner Board'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>

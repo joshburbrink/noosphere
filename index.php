@@ -42,6 +42,8 @@ if (get_setting('show_topo','1')==='1')
     $tiles[] = ['href'=>'/topo/',      'icon'=>'⛰️',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads — Bartholomew &amp; Brown County'];
 if (get_setting('show_calendar','1')==='1')
     $tiles[] = ['href'=>'/calendar/', 'icon'=>'📅', 'label'=>'Calendar',        'desc'=>'Community events &amp; schedules'];
+if (get_setting('show_runners','0')==='1')
+    $tiles[] = ['href'=>'/runners/',  'icon'=>'🏃', 'label'=>get_setting('runners_label','Runner Board'),  'desc'=>'Track who\'s out in the field — flags overdue runners'];
 if (get_setting('show_weather','0')==='1')
     $tiles[] = ['href'=>'/weather/',  'icon'=>'⛅', 'label'=>get_setting('weather_label','Weather Log'), 'desc'=>'Log weather observations &amp; conditions'];
 if (get_setting('show_radio','0')==='1')
