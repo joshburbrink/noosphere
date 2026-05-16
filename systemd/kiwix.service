@@ -1,0 +1,13 @@
+[Unit]
+Description=Kiwix Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+ExecStart=/usr/bin/kiwix-serve --port=8888 --urlRootLocation /library --library /var/lib/kiwix/library.xml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

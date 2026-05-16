@@ -305,7 +305,7 @@ register_shutdown_function(function() {
     if (strpos($uri, '/admin') !== false) return;
     $module = 'home';
     foreach (['/registry'=>'registry','/forum'=>'forum','/chat'=>'chat',
-              '/files'=>'files','/maps'=>'maps','/kiwix'=>'library',
+              '/files'=>'files','/maps'=>'maps','/library'=>'library',
               '/calendar'=>'calendar'] as $path => $mod) {
         if (strpos($uri, $path) !== false) { $module = $mod; break; }
     }

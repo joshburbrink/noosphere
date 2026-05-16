@@ -33,7 +33,7 @@ if (get_setting('show_forum','1')==='1')
 if (get_setting('show_files','1')==='1')
     $tiles[] = ['href'=>'/files/',    'icon'=>'📁', 'label'=>'Files',           'desc'=>'Share documents, notices &amp; resources'];
 if (get_setting('show_library','1')==='1')
-    $tiles[] = ['href'=>'/kiwix/',    'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
+    $tiles[] = ['href'=>'/library/',  'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
 if (get_setting('show_maps','1')==='1')
     $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Bartholomew &amp; Brown County — offline map with shared markers'];
 if (get_setting('show_topo','1')==='1')
