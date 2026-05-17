@@ -8,7 +8,7 @@ if (get_setting('show_weather','1') !== '1') { http_response_code(404); exit; }
 $m3u8 = '/var/www/noosphere/weather/stream/live.m3u8';
 $age  = file_exists($m3u8) ? (time() - filemtime($m3u8)) : 9999;
 
-$segs = glob('/var/www/noosphere/weather/stream/seg*.aac');
+$segs = glob('/var/www/noosphere/weather/stream/seg*.ts');
 if (!$segs) {
     echo json_encode(['ok'=>false,'age_s'=>$age]); exit;
 }
