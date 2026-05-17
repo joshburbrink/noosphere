@@ -2006,7 +2006,11 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
     <label for="t_tasks">Tasks</label>
   </div>
   <div class="mod-body">
-    <div class="field-label" style="margin-top:8px">Categories <span style="color:#555;font-weight:normal">&mdash; comma-separated, shown as filter tabs on the task board</span></div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <a href="/tasks/?manage=1" target="_blank" style="background:#16213e;border:1px solid #2a2a4a;color:#7ad;border-radius:6px;padding:6px 14px;font-size:12px;text-decoration:none">⚙ Manage Boards →</a>
+      <span style="font-size:11px;color:#555">Each board has its own name, description, and categories.</span>
+    </div>
+    <div class="field-label" style="margin-top:10px">Default categories for new boards <span style="color:#555;font-weight:normal">&mdash; comma-separated</span></div>
     <input type="text" name="tasks_categories" value="<?= esc(get_setting('tasks_categories','Rescue,Logistics,Medical,Maintenance,Other')) ?>" placeholder="Rescue,Logistics,Medical,Other">
     <div style="font-size:11px;color:#555;margin-top:4px">Suggested &mdash; Emergency: Rescue,Logistics,Medical,Maintenance,Communications,Other &middot; SAR: Search,Rescue,Medical,Logistics,Command,Other &middot; Shelter: Intake,Logistics,Medical,Maintenance,Staffing,Other</div>
 
