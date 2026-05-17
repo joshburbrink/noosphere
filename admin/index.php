@@ -87,6 +87,26 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $run_name   = $script;
     }
 
+    // --- SDR diagnostics (AJAX — returns JSON) ---
+    if (in_array($act, ['sdr_diag_usb','sdr_diag_rtltest','sdr_diag_log','sdr_diag_restart','sdr_diag_blacklist'])) {
+        header('Content-Type: application/json');
+        $arg = '';
+        if ($act === 'sdr_diag_log' || $act === 'sdr_diag_restart') {
+            $svc = preg_replace('/[^a-z\-]/', '', $_POST['service'] ?? 'noaa-weather');
+            $arg = in_array($svc, ['noaa-weather','scanner-waterfall']) ? $svc : 'noaa-weather';
+        }
+        $diag_cmds = [
+            'sdr_diag_usb'      => 'sudo /usr/local/bin/sdr-diag.sh usb',
+            'sdr_diag_rtltest'  => 'sudo /usr/local/bin/sdr-diag.sh rtl_test',
+            'sdr_diag_log'      => 'sudo /usr/local/bin/sdr-diag.sh log ' . escapeshellarg($arg),
+            'sdr_diag_restart'  => 'sudo /usr/local/bin/sdr-diag.sh restart ' . escapeshellarg($arg),
+            'sdr_diag_blacklist'=> 'sudo /usr/local/bin/sdr-diag.sh blacklist',
+        ];
+        $out = shell_exec($diag_cmds[$act] . ' 2>&1') ?? '(no output)';
+        echo json_encode(['ok' => true, 'output' => $out]);
+        exit;
+    }
+
     // --- Promote / demote registry user ---
     if ($act === 'set_admin') {
         $uid  = (int)($_POST['uid'] ?? 0);
@@ -389,16 +409,41 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'save_settings') {
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
                       'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
-                      'tasks_categories','tasks_auto_close_hours'];
+                      'tasks_categories','tasks_auto_close_hours',
+                      'radio_freq','radio_gain','radio_ppm','radio_same_fips'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
         $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','show_runners','readonly'];
+                        'show_weather','show_radio','show_runners','show_damage','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
+        }
+        // --- SDR radio mode (off|nwr|scanner) — invokes helper if changed ---
+        if (isset($_POST['radio_mode'])) {
+            $valid_modes = ['off','nwr','scanner'];
+            $new_mode = in_array($_POST['radio_mode'], $valid_modes, true) ? $_POST['radio_mode'] : 'off';
+            $old_mode = get_setting('radio_mode', 'off');
+            $freq = trim($_POST['radio_freq'] ?? '162.550M') ?: '162.550M';
+            $gain = trim($_POST['radio_gain'] ?? '49.6') ?: '49.6';
+            $ppm  = (string)(int)($_POST['radio_ppm'] ?? 0);
+            $fips = preg_replace('/[^0-9,]/', '', $_POST['radio_same_fips'] ?? '018005,018013');
+            set_setting('radio_mode', $new_mode);
+            set_setting('radio_freq', $freq);
+            set_setting('radio_gain', $gain);
+            set_setting('radio_ppm', $ppm);
+            set_setting('radio_same_fips', $fips);
+            // Apply unless mode is off AND nothing changed
+            $cmd = sprintf('sudo /usr/local/bin/noosphere-radio-mode.sh %s %s %s %s %s 2>&1',
+                escapeshellarg($new_mode),
+                escapeshellarg($freq),
+                escapeshellarg($gain),
+                escapeshellarg($ppm),
+                escapeshellarg($fips ?: ''));
+            $out = shell_exec($cmd);
+            if ($out !== null) $msg = ($msg ? $msg . ' · ' : '') . 'SDR: ' . trim($out);
         }
         // Registry fields: build from parallel arrays
         if (isset($_POST['rf_label']) && is_array($_POST['rf_label'])) {
@@ -1935,6 +1980,145 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   </div>
 </div>
 <?php
+// Detect dongle status for the SDR card
+$sdr_status = trim(shell_exec("/usr/local/bin/rtlsdr-detect.sh --verbose 2>&1") ?? "");
+$sdr_ok = (strpos($sdr_status, "Status:    OK") !== false);
+$sdr_mode = get_setting("radio_mode", "off");
+$sdr_freq = get_setting("radio_freq", "162.550M");
+$sdr_gain = get_setting("radio_gain", "49.6");
+$sdr_ppm  = get_setting("radio_ppm", "0");
+$sdr_fips = get_setting("radio_same_fips", "018005,018013");
+$svc_state = trim(shell_exec("systemctl is-active noaa-weather.service 2>/dev/null") ?? "");
+$status_box_bg  = $sdr_ok ? "#0a2a1a" : "#2a0a0a";
+$status_box_br  = $sdr_ok ? "#2a4a3a" : "#5a3a3a";
+$status_box_fg  = $sdr_ok ? "#7ad"   : "#e94560";
+$card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
+?>
+<div class="mod-section" style="border-color:<?= $card_border ?>">
+  <div class="mod-header">
+    <span style="font-size:15px">📡 SDR Radio <span style="font-size:11px;color:#888;font-weight:normal">— hardware-driven NOAA Weather Radio &amp; spectrum monitor</span></span>
+  </div>
+  <div class="mod-body">
+
+    <div style="background:<?= $status_box_bg ?>;border:1px solid <?= $status_box_br ?>;padding:8px 12px;border-radius:6px;margin:8px 0 12px;font-size:12px;font-family:monospace;white-space:pre-wrap;color:<?= $status_box_fg ?>"><?= htmlspecialchars($sdr_status ?: "(probe failed)") ?></div>
+
+    <div class="field-label" style="margin-top:4px">Mode <span style="color:#555;font-weight:normal">— only one can hold the dongle at a time</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <?php foreach ([
+        ["off",     "Off",                  "Dongle idle. Nothing in /weather/ or /radio/ SDR sections."],
+        ["nwr",     "NOAA Weather Radio",   "Decode SAME alerts &amp; stream live audio. Section appears in /weather/."],
+        ["scanner", "Spectrum Scanner",     "Waterfall display. Section appears in /radio/."],
+      ] as [$mval,$mlbl,$mdesc]):
+        $active = ($sdr_mode === $mval);
+        $bcol = $active ? "#e94560" : "#2a2a4a";
+        $bg   = $active ? "#2a1525" : "transparent";
+      ?>
+      <label style="flex:1;min-width:140px;padding:10px 12px;border:1px solid <?= $bcol ?>;border-radius:6px;cursor:pointer;background:<?= $bg ?>">
+        <input type="radio" name="radio_mode" value="<?= $mval ?>" <?= $active ? "checked" : "" ?>> <strong><?= $mlbl ?></strong>
+        <div style="font-size:11px;color:#888;margin-top:2px"><?= $mdesc ?></div>
+      </label>
+      <?php endforeach; ?>
+    </div>
+
+    <div class="field-label" style="margin-top:16px">NOAA Weather Radio tuning</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px">
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Frequency</div>
+        <select name="radio_freq" style="width:100%">
+        <?php foreach (["162.400M","162.425M","162.450M","162.475M","162.500M","162.525M","162.550M"] as $f): ?>
+          <option value="<?= $f ?>" <?= $f === $sdr_freq ? "selected" : "" ?>><?= $f ?></option>
+        <?php endforeach; ?>
+        </select>
+        <div style="font-size:10px;color:#555;margin-top:3px">Use noaa-scan.sh on the host to pick strongest local NWR</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Tuner gain (dB)</div>
+        <input type="text" name="radio_gain" value="<?= htmlspecialchars($sdr_gain) ?>" style="width:100%" placeholder="49.6">
+        <div style="font-size:10px;color:#555;margin-top:3px">numeric dB; max varies by tuner (R820T tops at 49.6)</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">PPM correction</div>
+        <input type="number" name="radio_ppm" value="<?= htmlspecialchars($sdr_ppm) ?>" style="width:100%" placeholder="0">
+        <div style="font-size:10px;color:#555;margin-top:3px">Crystal drift, usually 0–60</div>
+      </div>
+    </div>
+
+    <div class="field-label" style="margin-top:14px">Local FIPS codes <span style="color:#555;font-weight:normal">— alerts matching these are flagged as local</span></div>
+    <input type="text" name="radio_same_fips" value="<?= htmlspecialchars($sdr_fips) ?>" placeholder="018005,018013" style="margin-bottom:4px">
+    <div style="font-size:11px;color:#555">Bartholomew IN = 018005 · Brown IN = 018013 · Lookup at weather.gov/nwr/counties</div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;color:#888">Service:</span>
+      <span style="font-family:monospace;font-size:12px;color:<?= $svc_state === "active" ? "#7ad" : "#888" ?>">noaa-weather.service = <?= htmlspecialchars($svc_state ?: "unknown") ?></span>
+      <span style="margin-left:auto;font-size:11px;color:#555">Save Settings to apply mode + tuning changes</span>
+    </div>
+
+
+    <details style="margin-top:16px;border:1px solid #2a2a4a;border-radius:6px">
+      <summary style="padding:8px 12px;font-size:12px;color:#888;cursor:pointer;user-select:none">🔧 Diagnostics &amp; Troubleshooting</summary>
+      <div style="padding:12px">
+
+        <!-- Quick-fix buttons -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_usb" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">🔍 Scan USB</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_rtltest" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📡 rtl_test (~8s)</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noaa-weather" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 NWR Log</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="scanner-waterfall" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 Scanner Log</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="noaa-weather" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart noaa-weather.service?')">↺ Restart NWR</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="scanner-waterfall" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart scanner-waterfall.service?')">↺ Restart Scanner</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_blacklist" style="background:#111126;border:1px solid #e9456022;color:#f39c12;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Re-write blacklist and unload DVB modules?')">🛡 Re-apply Blacklist</button>
+        </div>
+
+        <!-- Output area -->
+        <div id="sdr-diag-output" style="display:none;background:#000;border:1px solid #2a2a4a;border-radius:5px;padding:10px;font-family:monospace;font-size:11px;color:#ccc;white-space:pre-wrap;max-height:260px;overflow-y:auto"></div>
+        <div id="sdr-diag-spinner" style="display:none;font-size:12px;color:#555;margin-top:6px">Running…</div>
+
+        <!-- Common errors guide -->
+        <details style="margin-top:14px">
+          <summary style="font-size:12px;color:#555;cursor:pointer">Common issues</summary>
+          <div style="margin-top:8px;font-size:12px;color:#888;line-height:1.7">
+            <strong style="color:#aaa">No device found</strong> — dongle not plugged in, or DVB kernel modules claimed it first. Run <em>Re-apply Blacklist</em> then unplug/replug dongle.<br>
+            <strong style="color:#aaa">Device busy / cannot open</strong> — another process is using the dongle. Stop all SDR services (set Mode → Off, save), then retry.<br>
+            <strong style="color:#aaa">Weak / no SAME alerts</strong> — stock antenna has poor gain at 162 MHz. Use a quarter-wave dipole (~46cm) near a window. See Admin → Wiki → Optional Hardware.<br>
+            <strong style="color:#aaa">Wrong frequency</strong> — WXL58 (Indianapolis) transmits on 162.550 MHz. Confirm with <code style="color:#888">rtl_fm -f 162550000 -s 22050 | play -r 22050 -t raw -e s -b 16 -c 1 - 2>/dev/null</code> on the server.<br>
+            <strong style="color:#aaa">High PPM drift</strong> — cheap dongles drift ±60 PPM. Run <em>rtl_test</em> and watch the PPM correction value; enter it in the PPM field above.
+          </div>
+        </details>
+      </div>
+    </details>
+
+    <script>
+    (function(){
+      document.querySelectorAll('.sdr-diag-btn').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          if (btn.getAttribute('onclick') && !confirm('')) return;
+          var act = btn.dataset.act;
+          var svc = btn.dataset.service || '';
+          var out = document.getElementById('sdr-diag-output');
+          var spin = document.getElementById('sdr-diag-spinner');
+          out.style.display = 'none';
+          spin.style.display = 'block';
+          var fd = new FormData();
+          fd.append('act', act);
+          if (svc) fd.append('service', svc);
+          fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+          fetch('', {method:'POST', body:fd})
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+              spin.style.display = 'none';
+              out.textContent = r.output || r.error || '(no output)';
+              out.style.display = 'block';
+              out.scrollTop = out.scrollHeight;
+            })
+            .catch(function(e){ spin.style.display='none'; out.textContent='Error: '+e; out.style.display='block'; });
+        });
+      });
+    })();
+    </script>
+  </div>
+</div>
+
+<?php
 $simple_mods = [
     ['show_chat',     't_chat',     'Chat'],
     ['show_files',    't_files',    'Files'],
@@ -1944,6 +2128,7 @@ $simple_mods = [
     ['show_weather',  't_weather',  'Weather Log'],
     ['show_radio',    't_radio',    'Radio Net Log'],
     ['show_runners',  't_runners',  'Runner Board'],
+    ['show_damage',   't_damage',   'Damage Reports'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>

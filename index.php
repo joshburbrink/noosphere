@@ -48,6 +48,8 @@ if (get_setting('show_weather','0')==='1')
     $tiles[] = ['href'=>'/weather/',  'icon'=>'⛅', 'label'=>get_setting('weather_label','Weather Log'), 'desc'=>'Log weather observations &amp; conditions'];
 if (get_setting('show_radio','0')==='1')
     $tiles[] = ['href'=>'/radio/',    'icon'=>'📻', 'label'=>get_setting('radio_label','Radio Net Log'),  'desc'=>'Log radio contacts, traffic &amp; net check-ins'];
+if (get_setting('show_damage','0')==='1')
+    $tiles[] = ['href'=>'/damage/',  'icon'=>'🏚', 'label'=>'Damage Reports', 'desc'=>'Submit and view address-level damage assessments'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,8 +61,6 @@ if (get_setting('show_radio','0')==='1')
         * { box-sizing:border-box; margin:0; padding:0; }
         body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
         .alert { background:#3a0a0a; border:2px solid #e94560; color:#e94560; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:2rem; text-align:center; max-width:700px; width:100%; }
-        h1 { font-size:3rem; margin-bottom:0.5rem; color:#e94560; }
-        p { color:#aaa; margin-bottom:3rem; font-size:1.1rem; }
         .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; width:100%; max-width:1100px; }
         a.tile { display:block; background:#16213e; border:1px solid #e94560; border-radius:12px; padding:2rem; text-align:center; text-decoration:none; color:#eee; transition:0.2s; }
         a.tile:hover { background:#e94560; transform:translateY(-3px); }
@@ -74,8 +74,6 @@ if (get_setting('show_radio','0')==='1')
     <?php if ($alert): ?>
     <div class="alert">⚠ <?= htmlspecialchars($alert) ?></div>
     <?php endif; ?>
-    <h1><?= htmlspecialchars($name) ?></h1>
-    <p><?= htmlspecialchars($tagline) ?></p>
     <div class="grid">
         <?php foreach ($tiles as $t): ?>
         <a class="tile" href="<?= $t['href'] ?>">

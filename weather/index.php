@@ -120,6 +120,8 @@ tr:hover td { background:#1a1f35; }
 
 <?php if ($msg): ?><div class="msg"><?= htmlspecialchars($msg) ?></div><?php endif ?>
 
+<?php include __DIR__ . "/_nwr_section.php"; ?>
+
 <?php if (!$is_readonly): ?>
 <div class="card">
   <h2>Log Observation</h2>

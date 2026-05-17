@@ -1,0 +1,17 @@
+# Large binary/data files
+maps/*.mbtiles
+maps/*.pbf
+maps/*.osm.pbf
+maps/fonts/
+maps/lib/
+maps/satellite.mbtiles
+
+# Downloaded topo PDFs (large assets, not source)
+maps/topo/*.pdf
+
+# Runtime / generated
+weather/stream/
+radio/scanner/
+
+# Backups
+*.bak

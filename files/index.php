@@ -71,6 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $files = glob($upload_dir . '*');
 usort($files, fn($a,$b) => filemtime($b) - filemtime($a));
 
+// External drive files
+$ext_dir   = '/media/noosphere-ext/files/';
+$ext_files = [];
+if (get_setting('ext_drive_mounted','0') === '1' && is_dir($ext_dir)) {
+    $ext_files = glob($ext_dir . '*') ?: [];
+    usort($ext_files, fn($a,$b) => strcmp(basename($a), basename($b)));
+}
+
 function fmtSize($bytes) {
     if ($bytes < 1024) return $bytes . ' B';
     if ($bytes < 1048576) return round($bytes/1024, 1) . ' KB';
@@ -149,11 +157,12 @@ h2 { font-size:15px; color:#e94560; margin-bottom:12px; }
   <div style="font-size:13px;color:#555;text-align:center;padding:16px 0 20px">Files are uploaded by administrators. Download any file below.</div>
   <?php endif; ?>
 
-  <h2>Available Files (<?= count($files) ?>)</h2>
+  <h2>Available Files (<?= count($files) + count($ext_files) ?>)</h2>
   <div class="file-list">
-  <?php if (!$files): ?>
-    <div class="empty">No files uploaded yet.</div>
-  <?php else: foreach ($files as $fp):
+  <?php if (!$files && !$ext_files): ?>
+    <div class="empty">No files available yet.</div>
+  <?php endif; ?>
+  <?php if ($files): foreach ($files as $fp):
     $fname = basename($fp);
     $ext = strtolower(pathinfo($fname, PATHINFO_EXTENSION));
     $icons = ['pdf'=>'&#x1F4C4;','jpg'=>'&#x1F5BC;','jpeg'=>'&#x1F5BC;','png'=>'&#x1F5BC;','gif'=>'&#x1F5BC;',
@@ -181,6 +190,34 @@ h2 { font-size:15px; color:#e94560; margin-bottom:12px; }
       </div>
     </div>
   <?php endforeach; endif; ?>
+
+  <?php if ($ext_files): ?>
+  <div style="margin-top:16px">
+    <h2 style="font-size:15px;color:#e94560;margin-bottom:10px">&#x1F4BE; External Drive <span style="font-size:11px;color:#555;font-weight:normal">(read-only)</span></h2>
+    <div class="file-list">
+    <?php foreach ($ext_files as $fp):
+      $fname = basename($fp);
+      $ext   = strtolower(pathinfo($fname, PATHINFO_EXTENSION));
+      $icons = ['pdf'=>'&#x1F4C4;','jpg'=>'&#x1F5BC;','jpeg'=>'&#x1F5BC;','png'=>'&#x1F5BC;','gif'=>'&#x1F5BC;',
+                'mp3'=>'&#x1F3B5;','mp4'=>'&#x1F3AC;','zip'=>'&#x1F5DC;','txt'=>'&#x1F4DD;','doc'=>'&#x1F4DD;','docx'=>'&#x1F4DD;',
+                'xls'=>'&#x1F4CA;','xlsx'=>'&#x1F4CA;','csv'=>'&#x1F4CA;'];
+      $icon  = $icons[$ext] ?? '&#x1F4CE;';
+      $size  = fmtSize(filesize($fp));
+    ?>
+      <div class="file-row" style="border-left:3px solid #2a2a4a">
+        <div class="file-icon"><?= $icon ?></div>
+        <div class="file-info">
+          <div class="file-name"><?= esc($fname) ?></div>
+          <div class="file-meta"><?= $size ?></div>
+        </div>
+        <div class="file-actions">
+          <a class="dl-btn" href="/files/ext/<?= urlencode($fname) ?>" download>Download</a>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    </div>
+  </div>
+  <?php endif; ?>
   </div>
 </div>
 <script>

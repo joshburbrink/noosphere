@@ -577,6 +577,66 @@ tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --out
   <div class=note>Tile generation can take 5–20 minutes depending on hardware. The existing <code>counties.mbtiles</code> is sufficient for normal use.</div>
 </div>
 
+
+<div class="section" id="hardware">
+  <h2>12. Optional Hardware</h2>
+  <p>Noosphere works without any additional hardware, but these peripherals unlock specific modules. All are passive add-ons — plug in and configure from the admin panel.</p>
+
+  <h3>RTL-SDR Dongle</h3>
+  <p><strong>Enables:</strong> NOAA Weather Radio streaming + SAME alert decoding (<code>/weather/</code>), spectrum waterfall scanner (<code>/radio/</code>).</p>
+  <h4>Recommended models</h4>
+  <ul>
+    <li><strong>RTL-SDR Blog V3 / V4</strong> (~$30) — best sensitivity, TCXO clock, bias-tee for powered antennas</li>
+    <li><strong>NooElec NESDR Smart</strong> (~$25) — solid budget option, TCXO, SMA connector</li>
+    <li>Any RTL2832U-based dongle works; avoid the cheapest no-brand units (high PPM drift)</li>
+  </ul>
+  <h4>Setup</h4>
+  <ol>
+    <li>Plug dongle into any USB port on the server</li>
+    <li>Drivers are pre-installed; DVB modules are blacklisted at <code>/etc/modprobe.d/rtlsdr-blacklist.conf</code></li>
+    <li>Go to <strong>Admin → Settings → Modules → SDR Radio</strong> — select NWR or Scanner mode</li>
+    <li>Configure frequency, gain, and PPM offset; hit Save</li>
+  </ol>
+  <h4>Verify detection</h4>
+  <pre>rtlsdr-detect.sh --verbose   # should show tuner type and serial</pre>
+  <div class=note>If the dongle is not detected, check that DVB modules are blacklisted: <code>lsmod | grep dvb</code> should return nothing. If modules are loaded, run <code>modprobe -r dvb_usb_rtl28xxu</code> and reboot.</div>
+
+  <h3>NWR Antenna (162 MHz)</h3>
+  <p><strong>Enables:</strong> Reliable NOAA Weather Radio reception. The stock whip antenna included with most RTL-SDR kits resonates near 860 MHz and has very poor gain at 162 MHz.</p>
+  <h4>DIY quarter-wave dipole (~$5 in parts)</h4>
+  <ul>
+    <li>Two 462 mm (~18.2 in) wire elements, vertical orientation</li>
+    <li>Mount near a window — metal roofs and walls block VHF significantly</li>
+    <li>Connect to dongle via PL-259 or BNC → SMA adapter</li>
+  </ul>
+  <h4>Commercial options</h4>
+  <ul>
+    <li><strong>Bingfu VHF UHF Scanner Antenna</strong> (~$15) — magnetic base, telescoping, covers 136–512 MHz</li>
+    <li><strong>Tram 1410</strong> (~$25) — discone, covers 25–1300 MHz, best all-around if you also run the scanner</li>
+    <li>Search terms: VHF scanner antenna SMA or 162 MHz weather radio antenna</li>
+  </ul>
+  <div class=note>Even a basic telescoping antenna extended to 462 mm and placed near a window will dramatically outperform the stock whip at 162 MHz.</div>
+
+  <h3>Radio Programming Cable (Baofeng / CHIRP)</h3>
+  <p><strong>Enables:</strong> <a href="/radio/program/" style="color:#7ad">/radio/program/</a> — direct USB programming of 500+ radios from county frequency data without a separate laptop.</p>
+  <h4>Compatible cables</h4>
+  <ul>
+    <li><strong>Baofeng USB-K cable</strong> (~$8) — works with UV-5R, UV-82, BF-888S, UV-17, and most Baofeng models; 3.5mm/2.5mm K-plug</li>
+    <li><strong>Kenwood KPG-22U / KPG-46U clone</strong> (~$10) — Kenwood and compatible models</li>
+    <li><strong>FTDI-based USB cables</strong> — Yaesu, Icom, Wouxun, and other brands; check CHIRP wiki for your specific model</li>
+    <li>Avoid cables marked charge only — they lack the data lines needed for programming</li>
+  </ul>
+  <h4>Drivers</h4>
+  <p>Most cables use CP2102, CH340, or PL2303 USB-serial chips — all are supported by the Debian kernel with no manual install. The cable will appear as <code>/dev/ttyUSB0</code> when plugged in.</p>
+  <h4>Setup</h4>
+  <ol>
+    <li>Plug cable into the server USB port, other end into radio (radio powered on, in normal mode)</li>
+    <li>Go to <a href="/radio/program/" style="color:#7ad">/radio/program/</a></li>
+    <li>Select the detected port, choose brand and model, pick county data, click Program</li>
+  </ol>
+  <div class=note>The radio model cannot be auto-detected from USB — always select the correct model before programming. Programming the wrong model may corrupt the radio's memory; verify with the CHIRP channel preview before hitting Program.</div>
+</div>
+
 </div><!-- /container -->
 </body>
 </html>

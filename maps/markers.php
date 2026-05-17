@@ -85,7 +85,7 @@ if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$can_delete) {
         http_response_code(403);
-        echo json_encode(['ok'=>false, 'err'=>'Admin login or creator_token required']);
+        echo json_encode(['ok'=>false, 'err'=>'Admin login or creator token required']);
         exit;
     }
 
@@ -117,7 +117,7 @@ function process_marker_photo(string $tmp): ?string {
     $src = match($info['mime']) {
         'image/jpeg' => @imagecreatefromjpeg($tmp),
         'image/png'  => @imagecreatefrompng($tmp),
-        'image/webp' => @imagecreatefrowebp($tmp),
+        'image/webp' => @imagecreatefromwebp($tmp),
         'image/gif'  => @imagecreatefromgif($tmp),
         default      => false,
     };

@@ -116,9 +116,13 @@ tr:hover td { background:#1a1f35; }
 <div class="topbar">
   <h1>📻 <?= htmlspecialchars($site_label) ?></h1>
   <a class="back" href="/">← Home</a>
+  <a href="/radio/reference/" style="font-size:13px;color:#7ad;text-decoration:none;border:1px solid #2a2a4a;border-radius:4px;padding:4px 10px;">📡 Reference</a>
+  <a href="/radio/program/" style="font-size:13px;color:#2ecc71;text-decoration:none;border:1px solid #2a2a4a;border-radius:4px;padding:4px 10px;">⚡ Program Radio</a>
 </div>
 
 <?php if ($msg):   ?><div class="msg"><?=   htmlspecialchars($msg)   ?></div><?php endif ?>
+
+<?php include __DIR__ . "/_scanner_section.php"; ?>
 <?php if ($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif ?>
 
 <?php if (!$is_readonly): ?>
