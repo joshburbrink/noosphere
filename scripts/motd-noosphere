@@ -1,0 +1,86 @@
+#!/bin/bash
+# Noosphere login MOTD — live status summary + quick reference
+
+G='\e[32m'; Y='\e[33m'; R='\e[31m'; C='\e[36m'; W='\e[1m'; X='\e[0m'
+
+svc_status() {
+    local svc=$1 label=$2
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        local restarts
+        restarts=$(systemctl show "$svc" --property=NRestarts --value 2>/dev/null)
+        if [[ -n "$restarts" && "$restarts" -gt 5 ]]; then
+            printf "${Y}⚠ %-20s${X} restarting repeatedly\n" "$label"
+        else
+            printf "${G}✓ %-20s${X}\n" "$label"
+        fi
+    else
+        printf "${R}✗ %-20s${X} STOPPED — see below to restart\n" "$label"
+    fi
+}
+
+http_ok() {
+    local code
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$1" 2>/dev/null)
+    [[ "$code" == "200" ]]
+}
+
+echo ""
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
+printf "  ${C}${W}Noosphere${X}  —  offline community hub\n"
+printf "  Uptime: %s\n" "$(uptime -p 2>/dev/null || uptime)"
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
+echo ""
+
+# ── Service status ──────────────────────────────────────────────────────────
+printf "  ${W}Services${X}\n"
+svc_status nginx            "nginx (web server)"
+svc_status php8.4-fpm       "php8.4-fpm"
+svc_status kiwix            "kiwix (library)"
+svc_status mbtileserver     "mbtileserver (maps)"
+svc_status wifi-reconnect   "wifi watchdog"
+
+# ── Web health ─────────────────────────────────────────────────────────────
+echo ""
+printf "  ${W}Web${X}\n"
+if http_ok "http://localhost/"; then
+    printf "${G}✓ %-20s${X}\n" "homepage responding"
+else
+    printf "${R}✗ %-20s${X} not responding — restart nginx + php-fpm\n" "homepage"
+fi
+
+# ── Network ────────────────────────────────────────────────────────────────
+echo ""
+printf "  ${W}Network${X}\n"
+ETH_IP=$(ip -4 addr show eno1 2>/dev/null | grep -oP '(?<=inet )\S+' | head -1)
+WIFI_IF=$(ip link show 2>/dev/null | awk -F': ' '/^ *[0-9]+: wl/{gsub(/@.*/, "", $2); print $2; exit}')
+WIFI_IP=$(ip -4 addr show "$WIFI_IF" 2>/dev/null | grep -oP '(?<=inet )\S+' | head -1)
+
+[[ -n "$ETH_IP"  ]] && printf "${G}✓ ethernet${X}  %s\n" "$ETH_IP"  || printf "${Y}– ethernet   not connected${X}\n"
+[[ -n "$WIFI_IP" ]] && printf "${G}✓ wifi${X}      %s\n" "$WIFI_IP" || printf "${Y}– wifi       not connected${X}\n"
+
+CONNECT_IP=${ETH_IP:-$WIFI_IP}
+[[ -n "$CONNECT_IP" ]] && printf "\n  ${W}Connect:${X} http://%s/\n" "${CONNECT_IP%/*}"
+
+# ── Disk ───────────────────────────────────────────────────────────────────
+echo ""
+printf "  ${W}Disk${X}\n"
+df -h 2>/dev/null | awk 'NR>1 && /^\// && !seen[$1]++ {
+    pct=$5+0
+    col=(pct>=90)?"\033[31m":(pct>=75)?"\033[33m":"\033[32m"
+    printf "  %s%-4s%s  %s (%s free)\n", col, $5, "\033[0m", $6, $4
+}'
+
+# ── Quick reference ─────────────────────────────────────────────────────────
+echo ""
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
+printf "  ${W}Quick commands${X}\n\n"
+printf "  ${C}noosphere-selftest${X}           full health check\n"
+printf "  ${C}noosphere-help${X}               paged troubleshooting guide\n"
+printf "  ${C}systemctl restart nginx${X}      restart web server\n"
+printf "  ${C}systemctl restart php8.4-fpm${X} restart PHP\n"
+printf "  ${C}journalctl -u nginx -n 50${X}    last 50 nginx log lines\n"
+printf "  ${C}journalctl -u php8.4-fpm -n 50${X}\n"
+printf "  ${C}hostname -I${X}                  show all IP addresses\n"
+printf "  ${C}df -h${X}                        disk usage\n"
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
+echo ""
