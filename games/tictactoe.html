@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Tic Tac Toe — Noosphere</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#1a1a2e;color:#eee;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:1rem}
+h2{color:#e94560;margin:.5rem 0}
+#mode{display:flex;gap:.5rem;margin:.75rem 0}
+button{background:#16213e;border:1px solid #e94560;color:#eee;padding:7px 16px;border-radius:6px;font-size:.9rem;cursor:pointer;transition:.15s}
+button:hover,button.active{background:#e94560}
+#scorebar{display:flex;gap:1.5rem;margin:.5rem 0;font-size:.9rem;color:#aaa;text-align:center}
+.sb{display:flex;flex-direction:column;align-items:center}
+.sb .lbl{font-size:.75rem;color:#666;margin-bottom:2px}
+.sb .val{font-size:1.2rem;font-weight:bold;color:#eee}
+#board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(280px,80vw);margin:.75rem 0}
+.cell{aspect-ratio:1;background:#16213e;border:2px solid #333;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:clamp(2rem,12vw,3rem);cursor:pointer;transition:.15s;user-select:none}
+.cell:hover:not(.taken){background:#1e2a4a;border-color:#e94560}
+.cell.x{color:#e94560}
+.cell.o{color:#3498db}
+.cell.win{background:#1a3a1a;border-color:#2ecc71}
+#msg{font-size:1.1rem;color:#e94560;min-height:1.6em;text-align:center;margin:.5rem 0}
+#newBtn{margin-top:.25rem}
+.back{margin-top:1.2rem;font-size:.85rem}
+.back a{color:#555;text-decoration:none;border:1px solid #333;padding:4px 12px;border-radius:5px}
+.back a:hover{color:#e94560;border-color:#e94560}
+</style>
+</head>
+<body>
+<h2>⭕ Tic Tac Toe</h2>
+<div id="mode">
+  <button class="active" id="pvpBtn" onclick="setMode('pvp')">2 Players</button>
+  <button id="aiBtn" onclick="setMode('ai')">vs Computer</button>
+</div>
+<div id="scorebar">
+  <div class="sb"><div class="lbl">❌ X</div><div class="val" id="sx">0</div></div>
+  <div class="sb"><div class="lbl">Draws</div><div class="val" id="sd">0</div></div>
+  <div class="sb"><div class="lbl">⭕ O</div><div class="val" id="so">0</div></div>
+</div>
+<div id="board"></div>
+<div id="msg">X goes first</div>
+<button id="newBtn" onclick="newGame()">New Game</button>
+<div class="back"><a href="/games/">← Games</a></div>
+<script>
+let board,cur,mode,done,scores;
+mode='pvp';scores={X:0,O:0,D:0};
+
+const WINS=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function setMode(m){
+  mode=m;
+  document.getElementById('pvpBtn').classList.toggle('active',m==='pvp');
+  document.getElementById('aiBtn').classList.toggle('active',m==='ai');
+  newGame();
+}
+function newGame(){
+  board=Array(9).fill('');cur='X';done=false;
+  document.getElementById('msg').textContent='X goes first';
+  render();
+}
+function checkWinner(){
+  for(const [a,b,c] of WINS)if(board[a]&&board[a]===board[b]&&board[a]===board[c])return{winner:board[a],line:[a,b,c]};
+  if(board.every(v=>v))return{winner:null,draw:true};
+  return null;
+}
+function render(winLine=[]){
+  const el=document.getElementById('board');el.innerHTML='';
+  board.forEach((v,i)=>{
+    const d=document.createElement('div');d.className='cell'+(v?' taken':'');
+    if(v)d.classList.add(v.toLowerCase());
+    if(winLine.includes(i))d.classList.add('win');
+    d.textContent=v;
+    if(!done&&!v)d.onclick=()=>play(i);
+    el.appendChild(d);
+  });
+}
+function play(i){
+  if(done||board[i])return;
+  board[i]=cur;
+  const res=checkWinner();
+  if(res){
+    done=true;
+    if(res.winner){scores[res.winner]++;updateScores();document.getElementById('msg').textContent=`${res.winner} wins! 🎉`}
+    else{scores.D++;updateScores();document.getElementById('msg').textContent="It's a draw!"}
+    render(res.line||[]);return;
+  }
+  cur=cur==='X'?'O':'X';
+  document.getElementById('msg').textContent=`${cur}'s turn`;
+  render();
+  if(mode==='ai'&&cur==='O'&&!done)setTimeout(aiMove,300);
+}
+function updateScores(){
+  document.getElementById('sx').textContent=scores.X;
+  document.getElementById('so').textContent=scores.O;
+  document.getElementById('sd').textContent=scores.D;
+}
+function aiMove(){
+  // minimax
+  const best=minimax(board,'O');
+  play(best.idx);
+}
+function minimax(b,player){
+  const empty=b.map((v,i)=>v?null:i).filter(v=>v!==null);
+  for(const [a,x,c] of WINS){
+    if(b[a]&&b[a]===b[x]&&b[a]===b[c])return{score:b[a]==='O'?10:-10};
+  }
+  if(!empty.length)return{score:0};
+  const moves=empty.map(i=>{
+    const nb=[...b];nb[i]=player;
+    const res=minimax(nb,player==='O'?'X':'O');
+    return{idx:i,score:res.score};
+  });
+  return player==='O'?moves.reduce((a,b)=>b.score>a.score?b:a):moves.reduce((a,b)=>b.score<a.score?b:a);
+}
+newGame();
+</script>
+</body>
+</html>

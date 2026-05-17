@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Minesweeper — Noosphere</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#1a1a2e;color:#eee;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:1rem;touch-action:manipulation}
+h2{color:#e94560;margin:.5rem 0}
+#topbar{display:flex;align-items:center;gap:1.5rem;margin:.5rem 0;font-size:.9rem;color:#aaa}
+#topbar span{color:#eee;font-weight:bold}
+#diff{display:flex;gap:.5rem;margin:.5rem 0}
+button{background:#16213e;border:1px solid #e94560;color:#eee;padding:6px 14px;border-radius:6px;font-size:.85rem;cursor:pointer;transition:.15s}
+button:hover,button.active{background:#e94560}
+#board{display:inline-grid;gap:2px;background:#0f0f1a;padding:6px;border-radius:8px;border:2px solid #e94560;margin-top:.5rem;touch-action:manipulation}
+.cell{width:clamp(28px,8vw,36px);height:clamp(28px,8vw,36px);background:#16213e;border:1px solid #2a2a4a;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(.7rem,2.5vw,.9rem);font-weight:bold;cursor:pointer;user-select:none;transition:background .1s}
+.cell:hover{background:#1e2a4a}
+.cell.revealed{background:#0f0f1a;border-color:#1a1a2e;cursor:default}
+.cell.mine{background:#3a0a0a}
+.cell.flagged{background:#1e3a1e}
+.n1{color:#3498db}.n2{color:#2ecc71}.n3{color:#e94560}.n4{color:#9b59b6}
+.n5{color:#e67e22}.n6{color:#1abc9c}.n7{color:#f1c40f}.n8{color:#eee}
+#msg{margin-top:.75rem;font-size:1.1rem;color:#e94560;min-height:1.4em;text-align:center}
+#hint{font-size:.8rem;color:#555;margin-top:.3rem;text-align:center}
+.back{margin-top:1rem;font-size:.85rem}
+.back a{color:#555;text-decoration:none;border:1px solid #333;padding:4px 12px;border-radius:5px}
+.back a:hover{color:#e94560;border-color:#e94560}
+</style>
+</head>
+<body>
+<h2>💣 Minesweeper</h2>
+<div id="topbar">Mines: <span id="mc">0</span> &nbsp; Time: <span id="tm">0</span>s &nbsp; Best: <span id="hi">--</span></div>
+<div id="diff">
+  <button class="active" onclick="setDiff(9,9,10,this)">Easy</button>
+  <button onclick="setDiff(16,16,40,this)">Medium</button>
+  <button onclick="setDiff(16,30,99,this)">Hard</button>
+  <button onclick="newGame()">↺ New</button>
+</div>
+<div id="board"></div>
+<div id="msg">Click a cell to start · Long-press or right-click to flag</div>
+<div id="hint"></div>
+<div class="back"><a href="/games/">← Games</a></div>
+<script>
+let ROWS=9,COLS=9,MINES=10;
+let grid,revealed,flagged,gameOver,started,timer,elapsed,firstClick;
+let best=JSON.parse(localStorage.getItem('ms_best')||'{}');
+const boardEl=document.getElementById('board');
+
+function setDiff(r,c,m,btn){
+  document.querySelectorAll('#diff button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ROWS=r;COLS=c;MINES=m;newGame();
+}
+function updateBest(diff,t){
+  const k=`${ROWS}x${COLS}`;
+  if(!best[k]||t<best[k]){best[k]=t;localStorage.setItem('ms_best',JSON.stringify(best))}
+  const d=document.getElementById('hi');
+  d.textContent=best[k]?`${best[k]}s`:'--';
+}
+function newGame(){
+  clearInterval(timer);elapsed=0;gameOver=false;started=false;firstClick=true;
+  document.getElementById('tm').textContent=0;
+  const k=`${ROWS}x${COLS}`;
+  document.getElementById('hi').textContent=best[k]?`${best[k]}s`:'--';
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  revealed=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  flagged=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  document.getElementById('mc').textContent=MINES;
+  document.getElementById('msg').textContent='Click a cell to start · Long-press or right-click to flag';
+  render();
+}
+function placeMines(fy,fx){
+  let placed=0;
+  while(placed<MINES){
+    const r=Math.floor(Math.random()*ROWS),c=Math.floor(Math.random()*COLS);
+    if(grid[r][c]===-1)continue;
+    if(Math.abs(r-fy)<=1&&Math.abs(c-fx)<=1)continue;
+    grid[r][c]=-1;placed++;
+  }
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]===-1)continue;
+    let cnt=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&grid[nr][nc]===-1)cnt++;
+    }
+    grid[r][c]=cnt;
+  }
+}
+function reveal(r,c){
+  if(r<0||r>=ROWS||c<0||c>=COLS||revealed[r][c]||flagged[r][c])return;
+  revealed[r][c]=true;
+  if(grid[r][c]===0)for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)reveal(r+dr,c+dc);
+}
+function countFlagged(){let f=0;flagged.forEach(row=>row.forEach(v=>{if(v)f++}));return f}
+function checkWin(){return revealed.flat().filter(v=>v).length===ROWS*COLS-MINES}
+
+function render(){
+  boardEl.style.gridTemplateColumns=`repeat(${COLS},1fr)`;
+  boardEl.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el=document.createElement('div');el.className='cell';
+    if(revealed[r][c]){
+      el.classList.add('revealed');
+      if(grid[r][c]===-1){el.classList.add('mine');el.textContent='💣'}
+      else if(grid[r][c]>0){el.textContent=grid[r][c];el.classList.add(`n${grid[r][c]}`)}
+    }else if(flagged[r][c]){el.classList.add('flagged');el.textContent='🚩'}
+    // events
+    let pressTimer;
+    el.addEventListener('click',()=>handleClick(r,c));
+    el.addEventListener('contextmenu',e=>{e.preventDefault();handleFlag(r,c)});
+    el.addEventListener('touchstart',e=>{pressTimer=setTimeout(()=>{handleFlag(r,c);e.preventDefault()},400)},{passive:true});
+    el.addEventListener('touchend',()=>clearTimeout(pressTimer),{passive:true});
+    boardEl.appendChild(el);
+  }
+}
+function handleClick(r,c){
+  if(gameOver||flagged[r][c])return;
+  if(firstClick){
+    firstClick=false;placeMines(r,c);
+    started=true;timer=setInterval(()=>{elapsed++;document.getElementById('tm').textContent=elapsed},1000);
+  }
+  if(revealed[r][c]){
+    // chord: if adjacent flags === grid value, reveal neighbors
+    if(grid[r][c]>0){
+      let adj=0;
+      for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&flagged[nr][nc])adj++}
+      if(adj===grid[r][c])for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)reveal(r+dr,c+dc);
+    }
+  }else if(grid[r][c]===-1){
+    revealed[r][c]=true;gameOver=true;clearInterval(timer);
+    for(let rr=0;rr<ROWS;rr++)for(let cc=0;cc<COLS;cc++)if(grid[rr][cc]===-1)revealed[rr][cc]=true;
+    render();document.getElementById('msg').textContent='💥 Boom! Game over.';return;
+  }else reveal(r,c);
+  render();
+  if(checkWin()){clearInterval(timer);gameOver=true;updateBest(`${ROWS}x${COLS}`,elapsed);
+    document.getElementById('msg').textContent=`🎉 You win! Time: ${elapsed}s`}
+}
+function handleFlag(r,c){
+  if(gameOver||revealed[r][c])return;
+  flagged[r][c]=!flagged[r][c];
+  document.getElementById('mc').textContent=MINES-countFlagged();
+  render();
+}
+newGame();
+</script>
+</body>
+</html>
