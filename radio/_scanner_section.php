@@ -54,6 +54,14 @@ function _fmt_hz($hz) {
   </div>
   <?php endif; ?>
 
+  <div id="scn-signal-bar" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#555">
+    <span>Peak signal</span>
+    <div style="flex:1;height:6px;background:#111;border-radius:3px;overflow:hidden">
+      <div id="scn-signal-fill" style="height:100%;width:0%;background:#555;border-radius:3px;transition:width 0.4s,background 0.4s"></div>
+    </div>
+    <span id="scn-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
+  </div>
+
   <div style="margin-top:10px;font-size:11px;color:#666">
     Band + gain configured in <code style="color:#888">/etc/noosphere/scanner.conf</code>. Admin band-picker coming soon.
   </div>
@@ -71,6 +79,28 @@ function _fmt_hz($hz) {
     }, 1000);
   }
   setTimeout(function(){ location.reload(); }, 60000);
+
+  function updateScnSignal() {
+    fetch('/radio/scanner/signal.php').then(function(r){ return r.json(); }).then(function(d){
+      var fill = document.getElementById('scn-signal-fill');
+      var lbl  = document.getElementById('scn-signal-db');
+      var bar  = document.getElementById('scn-signal-bar');
+      if (!fill) return;
+      if (!d.ok || d.peak_db === null) {
+        fill.style.width = '0%'; fill.style.background = '#555';
+        lbl.textContent = '— dB'; return;
+      }
+      var pct   = Math.max(0, Math.min(100, (d.peak_db + 60) / 60 * 100));
+      var color = d.peak_db > -30 ? '#2ecc71' : d.peak_db > -50 ? '#f39c12' : '#e94560';
+      fill.style.width = pct + '%';
+      fill.style.background = color;
+      lbl.style.color = color;
+      lbl.textContent = d.peak_db.toFixed(1) + ' dB';
+      bar.style.color = color;
+    }).catch(function(){});
+  }
+  updateScnSignal();
+  setInterval(updateScnSignal, 5000);
 })();
 </script>
 <?php else: ?>

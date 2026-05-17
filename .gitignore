@@ -12,6 +12,7 @@ maps/topo/*.pdf
 # Runtime / generated
 weather/stream/
 radio/scanner/
+!radio/scanner/signal.php
 
 # Backups
 *.bak
