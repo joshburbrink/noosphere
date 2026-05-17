@@ -23,6 +23,8 @@ $db->exec("CREATE TABLE IF NOT EXISTS reports (
     photo_path       TEXT,
     notes            TEXT
 )");
+@$db->exec("ALTER TABLE reports ADD COLUMN lat REAL");
+@$db->exec("ALTER TABLE reports ADD COLUMN lng REAL");
 
 $STRUCTURE_TYPES = ['residence'=>'Residence','commercial'=>'Commercial','agricultural'=>'Agricultural','infrastructure'=>'Infrastructure','other'=>'Other'];
 $DAMAGE_LEVELS   = ['none'=>'None / Undamaged','minor'=>'Minor','major'=>'Major','destroyed'=>'Destroyed','inaccessible'=>'Inaccessible'];
@@ -46,6 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $hazards  = trim($_POST['hazards'] ?? '');
         $reporter = trim($_POST['reporter_name'] ?? '');
         $notes    = trim($_POST['notes'] ?? '');
+        $lat_raw  = trim($_POST['lat'] ?? '');
+        $lng_raw  = trim($_POST['lng'] ?? '');
+        $lat      = ($lat_raw !== '' && is_numeric($lat_raw) && abs((float)$lat_raw) <= 90)  ? (float)$lat_raw : null;
+        $lng      = ($lng_raw !== '' && is_numeric($lng_raw) && abs((float)$lng_raw) <= 180) ? (float)$lng_raw : null;
 
         if (!$address) {
             $error = 'Address / location description is required.';
@@ -68,19 +74,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
                 }
             }
 
-            $s = $db->prepare("INSERT INTO reports (submitted_at,address,structure_type,damage_level,occupants_accounted,occupant_count,utilities_affected,hazards,reporter_name,photo_path,notes)
-                               VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-            $s->bindValue(1, time(), SQLITE3_INTEGER);
-            $s->bindValue(2, $address, SQLITE3_TEXT);
-            $s->bindValue(3, $stype, SQLITE3_TEXT);
-            $s->bindValue(4, $dlevel, SQLITE3_TEXT);
-            $s->bindValue(5, $acct, SQLITE3_TEXT);
-            $s->bindValue(6, $ocount, $ocount !== null ? SQLITE3_INTEGER : SQLITE3_NULL);
-            $s->bindValue(7, $utils_str, $utils_str ? SQLITE3_TEXT : SQLITE3_NULL);
-            $s->bindValue(8, $hazards ?: null, $hazards ? SQLITE3_TEXT : SQLITE3_NULL);
-            $s->bindValue(9, $reporter ?: null, $reporter ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s = $db->prepare("INSERT INTO reports (submitted_at,address,structure_type,damage_level,occupants_accounted,occupant_count,utilities_affected,hazards,reporter_name,photo_path,notes,lat,lng)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $s->bindValue(1,  time(), SQLITE3_INTEGER);
+            $s->bindValue(2,  $address, SQLITE3_TEXT);
+            $s->bindValue(3,  $stype, SQLITE3_TEXT);
+            $s->bindValue(4,  $dlevel, SQLITE3_TEXT);
+            $s->bindValue(5,  $acct, SQLITE3_TEXT);
+            $s->bindValue(6,  $ocount, $ocount !== null ? SQLITE3_INTEGER : SQLITE3_NULL);
+            $s->bindValue(7,  $utils_str, $utils_str ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s->bindValue(8,  $hazards ?: null, $hazards ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s->bindValue(9,  $reporter ?: null, $reporter ? SQLITE3_TEXT : SQLITE3_NULL);
             $s->bindValue(10, $photo_path, $photo_path ? SQLITE3_TEXT : SQLITE3_NULL);
             $s->bindValue(11, $notes ?: null, $notes ? SQLITE3_TEXT : SQLITE3_NULL);
+            $s->bindValue(12, $lat, $lat !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
+            $s->bindValue(13, $lng, $lng !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
             $s->execute();
             $msg = 'Damage report submitted.';
         }
@@ -245,6 +253,18 @@ tr:hover td { background:#1a1f35; }
         <label>Additional Notes</label>
         <textarea name="notes" placeholder="Any other relevant information…"></textarea>
       </div>
+      <?php if (get_setting('show_maps','1') === '1'): ?>
+      <div class="form-full">
+        <label>Pin on Map <span style="color:#555;font-weight:normal">(optional — tap the map to mark the exact location)</span></label>
+        <input type="hidden" name="lat" id="dmg-lat">
+        <input type="hidden" name="lng" id="dmg-lng">
+        <div id="dmg-map-wrap" style="height:220px;border:1px solid #2a2a4a;border-radius:6px;overflow:hidden;position:relative;cursor:crosshair">
+          <div id="dmg-map" style="height:100%"></div>
+          <div id="dmg-map-hint" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#aaa;font-size:11px;padding:3px 10px;border-radius:4px;pointer-events:none">Tap to pin location</div>
+        </div>
+        <div id="dmg-pin-status" style="font-size:11px;color:#555;margin-top:4px"></div>
+      </div>
+      <?php endif ?>
       <div class="form-full">
         <button type="submit" class="btn">Submit Report</button>
       </div>
@@ -323,5 +343,56 @@ tr:hover td { background:#1a1f35; }
   <?php endif; ?>
   </div>
 </div>
+
+<?php if (get_setting('show_maps','1') === '1'): ?>
+<link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
+<script src="/maps/lib/maplibre-gl.js"></script>
+<script>
+(function() {
+  var wrap = document.getElementById('dmg-map');
+  if (!wrap) return;
+
+  var map = new maplibregl.Map({
+    container: 'dmg-map',
+    style: {
+      version: 8,
+      glyphs: '/maps/fonts/{fontstack}/{range}.pbf',
+      sources: { counties: { type:'vector', tiles:[window.location.origin+'/tiles/counties/tiles/{z}/{x}/{y}.pbf'], minzoom:4, maxzoom:14 } },
+      layers: [
+        { id:'bg',    type:'background', paint:{'background-color':'#1a1f2e'} },
+        { id:'water', type:'fill', source:'counties', 'source-layer':'water', paint:{'fill-color':'#162236'} },
+        { id:'roads', type:'line', source:'counties', 'source-layer':'transportation', paint:{'line-color':'#3a3e62','line-width':1} },
+        { id:'place', type:'symbol', source:'counties', 'source-layer':'place', minzoom:8,
+          layout:{'text-field':['get','name:latin'],'text-size':12,'text-font':['Noto Sans Regular']},
+          paint:{'text-color':'#b0b0cc','text-halo-color':'#0a0a1a','text-halo-width':1.5} },
+      ]
+    },
+    center: [-85.90, 39.20], zoom: 11, maxZoom: 19, minZoom: 7,
+    attributionControl: false,
+  });
+
+  var pinMarker = null;
+  var hint = document.getElementById('dmg-map-hint');
+  var status = document.getElementById('dmg-pin-status');
+
+  map.on('click', function(e) {
+    var lat = e.lngLat.lat.toFixed(6);
+    var lng = e.lngLat.lng.toFixed(6);
+    document.getElementById('dmg-lat').value = lat;
+    document.getElementById('dmg-lng').value = lng;
+
+    if (pinMarker) pinMarker.remove();
+    var el = document.createElement('div');
+    el.style.cssText = 'width:22px;height:22px;border-radius:50%;background:#e94560;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.6)';
+    pinMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([parseFloat(lng), parseFloat(lat)]).addTo(map);
+
+    if (hint) hint.style.display = 'none';
+    if (status) status.textContent = 'Pinned at ' + lat + ', ' + lng + ' — tap again to move';
+    status.style.color = '#2ecc71';
+  });
+})();
+</script>
+<?php endif ?>
 </body>
 </html>
