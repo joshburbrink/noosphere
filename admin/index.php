@@ -87,6 +87,15 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $run_name   = $script;
     }
 
+    // --- AP mode toggle (AJAX — returns JSON) ---
+    if ($act === 'ap_enable' || $act === 'ap_disable') {
+        header('Content-Type: application/json');
+        $subcmd = $act === 'ap_enable' ? 'enable' : 'disable';
+        $out = shell_exec('sudo /usr/local/bin/setup-hostapd.sh ' . $subcmd . ' 2>&1') ?? '(no output)';
+        echo json_encode(['ok' => true, 'output' => $out]);
+        exit;
+    }
+
     // --- SDR diagnostics (AJAX — returns JSON) ---
     if (in_array($act, ['sdr_diag_usb','sdr_diag_rtltest','sdr_diag_log','sdr_diag_restart','sdr_diag_blacklist'])) {
         header('Content-Type: application/json');
@@ -1420,6 +1429,82 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
 <!-- NETWORK -->
 <div id="tab-network" class="tab-content">
 
+<?php
+// Read AP / network mode state
+$_ap_conf  = @file_get_contents('/etc/noosphere/ap.conf')  ?: '';
+$_net_conf = @file_get_contents('/etc/noosphere/network.conf') ?: '';
+function _ap_conf_val($key, $conf) {
+    if (preg_match('/^' . $key . '=(.*)$/m', $conf, $m)) return trim($m[1]);
+    return '';
+}
+$ap_mode      = _ap_conf_val('NETWORK_MODE', $_net_conf) ?: 'external-router';
+$ap_iface     = _ap_conf_val('AP_INTERFACE', $_net_conf) ?: _ap_conf_val('AP_INTERFACE', $_ap_conf);
+$ap_ip        = _ap_conf_val('AP_IP',        $_net_conf) ?: '192.168.4.1';
+$ap_ssid      = _ap_conf_val('AP_SSID',      $_net_conf) ?: _ap_conf_val('AP_SSID', $_ap_conf);
+$ap_conf_ssid = _ap_conf_val('AP_SSID',      $_ap_conf);
+$ap_conf_iface= _ap_conf_val('AP_INTERFACE', $_ap_conf);
+$ap_has_conf  = !empty($ap_conf_ssid);
+$hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'inactive');
+?>
+
+<details class="cpanel" open>
+  <summary>WiFi Access Point Mode</summary>
+  <div class="cpbody">
+    <div style="font-size:12px;color:#888;margin-bottom:12px">
+      Two options: <strong>Hostapd</strong> (this laptop broadcasts WiFi directly) or <strong>External Router</strong> (GL.iNet or any router connected via ethernet).
+      Both work — hostapd is useful when no router is available.
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px;background:#<?= $ap_mode==='hostapd' ? '0a2a0a' : '161630' ?>;border:1px solid #<?= $ap_mode==='hostapd' ? '2a6a2a' : '2a2a4a' ?>;border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:#<?= $ap_mode==='hostapd' ? '2ecc71' : '555' ?>;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+          <?= $ap_mode==='hostapd' ? '● Active' : '○ Inactive' ?>
+        </div>
+        <div style="font-size:13px;font-weight:bold;margin-bottom:4px">Hostapd (Built-in AP)</div>
+        <?php if ($ap_mode === 'hostapd'): ?>
+          <div style="font-size:12px;color:#aaa">SSID: <strong><?= esc($ap_ssid) ?></strong></div>
+          <div style="font-size:12px;color:#aaa">IP: <?= esc($ap_ip) ?> &nbsp;|&nbsp; Iface: <?= esc($ap_iface) ?></div>
+          <div style="font-size:12px;color:#aaa">hostapd: <span style="color:<?= $hostapd_svc==='active'?'#2ecc71':'#e94560' ?>"><?= esc($hostapd_svc) ?></span></div>
+        <?php elseif ($ap_has_conf): ?>
+          <div style="font-size:12px;color:#777">Configured: <?= esc($ap_conf_ssid) ?> on <?= esc($ap_conf_iface) ?></div>
+          <div style="font-size:12px;color:#777">Run <em>enable</em> below to activate</div>
+        <?php else: ?>
+          <div style="font-size:12px;color:#555">Not configured. SSH and run:<br>
+            <code style="font-size:11px">setup-hostapd.sh configure</code>
+          </div>
+        <?php endif ?>
+      </div>
+      <div style="flex:1;min-width:180px;background:#<?= $ap_mode==='external-router' ? '0a1a2a' : '161630' ?>;border:1px solid #<?= $ap_mode==='external-router' ? '2a4a6a' : '2a2a4a' ?>;border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:#<?= $ap_mode==='external-router' ? '4a9eff' : '555' ?>;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+          <?= $ap_mode==='external-router' ? '● Active' : '○ Inactive' ?>
+        </div>
+        <div style="font-size:13px;font-weight:bold;margin-bottom:4px">External Router</div>
+        <div style="font-size:12px;color:#aaa">GL.iNet or any router</div>
+        <div style="font-size:12px;color:#777">eno1 ethernet → router LAN port</div>
+        <div style="font-size:12px;color:#777">Captive portal → 192.168.8.2</div>
+      </div>
+    </div>
+
+    <?php if ($ap_has_conf): ?>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <?php if ($ap_mode !== 'hostapd'): ?>
+        <button class="btn-sm" id="btn-ap-enable" onclick="apToggle('ap_enable')">Enable AP Mode</button>
+      <?php else: ?>
+        <button class="btn-sm" id="btn-ap-disable" onclick="apToggle('ap_disable')" style="border-color:#e94560;color:#e94560">Disable AP / Switch to External Router</button>
+      <?php endif ?>
+    </div>
+    <?php else: ?>
+    <div style="font-size:12px;color:#555">
+      To configure: SSH to server and run <code>setup-hostapd.sh configure</code>
+    </div>
+    <?php endif ?>
+
+    <div id="ap-output" style="display:none;margin-top:10px">
+      <div class="logbox" id="ap-output-text" style="font-size:11px;max-height:200px;overflow-y:auto"></div>
+    </div>
+  </div>
+</details>
+
 <details class="cpanel" open>
   <summary>Connected Devices <span class="badge" id="dev-count"></span></summary>
   <div class="cpbody">
@@ -2442,6 +2527,31 @@ function removeField(btn) { btn.closest('.rf-row').remove(); }
 document.getElementById('new-rf-label') && document.getElementById('new-rf-label').addEventListener('keydown', function(e){
   if (e.key === 'Enter') { e.preventDefault(); addField(); }
 });
+
+function apToggle(act) {
+  var btn = document.getElementById('btn-ap-enable') || document.getElementById('btn-ap-disable');
+  if (btn) btn.disabled = true;
+  var outEl = document.getElementById('ap-output');
+  var textEl = document.getElementById('ap-output-text');
+  outEl.style.display = 'block';
+  textEl.textContent = (act === 'ap_enable' ? 'Enabling AP mode...' : 'Disabling AP mode...') + ' (may take 10-15s)';
+  var fd = new FormData();
+  fd.append('act', act);
+  fd.append('csrf_token', document.querySelector('meta[name=csrf-token]') ? document.querySelector('meta[name=csrf-token]').content : '');
+  // include CSRF from hidden field
+  var csrfField = document.querySelector('input[name=csrf_token]');
+  if (csrfField) fd.set('csrf_token', csrfField.value);
+  fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      textEl.textContent = d.output || '(done)';
+      setTimeout(() => location.reload(), 1500);
+    })
+    .catch(e => {
+      textEl.textContent = 'Error: ' + e;
+      if (btn) btn.disabled = false;
+    });
+}
 </script>
 <form id="zim-action-form" method="post" style="display:none">
   <?= csrf_field() ?>

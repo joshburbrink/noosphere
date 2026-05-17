@@ -65,8 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $id = (int)($_POST['id'] ?? 0);
         if ($id) {
             $now = time();
-            $db->prepare("UPDATE runners SET status='returned',returned_at=? WHERE id=? AND status='out'")
-               ->execute([$now, $id]);
+            $s = $db->prepare("UPDATE runners SET status='returned',returned_at=? WHERE id=? AND status='out'");
+            $s->bindValue(1, $now, SQLITE3_INTEGER);
+            $s->bindValue(2, $id, SQLITE3_INTEGER);
+            $s->execute();
             $msg = 'Marked as returned.';
         }
     }

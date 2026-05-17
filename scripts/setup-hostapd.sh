@@ -1,0 +1,318 @@
+#!/bin/bash
+# Noosphere — hostapd access point setup/teardown
+# Usage: setup-hostapd.sh {configure|enable|disable|status}
+#
+# configure — interactive: pick interface, set SSID/password/channel, write /etc/noosphere/ap.conf
+# enable    — apply ap.conf: start hostapd, configure dnsmasq, update nginx captive portal IPs
+# disable   — stop hostapd, revert nginx captive portal IPs to 192.168.8.2 (external router mode)
+# status    — show current mode
+
+set -e
+
+AP_CONF="/etc/noosphere/ap.conf"
+NET_CONF="/etc/noosphere/network.conf"
+HOSTAPD_CONF="/etc/hostapd/noosphere.conf"
+DNSMASQ_DROP="/etc/dnsmasq.d/noosphere-ap.conf"
+NGINX_CONF="/etc/nginx/sites-enabled/noosphere"
+AP_IP="192.168.4.1"
+AP_NETMASK="255.255.255.0"
+AP_DHCP_START="192.168.4.100"
+AP_DHCP_END="192.168.4.200"
+
+err() { echo "ERROR: $*" >&2; exit 1; }
+info() { echo "  $*"; }
+
+mkdir -p /etc/noosphere
+
+# ── detect wireless interfaces ────────────────────────────────────────────────
+list_wireless() {
+    # list interfaces under /sys/class/net that have a 'wireless' or 'phy80211' dir
+    for iface in /sys/class/net/*/; do
+        name=$(basename "$iface")
+        if [ -d "${iface}wireless" ] || [ -d "${iface}phy80211" ]; then
+            echo "$name"
+        fi
+    done
+}
+
+pick_interface() {
+    local ifaces
+    ifaces=$(list_wireless)
+    if [ -z "$ifaces" ]; then
+        err "No wireless interfaces found. Plug in the USB WiFi adapter and try again."
+    fi
+    local count
+    count=$(echo "$ifaces" | wc -l)
+    if [ "$count" -eq 1 ]; then
+        echo "$ifaces"
+        return
+    fi
+    echo ""
+    echo "Multiple wireless interfaces detected:"
+    local i=1
+    local arr=()
+    while IFS= read -r iface; do
+        echo "  $i) $iface"
+        arr+=("$iface")
+        i=$((i+1))
+    done <<< "$ifaces"
+    read -rp "Select interface number [1]: " sel
+    sel=${sel:-1}
+    echo "${arr[$((sel-1))]}"
+}
+
+# ── configure (interactive) ───────────────────────────────────────────────────
+cmd_configure() {
+    echo ""
+    echo "=== Noosphere Access Point Configuration ==="
+    echo ""
+
+    IFACE=$(pick_interface)
+    info "Using interface: $IFACE"
+    echo ""
+
+    read -rp "  SSID [Noosphere]: " SSID
+    SSID=${SSID:-Noosphere}
+
+    read -rp "  WiFi password (leave blank for open network): " PASSWORD
+    echo ""
+
+    read -rp "  Channel [6]: " CHANNEL
+    CHANNEL=${CHANNEL:-6}
+
+    # Validate channel
+    if ! [[ "$CHANNEL" =~ ^[0-9]+$ ]] || [ "$CHANNEL" -lt 1 ] || [ "$CHANNEL" -gt 13 ]; then
+        echo "  Invalid channel. Using 6."
+        CHANNEL=6
+    fi
+
+    echo ""
+    echo "  AP IP:   $AP_IP/24"
+    echo "  SSID:    $SSID"
+    echo "  Channel: $CHANNEL"
+    [ -n "$PASSWORD" ] && echo "  Auth:    WPA2-PSK" || echo "  Auth:    Open (no password)"
+    echo ""
+    read -rp "  Save this configuration? [Y/n]: " confirm
+    confirm=${confirm:-Y}
+    if [[ ! "$confirm" =~ ^[Yy] ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+
+    cat > "$AP_CONF" <<EOF
+AP_INTERFACE=$IFACE
+AP_SSID=$SSID
+AP_CHANNEL=$CHANNEL
+AP_PASSWORD=$PASSWORD
+AP_IP=$AP_IP
+EOF
+
+    echo ""
+    info "Saved to $AP_CONF"
+    echo ""
+    echo "Run: setup-hostapd.sh enable    to start the access point"
+    echo "Run: setup-hostapd.sh disable   to stop it and revert to external router"
+}
+
+# ── enable ────────────────────────────────────────────────────────────────────
+cmd_enable() {
+    [ -f "$AP_CONF" ] || err "No AP configuration found. Run: setup-hostapd.sh configure"
+
+    source "$AP_CONF"
+
+    [ -n "$AP_INTERFACE" ] || err "AP_INTERFACE not set in $AP_CONF"
+    [ -n "$AP_SSID" ]      || err "AP_SSID not set in $AP_CONF"
+
+    # Verify interface exists
+    [ -d "/sys/class/net/$AP_INTERFACE" ] || err "Interface $AP_INTERFACE not found. Is the adapter plugged in?"
+
+    echo ""
+    echo "=== Enabling AP Mode ==="
+
+    # Install hostapd if missing
+    if ! command -v hostapd &>/dev/null; then
+        info "Installing hostapd..."
+        apt-get install -y hostapd
+    fi
+
+    # Bring interface up, assign IP
+    info "Configuring interface $AP_INTERFACE..."
+    ip link set "$AP_INTERFACE" up
+    ip addr flush dev "$AP_INTERFACE" 2>/dev/null || true
+    ip addr add "$AP_IP/$AP_NETMASK" dev "$AP_INTERFACE"
+
+    # Write hostapd config
+    info "Writing hostapd config..."
+    mkdir -p /etc/hostapd
+    cat > "$HOSTAPD_CONF" <<EOF
+interface=$AP_INTERFACE
+driver=nl80211
+ssid=$AP_SSID
+hw_mode=g
+channel=${AP_CHANNEL:-6}
+wmm_enabled=1
+macaddr_acl=0
+ignore_broadcast_ssid=0
+country_code=US
+ieee80211n=1
+ht_capab=[HT40][SHORT-GI-20]
+EOF
+
+    if [ -n "$AP_PASSWORD" ]; then
+        cat >> "$HOSTAPD_CONF" <<EOF
+auth_algs=1
+wpa=2
+wpa_passphrase=$AP_PASSWORD
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+EOF
+    else
+        echo "auth_algs=1" >> "$HOSTAPD_CONF"
+    fi
+
+    # Write dnsmasq drop-in for AP
+    info "Writing dnsmasq config..."
+    cat > "$DNSMASQ_DROP" <<EOF
+# Noosphere AP mode — auto-generated by setup-hostapd.sh
+interface=$AP_INTERFACE
+bind-interfaces
+dhcp-range=$AP_DHCP_START,$AP_DHCP_END,$AP_NETMASK,12h
+dhcp-option=3,$AP_IP
+dhcp-option=6,$AP_IP
+address=/#/$AP_IP
+EOF
+
+    # Update nginx captive portal redirect IPs
+    info "Updating nginx captive portal (${AP_IP})..."
+    _update_nginx_ip "192.168.8.2" "$AP_IP"
+
+    # Configure hostapd default config path
+    sed -i "s|^#DAEMON_CONF=.*|DAEMON_CONF=\"$HOSTAPD_CONF\"|; s|^DAEMON_CONF=.*|DAEMON_CONF=\"$HOSTAPD_CONF\"|" \
+        /etc/default/hostapd 2>/dev/null || true
+
+    # Write mode file
+    cat > "$NET_CONF" <<EOF
+NETWORK_MODE=hostapd
+AP_INTERFACE=$AP_INTERFACE
+AP_IP=$AP_IP
+AP_SSID=$AP_SSID
+EOF
+
+    # Reload/restart services
+    info "Restarting services..."
+    systemctl restart dnsmasq
+    systemctl unmask hostapd 2>/dev/null || true
+    systemctl enable hostapd 2>/dev/null || true
+    systemctl restart hostapd
+    systemctl reload nginx
+
+    echo ""
+    info "AP mode enabled."
+    info "SSID: $AP_SSID  |  IP: $AP_IP  |  Interface: $AP_INTERFACE"
+    [ -n "$AP_PASSWORD" ] && info "Password: $AP_PASSWORD" || info "Network is open (no password)"
+    echo ""
+    echo "Clients connect to '$AP_SSID' and are captive-portaled to http://$AP_IP/"
+    echo ""
+    echo "To stop: setup-hostapd.sh disable"
+}
+
+# ── disable ───────────────────────────────────────────────────────────────────
+cmd_disable() {
+    echo ""
+    echo "=== Disabling AP Mode ==="
+
+    # Stop hostapd
+    if systemctl is-active --quiet hostapd 2>/dev/null; then
+        info "Stopping hostapd..."
+        systemctl stop hostapd
+        systemctl disable hostapd 2>/dev/null || true
+    fi
+
+    # Remove dnsmasq drop-in
+    if [ -f "$DNSMASQ_DROP" ]; then
+        info "Removing dnsmasq AP config..."
+        rm -f "$DNSMASQ_DROP"
+    fi
+
+    # Restore nginx captive portal IPs to external router
+    info "Restoring nginx captive portal (192.168.8.2)..."
+    _update_nginx_ip "$AP_IP" "192.168.8.2"
+
+    # Release AP interface IP if we set it
+    if [ -f "$AP_CONF" ]; then
+        source "$AP_CONF"
+        if [ -n "$AP_INTERFACE" ] && [ -d "/sys/class/net/$AP_INTERFACE" ]; then
+            ip addr flush dev "$AP_INTERFACE" 2>/dev/null || true
+        fi
+    fi
+
+    # Write mode file
+    cat > "$NET_CONF" <<EOF
+NETWORK_MODE=external-router
+EOF
+
+    # Reload services
+    info "Reloading services..."
+    systemctl restart dnsmasq
+    systemctl reload nginx
+
+    echo ""
+    info "AP mode disabled. External router mode active."
+    echo ""
+    echo "Connect ethernet from eno1 to router LAN port."
+    echo "Run setup-router.sh if router needs configuration."
+}
+
+# ── status ────────────────────────────────────────────────────────────────────
+cmd_status() {
+    echo ""
+    echo "=== Noosphere Network Mode ==="
+    echo ""
+
+    local mode="unknown"
+    if [ -f "$NET_CONF" ]; then
+        source "$NET_CONF"
+        mode="$NETWORK_MODE"
+    fi
+
+    echo "  Mode: $mode"
+    echo ""
+
+    if [ "$mode" = "hostapd" ]; then
+        echo "  AP Interface: ${AP_INTERFACE:-?}"
+        echo "  AP IP:        ${AP_IP:-?}"
+        echo "  SSID:         ${AP_SSID:-?}"
+        echo ""
+        local svc_state
+        svc_state=$(systemctl is-active hostapd 2>/dev/null || echo "unknown")
+        echo "  hostapd service: $svc_state"
+    fi
+
+    if [ -f "$AP_CONF" ]; then
+        echo ""
+        echo "  Saved AP config: $AP_CONF"
+        grep -E "^AP_" "$AP_CONF" | sed 's/AP_PASSWORD=.*/AP_PASSWORD=(set)/' | sed 's/^/    /'
+    else
+        echo "  No AP config saved. Run: setup-hostapd.sh configure"
+    fi
+    echo ""
+}
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+_update_nginx_ip() {
+    local from="$1" to="$2"
+    if [ -f "$NGINX_CONF" ]; then
+        sed -i "s|http://${from}/|http://${to}/|g" "$NGINX_CONF"
+    else
+        echo "  WARNING: $NGINX_CONF not found — update captive portal IPs manually"
+    fi
+}
+
+# ── dispatch ──────────────────────────────────────────────────────────────────
+case "${1:-status}" in
+    configure) cmd_configure ;;
+    enable)    cmd_enable    ;;
+    disable)   cmd_disable   ;;
+    status)    cmd_status    ;;
+    *) echo "Usage: $0 {configure|enable|disable|status}"; exit 1 ;;
+esac
