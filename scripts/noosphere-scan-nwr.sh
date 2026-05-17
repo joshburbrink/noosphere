@@ -12,6 +12,13 @@ WAS_ACTIVE=0
 if systemctl is-active --quiet noaa-weather.service; then
     WAS_ACTIVE=1
     systemctl stop noaa-weather.service
+    # Wait for systemd to actually release rtl_fm + ffmpeg + the dongle.
+    # `usb_claim_interface error -6` happens if rtl_power starts too soon.
+    for _ in 1 2 3 4 5; do
+        pgrep -x rtl_fm >/dev/null || break
+        sleep 1
+    done
+    sleep 1
 fi
 
 TMP=$(mktemp /tmp/nwrscan.XXXXXX.csv)
@@ -22,8 +29,6 @@ cleanup() {
     fi
 }
 trap cleanup EXIT INT TERM
-
-sleep 1
 
 # Sweep 162.395-162.560 MHz in 25 kHz bins, single shot, 3s integration.
 rtl_power -f 162.395M:162.560M:25000 -g $GAIN -i $INTEG -1 "$TMP" >/dev/null 2>&1 || true

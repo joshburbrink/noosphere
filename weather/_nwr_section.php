@@ -95,39 +95,14 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       <?php endforeach ?>
       <span style="font-size:10px;color:#555;margin-left:6px">NWR is fixed to these 7 channels</span>
     </form>
-    <form method="post" style="margin-top:8px">
-      <?= csrf_field() ?>
-      <input type="hidden" name="act" value="scan_nwr">
-      <button type="submit"
-              onclick="this.disabled=true;this.textContent='Scanning… (~6s, audio briefly off)';this.form.submit();"
+    <div style="margin-top:8px">
+      <button type="button" id="nwr-scan-btn"
               style="background:#0f0f1a;color:#7ad;border:1px solid #2a4a6a;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer">
         🔍 Scan all channels (find strongest signal)
       </button>
-    </form>
-    <?php if (!empty($scan_results)):
-      $max_db = max($scan_results);
-      $min_db = min($scan_results);
-      $best   = array_keys($scan_results, $max_db)[0];
-    ?>
-    <div style="margin-top:8px;padding:8px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:5px">
-      <div style="font-size:11px;color:#888;margin-bottom:6px">Scan results (strongest first) — best: <strong style="color:#2ecc71;font-family:monospace"><?= $best ?> MHz</strong></div>
-      <?php
-        arsort($scan_results);
-        $range = max(1, $max_db - $min_db);
-        foreach ($scan_results as $ch => $db):
-          $pct = ($db - $min_db) / $range * 100;
-          $is_best = ($ch === $best);
-      ?>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:11px;font-family:monospace">
-        <span style="width:60px;color:<?= $is_best ? '#2ecc71' : '#7ad' ?>"><?= $ch ?></span>
-        <div style="flex:1;height:10px;background:#000;border-radius:2px;overflow:hidden">
-          <div style="height:100%;width:<?= number_format($pct,1) ?>%;background:<?= $is_best ? '#2ecc71' : '#4a6a8a' ?>"></div>
-        </div>
-        <span style="width:55px;text-align:right;color:<?= $is_best ? '#2ecc71' : '#aaa' ?>"><?= number_format($db,1) ?> dB</span>
-      </div>
-      <?php endforeach ?>
+      <div style="display:inline-block;font-size:11px;color:#555;margin-left:8px">~6s · audio resumes after</div>
     </div>
-    <?php endif ?>
+    <div id="nwr-scan-output" style="display:none;margin-top:8px;padding:8px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:5px"></div>
   </div>
   <?php endif ?>
 </div>
@@ -176,13 +151,21 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
 (function(){
   var audio = document.getElementById('nwr-audio');
   var src = '/weather/stream/live.m3u8';
-  if (window.Hls && Hls.isSupported()) {
-    var hls = new Hls({ liveSyncDuration: 4, liveMaxLatencyDuration: 8, maxBufferLength: 10 });
-    hls.loadSource(src);
-    hls.attachMedia(audio);
-  } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-    audio.src = src;
+  var hls = null;
+  function initHls() {
+    if (hls) { try { hls.destroy(); } catch(e){} }
+    if (window.Hls && Hls.isSupported()) {
+      hls = new Hls({ liveSyncDuration: 4, liveMaxLatencyDuration: 8, maxBufferLength: 10 });
+      hls.loadSource(src);
+      hls.attachMedia(audio);
+      hls.on(Hls.Events.ERROR, function(_, data){
+        if (data.fatal) { setTimeout(initHls, 500); }
+      });
+    } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+      audio.src = src;
+    }
   }
+  initHls();
 
   var specCtx = null, analyser = null;
   var canvas = document.getElementById('nwr-spectrum');
@@ -248,6 +231,57 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
   }
   updateSignal();
   setInterval(updateSignal, 5000);
+
+  var scanBtn = document.getElementById('nwr-scan-btn');
+  if (scanBtn) scanBtn.addEventListener('click', function(){
+    var box = document.getElementById('nwr-scan-output');
+    var orig = scanBtn.textContent;
+    scanBtn.disabled = true;
+    scanBtn.textContent = 'Scanning… (~6s)';
+    box.style.display = 'none';
+    var fd = new FormData();
+    fd.append('_csrf', document.querySelector('input[name=_csrf]') ? document.querySelector('input[name=_csrf]').value : '');
+    fd.append('act', 'scan_nwr');
+    fetch('', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        scanBtn.disabled = false; scanBtn.textContent = orig;
+        if (!r.ok) {
+          box.innerHTML = '<div style="color:#e94560;font-size:12px">Scan failed</div><pre style="color:#888;font-size:11px;white-space:pre-wrap">'+(r.raw||'(no output)')+'</pre>';
+          box.style.display = 'block'; return;
+        }
+        var entries = Object.entries(r.channels).sort(function(a,b){return b[1]-a[1];});
+        var max = entries[0][1], min = entries[entries.length-1][1];
+        var range = Math.max(1, max - min);
+        var best = entries[0][0];
+        var spread = (max - min).toFixed(1);
+        var html = '<div style="font-size:12px;color:#888;margin-bottom:6px">Strongest: <strong style="color:#2ecc71;font-family:monospace">'+best+' MHz</strong> · spread '+spread+' dB '+
+                   (spread < 3 ? '<span style="color:#f39c12">(low — likely noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal)</span>')+'</div>';
+        entries.forEach(function(e){
+          var ch = e[0], db = e[1];
+          var pct = (db - min) / range * 100;
+          var isBest = (ch === best);
+          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:11px;font-family:monospace">'+
+            '<span style="width:60px;color:'+(isBest?'#2ecc71':'#7ad')+'">'+ch+'</span>'+
+            '<div style="flex:1;height:10px;background:#000;border-radius:2px;overflow:hidden">'+
+              '<div style="height:100%;width:'+pct.toFixed(1)+'%;background:'+(isBest?'#2ecc71':'#4a6a8a')+'"></div>'+
+            '</div>'+
+            '<span style="width:55px;text-align:right;color:'+(isBest?'#2ecc71':'#aaa')+'">'+db.toFixed(1)+' dB</span>'+
+            '</div>';
+        });
+        box.innerHTML = html;
+        box.style.display = 'block';
+        // Stream just restarted with fresh MEDIA-SEQUENCE — re-init HLS so the
+        // player follows the new playlist instead of stalling on stale state.
+        setTimeout(initHls, 1500);
+      })
+      .catch(function(e){
+        scanBtn.disabled = false; scanBtn.textContent = orig;
+        box.innerHTML = '<div style="color:#e94560;font-size:12px">Error: '+e+'</div>';
+        box.style.display = 'block';
+      });
+  });
+
 })();
 </script>
 <?php endif; ?>

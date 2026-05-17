@@ -76,13 +76,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
     if ($act === 'scan_nwr' && $is_admin) {
         $out = []; $code = 0;
         exec('sudo -n /usr/local/bin/noosphere-scan-nwr.sh 2>&1', $out, $code);
-        if ($code === 0) {
-            $scan_results = [];
-            foreach ($out as $line) {
-                if (preg_match('/^(\d+\.\d+)=(-?\d+\.\d+)$/', $line, $m)) {
-                    $scan_results[$m[1]] = (float)$m[2];
-                }
+        $channels = [];
+        foreach ($out as $line) {
+            if (preg_match('/^(\d+\.\d+)=(-?\d+\.\d+)$/', trim($line), $m)) {
+                $channels[$m[1]] = (float)$m[2];
             }
+        }
+        // AJAX response: return JSON and exit (no page reload, audio keeps playing)
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => !empty($channels), 'channels' => $channels, 'raw' => implode("\n", $out)]);
+            exit;
+        }
+        if (!empty($channels)) {
+            $scan_results = $channels;
             $msg = 'Scan complete — strongest channel highlighted below.';
         } else {
             $error = 'Scan failed: ' . htmlspecialchars(implode(' ', $out));
