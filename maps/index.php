@@ -6,7 +6,8 @@ if (get_setting('show_maps','1') !== '1') { http_response_code(404); exit; }
 $is_admin    = !empty($_SESSION['admin']);
 $is_readonly = is_readonly();
 $aprs_active   = (get_setting('radio_mode','off') === 'aprs');
-$damage_active = (get_setting('show_damage','0') === '1');
+$incidents_active = (get_setting('show_incidents','0') === '1');
+$incidents_command = (get_setting('show_incidents_command','0') === '1');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -79,8 +80,8 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <button class="theme-btn" data-theme="hc"    onclick="setTheme('hc')">Hi-Vis</button>
     <button class="theme-btn" id="btn-satellite" onclick="toggleSatellite()">Satellite</button>
   </div>
-<?php if ($damage_active): ?>
-  <button class="theme-btn" id="btn-damage" onclick="toggleDamage()" title="Toggle damage report pins">Damage</button>
+<?php if ($incidents_active): ?>
+  <button class="theme-btn" id="btn-incidents" onclick="toggleIncidents()" title="Toggle incident / map-report pins">Incidents</button>
 <?php endif; ?>
 <?php if ($aprs_active): ?>
   <button class="theme-btn" id="btn-aprs" onclick="toggleAprs()" title="Toggle APRS station markers">APRS</button>
@@ -124,7 +125,8 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 var IS_ADMIN    = <?= $is_admin    ? 'true' : 'false' ?>;
 var IS_READONLY = <?= $is_readonly ? 'true' : 'false' ?>;
 var APRS_ACTIVE   = <?= $aprs_active   ? 'true' : 'false' ?>;
-var DAMAGE_ACTIVE = <?= $damage_active ? 'true' : 'false' ?>;
+var INCIDENTS_ACTIVE  = <?= $incidents_active  ? 'true' : 'false' ?>;
+var INCIDENTS_COMMAND = <?= $incidents_command ? 'true' : 'false' ?>;
 
 var THEMES = {
     dark: {
@@ -488,48 +490,85 @@ function esc(s) {
 loadMarkers();
 setInterval(loadMarkers, 20000);
 
-// ── Damage layer ─────────────────────────────────────────────────────────────
-var dmgMarkers  = {};
-var dmgVisible  = false;
+// ── Incidents layer ──────────────────────────────────────────────────────────
+var incMarkers = {};
+var incVisible = false;
+var incTimer   = null;
 
-var DMG_COLORS = {
-  none:         { color:'#2ecc71', label:'None / Undamaged' },
-  minor:        { color:'#f39c12', label:'Minor' },
-  major:        { color:'#e67e22', label:'Major' },
-  destroyed:    { color:'#e94560', label:'Destroyed' },
-  inaccessible: { color:'#9b59b6', label:'Inaccessible' },
+var INC_TYPE = {
+  damage:   { color:'#e67e22', icon:'🏚', label:'Damage' },
+  medical:  { color:'#e94560', icon:'🏥', label:'Medical' },
+  hazard:   { color:'#f39c12', icon:'⚠️', label:'Hazard' },
+  missing:  { color:'#9b59b6', icon:'🔍', label:'Missing Person' },
+  resource: { color:'#2ecc71', icon:'📦', label:'Resource' },
+  general:  { color:'#7aa7d9', icon:'📍', label:'General' },
+};
+var INC_SEV = {
+  critical: { color:'#e94560', label:'Critical' },
+  serious:  { color:'#e67e22', label:'Serious' },
+  minor:    { color:'#f39c12', label:'Minor' },
+  info:     { color:'#7aa7d9', label:'Info' },
+};
+var INC_STATUS = {
+  open:         { color:'#e94560', label:'Open' },
+  acknowledged: { color:'#f39c12', label:'Acknowledged' },
+  resolved:     { color:'#2ecc71', label:'Resolved' },
 };
 
-function dmgPopup(r) {
-  var dc = DMG_COLORS[r.damage_level] || DMG_COLORS.minor;
+function incPopup(r) {
+  var tcfg = INC_TYPE[r.type] || INC_TYPE.general;
+  var scfg = r.severity ? INC_SEV[r.severity] : null;
+  var stcfg = INC_STATUS[r.status] || INC_STATUS.open;
+  var color = scfg ? scfg.color : tcfg.color;
   var d  = new Date(r.submitted_at * 1000);
   var ts = d.toLocaleDateString([],{month:'short',day:'numeric'}) + ' ' +
            d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  return '<div style="min-width:180px;max-width:260px">' +
-    '<b style="display:block;margin-bottom:4px">' + esc(r.address) + '</b>' +
-    '<span style="font-size:11px;padding:1px 7px;border-radius:3px;background:' + dc.color + '22;color:' + dc.color + ';border:1px solid ' + dc.color + '44">' + dc.label + '</span>' +
-    (r.structure_type ? '<span style="font-size:11px;color:#888;margin-left:6px">' + esc(r.structure_type) + '</span>' : '') +
-    (r.hazards  ? '<p style="margin:6px 0 0;font-size:12px;color:#f39c12">⚠ ' + esc(r.hazards) + '</p>' : '') +
+
+  var meta = '';
+  if (r.type === 'damage' && r.meta) {
+    var parts = [];
+    if (r.meta.damage_level)        parts.push(r.meta.damage_level);
+    if (r.meta.structure_type)      parts.push(r.meta.structure_type);
+    if (r.meta.occupants_accounted) parts.push('occupants: ' + r.meta.occupants_accounted +
+      (r.meta.occupant_count != null ? ' (' + r.meta.occupant_count + ')' : ''));
+    if (r.meta.utilities_affected && r.meta.utilities_affected.length)
+      parts.push('utils off: ' + r.meta.utilities_affected.join(','));
+    if (parts.length) meta = '<div style="font-size:11px;color:#7aa7d9;margin-top:4px">' + esc(parts.join(' · ')) + '</div>';
+    if (r.meta.hazards) meta += '<div style="font-size:12px;color:#f39c12;margin-top:3px">⚠ ' + esc(r.meta.hazards) + '</div>';
+  }
+
+  return '<div style="min-width:200px;max-width:280px">' +
+    '<b style="display:block;margin-bottom:4px;color:' + color + '">' + esc(r.title) + '</b>' +
+    '<span style="font-size:11px;padding:1px 7px;border-radius:3px;background:' + tcfg.color + '22;color:' + tcfg.color + ';border:1px solid ' + tcfg.color + '44">' + tcfg.icon + ' ' + tcfg.label + '</span>' +
+    (scfg ? ' <span style="font-size:11px;padding:1px 7px;border-radius:3px;background:' + scfg.color + '22;color:' + scfg.color + ';border:1px solid ' + scfg.color + '44">' + scfg.label + '</span>' : '') +
+    (INCIDENTS_COMMAND ? ' <span style="font-size:11px;padding:1px 7px;border-radius:3px;background:' + stcfg.color + '22;color:' + stcfg.color + ';border:1px solid ' + stcfg.color + '44">' + stcfg.label + '</span>' : '') +
+    meta +
+    (r.description ? '<p style="margin:6px 0 0;font-size:12px">' + esc(r.description.slice(0,200)) + (r.description.length>200?'…':'') + '</p>' : '') +
+    (r.location_text ? '<p style="margin:4px 0 0;font-size:11px;color:#888">📍 ' + esc(r.location_text) + '</p>' : '') +
     '<p style="margin:4px 0 0;font-size:11px;color:#555">' + ts + (r.reporter_name ? ' · ' + esc(r.reporter_name) : '') + '</p>' +
+    (r.photo_path ? '<p style="margin:4px 0 0"><a href="/incident-photos/' + encodeURIComponent(r.photo_path) + '" target="_blank" style="font-size:11px">📷 photo</a></p>' : '') +
     '</div>';
 }
 
-function loadDamage() {
-  if (!dmgVisible) return;
-  fetch('/maps/damage.php')
+function loadIncidents() {
+  if (!incVisible) return;
+  fetch('/incidents/api.php?action=list&only_pinned=1')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       var seen = {};
       rows.forEach(function(r) {
         seen[r.id] = true;
-        if (dmgMarkers[r.id]) return;
-        var dc = DMG_COLORS[r.damage_level] || DMG_COLORS.minor;
+        if (incMarkers[r.id]) return;
+        var tcfg = INC_TYPE[r.type] || INC_TYPE.general;
+        var scfg = r.severity ? INC_SEV[r.severity] : null;
+        var color = scfg ? scfg.color : tcfg.color;
+        var dim   = r.status === 'resolved' ? 'opacity:.45;' : '';
         var el = document.createElement('div');
-        el.style.cssText = 'width:26px;height:26px;border-radius:4px;background:' + dc.color +
+        el.style.cssText = 'width:26px;height:26px;border-radius:4px;background:' + color +
           ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;' +
-          'font-size:13px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.6)';
-        el.textContent = '🏚';
-        var popup = new maplibregl.Popup({ offset: 15 }).setHTML(dmgPopup(r));
+          'font-size:13px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.6);' + dim;
+        el.textContent = tcfg.icon;
+        var popup = new maplibregl.Popup({ offset: 15 }).setHTML(incPopup(r));
         el.addEventListener('click', function(e) {
           e.stopPropagation();
           popup.isOpen() ? popup.remove() : popup.setLngLat([r.lng, r.lat]).addTo(map);
@@ -537,25 +576,31 @@ function loadDamage() {
         var mk = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([r.lng, r.lat]).addTo(map);
         mk._popup = popup;
-        dmgMarkers[r.id] = mk;
+        incMarkers[r.id] = mk;
       });
-      Object.keys(dmgMarkers).forEach(function(id) {
-        if (!seen[id]) { dmgMarkers[id]._popup.remove(); dmgMarkers[id].remove(); delete dmgMarkers[id]; }
+      Object.keys(incMarkers).forEach(function(id) {
+        if (!seen[id]) { incMarkers[id]._popup.remove(); incMarkers[id].remove(); delete incMarkers[id]; }
       });
     })
-    .catch(function(e) { console.warn('damage poll failed:', e); });
+    .catch(function(e) { console.warn('incidents poll failed:', e); });
 }
 
-function clearDamage() {
-  Object.values(dmgMarkers).forEach(function(mk) { mk._popup.remove(); mk.remove(); });
-  dmgMarkers = {};
+function clearIncidents() {
+  Object.values(incMarkers).forEach(function(mk) { mk._popup.remove(); mk.remove(); });
+  incMarkers = {};
 }
 
-function toggleDamage() {
-  dmgVisible = !dmgVisible;
-  var btn = document.getElementById('btn-damage');
-  if (btn) btn.classList.toggle('active', dmgVisible);
-  if (dmgVisible) { loadDamage(); } else { clearDamage(); }
+function toggleIncidents() {
+  incVisible = !incVisible;
+  var btn = document.getElementById('btn-incidents');
+  if (btn) btn.classList.toggle('active', incVisible);
+  if (incVisible) {
+    loadIncidents();
+    if (!incTimer) incTimer = setInterval(loadIncidents, 30000);
+  } else {
+    clearIncidents();
+    if (incTimer) { clearInterval(incTimer); incTimer = null; }
+  }
 }
 
 // ── APRS layer ─────────────────────────────────────────────────────────────────
