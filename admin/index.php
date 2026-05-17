@@ -87,6 +87,20 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $run_name   = $script;
     }
 
+    // --- NWR channel scan (AJAX — returns JSON of freq→dB) ---
+    if ($act === 'sdr_nwr_scan') {
+        header('Content-Type: application/json');
+        $raw = shell_exec('sudo -n /usr/local/bin/noosphere-scan-nwr.sh 2>&1') ?? '';
+        $channels = [];
+        foreach (explode("\n", trim($raw)) as $line) {
+            if (preg_match('/^(\d+\.\d+)=(-?\d+\.\d+)$/', trim($line), $m)) {
+                $channels[$m[1]] = (float)$m[2];
+            }
+        }
+        echo json_encode(['ok' => !empty($channels), 'channels' => $channels, 'raw' => $raw]);
+        exit;
+    }
+
     // --- SDR diagnostics (AJAX — returns JSON) ---
     if (in_array($act, ['sdr_diag_usb','sdr_diag_rtltest','sdr_diag_log','sdr_diag_restart','sdr_diag_blacklist'])) {
         header('Content-Type: application/json');
@@ -2151,6 +2165,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_usb" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">🔍 Scan USB</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_rtltest" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📡 rtl_test (~8s)</button>
+          <button type="button" id="sdr-nwr-scan-btn" style="background:#111126;border:1px solid #2a2a4a;color:#2ecc71;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" title="Sweep all 7 NOAA NWR channels and rank by signal — useful for antenna placement. Briefly stops noaa-weather.">🔍 NWR Channel Scan (~6s)</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noaa-weather" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 NWR Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="scanner-waterfall" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 Scanner Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noosphere-rtl433" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 rtl_433 Log</button>
@@ -2163,6 +2178,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
         </div>
 
         <!-- Output area -->
+        <div id="sdr-nwr-scan-output" style="display:none;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:5px;padding:10px;margin-bottom:10px"></div>
         <div id="sdr-diag-output" style="display:none;background:#000;border:1px solid #2a2a4a;border-radius:5px;padding:10px;font-family:monospace;font-size:11px;color:#ccc;white-space:pre-wrap;max-height:260px;overflow-y:auto"></div>
         <div id="sdr-diag-spinner" style="display:none;font-size:12px;color:#555;margin-top:6px">Running…</div>
 
@@ -2205,6 +2221,57 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
             })
             .catch(function(e){ spin.style.display='none'; out.textContent='Error: '+e; out.style.display='block'; });
         });
+      });
+
+      var scanBtn = document.getElementById('sdr-nwr-scan-btn');
+      if (scanBtn) scanBtn.addEventListener('click', function(){
+        var box = document.getElementById('sdr-nwr-scan-output');
+        var spin = document.getElementById('sdr-diag-spinner');
+        scanBtn.disabled = true;
+        var orig = scanBtn.textContent;
+        scanBtn.textContent = 'Scanning… (~6s, NWR audio briefly off)';
+        spin.style.display = 'block';
+        box.style.display = 'none';
+        var fd = new FormData();
+        fd.append('act', 'sdr_nwr_scan');
+        fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+        fetch('', {method:'POST', body:fd})
+          .then(function(r){ return r.json(); })
+          .then(function(r){
+            spin.style.display = 'none';
+            scanBtn.disabled = false; scanBtn.textContent = orig;
+            if (!r.ok) {
+              box.innerHTML = '<div style="color:#e94560;font-size:12px">Scan failed:</div><pre style="color:#888;font-size:11px;white-space:pre-wrap">'+(r.raw||'(no output)')+'</pre>';
+              box.style.display = 'block'; return;
+            }
+            var entries = Object.entries(r.channels).sort(function(a,b){return b[1]-a[1];});
+            var max = entries[0][1], min = entries[entries.length-1][1];
+            var range = Math.max(1, max - min);
+            var best = entries[0][0];
+            var spread = (max - min).toFixed(1);
+            var html = '<div style="font-size:12px;color:#888;margin-bottom:8px">Strongest: <strong style="color:#2ecc71;font-family:monospace">'+best+' MHz</strong> · spread '+spread+' dB '+
+                       (spread < 3 ? '<span style="color:#f39c12">(low — likely just noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal detected)</span>')+'</div>';
+            entries.forEach(function(e){
+              var ch = e[0], db = e[1];
+              var pct = (db - min) / range * 100;
+              var isBest = (ch === best);
+              html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:11px;font-family:monospace">'+
+                '<span style="width:60px;color:'+(isBest?'#2ecc71':'#7ad')+'">'+ch+'</span>'+
+                '<div style="flex:1;height:10px;background:#000;border-radius:2px;overflow:hidden">'+
+                  '<div style="height:100%;width:'+pct.toFixed(1)+'%;background:'+(isBest?'#2ecc71':'#4a6a8a')+'"></div>'+
+                '</div>'+
+                '<span style="width:55px;text-align:right;color:'+(isBest?'#2ecc71':'#aaa')+'">'+db.toFixed(1)+' dB</span>'+
+                '</div>';
+            });
+            box.innerHTML = html;
+            box.style.display = 'block';
+          })
+          .catch(function(e){
+            spin.style.display = 'none';
+            scanBtn.disabled = false; scanBtn.textContent = orig;
+            box.innerHTML = '<div style="color:#e94560;font-size:12px">Error: '+e+'</div>';
+            box.style.display = 'block';
+          });
       });
     })();
     </script>
