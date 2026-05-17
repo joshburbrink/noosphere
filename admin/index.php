@@ -2018,7 +2018,8 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
 <?php
 // Detect dongle status for the SDR card
 $sdr_status = trim(shell_exec("/usr/local/bin/rtlsdr-detect.sh --verbose 2>&1") ?? "");
-$sdr_ok = (strpos($sdr_status, "Status:    OK") !== false);
+$sdr_ok = (strpos($sdr_status, "Status:    OK") !== false)
+             || (strpos($sdr_status, "IN USE") !== false && preg_match('/IN USE by PID \d+ \((?:rtl_fm|rtl_433|multimon)/', $sdr_status));
 $sdr_mode = get_setting("radio_mode", "off");
 $sdr_freq = get_setting("radio_freq", "162.550M");
 $sdr_gain = get_setting("radio_gain", "49.6");
