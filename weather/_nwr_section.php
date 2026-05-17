@@ -62,6 +62,13 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       <canvas id="nwr-spectrum" style="display:block;width:100%;height:80px" height="80"></canvas>
       <div id="nwr-spectrum-label" style="position:absolute;top:4px;left:8px;font-size:10px;color:#555;pointer-events:none">Signal · play audio to activate</div>
     </div>
+    <div id="nwr-signal-bar" style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:#555">
+      <span>Signal</span>
+      <div style="flex:1;height:6px;background:#111;border-radius:3px;overflow:hidden">
+        <div id="nwr-signal-fill" style="height:100%;width:0%;background:#555;border-radius:3px;transition:width 0.4s,background 0.4s"></div>
+      </div>
+      <span id="nwr-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
+    </div>
   </div>
 </div>
 <?php else: ?>
@@ -125,6 +132,7 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
     if (analyser) return;
     try {
       var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume();
       var src2 = ctx.createMediaElementSource(audio);
       analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
@@ -158,7 +166,28 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
   }
 
   audio.addEventListener('play', initSpectrum, { once: true });
-  setTimeout(function(){ location.reload(); }, 30000);
+
+  // Signal level polling (every 5s)
+  function updateSignal() {
+    fetch('/weather/signal.php').then(function(r){ return r.json(); }).then(function(d){
+      var fill = document.getElementById('nwr-signal-fill');
+      var lbl  = document.getElementById('nwr-signal-db');
+      if (!d.ok || d.max_db === null) {
+        fill.style.width = '0%'; fill.style.background = '#555';
+        lbl.textContent = '— dB'; return;
+      }
+      // Map -60dB..0dB to 0..100%
+      var pct = Math.max(0, Math.min(100, (d.max_db + 60) / 60 * 100));
+      var color = d.max_db > -30 ? '#2ecc71' : d.max_db > -50 ? '#f39c12' : '#e94560';
+      fill.style.width = pct + '%';
+      fill.style.background = color;
+      lbl.style.color = color;
+      lbl.textContent = d.max_db.toFixed(1) + ' dB';
+      document.getElementById('nwr-signal-bar').style.color = color;
+    }).catch(function(){});
+  }
+  updateSignal();
+  setInterval(updateSignal, 5000);
 })();
 </script>
 <?php endif; ?>

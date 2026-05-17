@@ -107,6 +107,18 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- Transcribe now (AJAX) ---
+    if ($act === 'transcribe_now') {
+        header('Content-Type: application/json');
+        $cmd = '/opt/noosphere-whisper/bin/python3 /usr/local/bin/noosphere-weather-transcribe.py manual 2>&1';
+        $out = shell_exec($cmd) ?? '(no output)';
+        $status = [];
+        $sf = '/var/lib/noosphere/weather/last-transcription.json';
+        if (file_exists($sf)) $status = json_decode(file_get_contents($sf), true) ?? [];
+        echo json_encode(['ok' => true, 'output' => $out, 'status' => $status]);
+        exit;
+    }
+
     // --- Promote / demote registry user ---
     if ($act === 'set_admin') {
         $uid  = (int)($_POST['uid'] ?? 0);
@@ -414,13 +426,20 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
-        $toggle_keys = ['show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
+        $toggle_keys = ['transcription_enabled','transcription_nwr_auto','transcription_nwr_hybrid','transcription_talk_post',
+                        'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
                         'show_weather','show_radio','show_runners','show_damage','show_triage','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
+        // --- Sync transcription timer ---
+        $t_auto = get_setting('transcription_enabled','0') === '1' && get_setting('transcription_nwr_auto','0') === '1';
+        shell_exec($t_auto
+            ? 'systemctl enable --now noosphere-weather-transcribe.timer 2>&1'
+            : 'systemctl disable --now noosphere-weather-transcribe.timer 2>&1');
+
         // --- SDR radio mode (off|nwr|scanner) — invokes helper if changed ---
         if (isset($_POST['radio_mode'])) {
             $valid_modes = ['off','nwr','scanner','rtl433','aprs'];
@@ -2190,6 +2209,96 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
     </script>
   </div>
 </div>
+
+
+<!-- Transcription -->
+<?php
+$t_enabled     = get_setting('transcription_enabled','0') === '1';
+$t_nwr_auto    = get_setting('transcription_nwr_auto','0') === '1';
+$t_nwr_hybrid  = get_setting('transcription_nwr_hybrid','0') === '1';
+$t_talk_post   = get_setting('transcription_talk_post','0') === '1';
+$whisper_ok    = (trim(shell_exec('/opt/noosphere-whisper/bin/python3 -c "import vosk; print(1)" 2>/dev/null') ?? '') === '1') && count(glob('/var/lib/noosphere/vosk-models/vosk-model*')) > 0;
+$last_tx = [];
+$tx_file = '/var/lib/noosphere/weather/last-transcription.json';
+if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), true) ?? [];
+?>
+<details class="cpanel" <?= $t_enabled ? 'open' : '' ?>>
+  <summary>🎙 Transcription <span style="font-size:11px;color:#888;font-weight:normal">— Auto-log NWR audio with vosk (offline speech recognition)</span></summary>
+  <div class="cpbody">
+    <?php if (!$whisper_ok): ?>
+    <div style="background:#1a1a00;border:1px solid #554400;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#aa9">
+      <strong style="color:#cc9">vosk or model not found.</strong> Install:<br>
+      <code style="font-size:11px;color:#888">python3 -m venv /opt/noosphere-whisper &amp;&amp; /opt/noosphere-whisper/bin/pip install vosk</code><br>
+      Then download a model into <code style="color:#888">/var/lib/noosphere/vosk-models/</code><br>
+      (e.g. <code style="color:#888">vosk-model-small-en-us-0.15</code> from alphacephei.com/vosk/models)<br>
+      Features below will be unavailable until both are present.
+    </div>
+    <?php else: ?>
+    <?php $vmodel = basename(glob("/var/lib/noosphere/vosk-models/vosk-model*")[0] ?? ""); ?>
+    <div style="font-size:12px;color:#2ecc71;margin-bottom:10px">&#x2714; vosk ready &mdash; model: <?= esc($vmodel) ?></div>
+    <?php endif; ?>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" name="transcription_enabled" <?= $t_enabled?'checked':'' ?> <?= !$whisper_ok?'disabled':'' ?>>
+        Enable transcription
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
+        <input type="checkbox" name="transcription_nwr_auto" <?= $t_nwr_auto?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        Auto-transcribe NWR every 30 min (systemd timer)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
+        <input type="checkbox" name="transcription_nwr_hybrid" <?= $t_nwr_hybrid?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        Hybrid mode — listen live + auto-transcribe simultaneously
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
+        <input type="checkbox" name="transcription_talk_post" <?= $t_talk_post?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        Post summary to Talk after each transcription
+      </label>
+    </div>
+
+    <?php if ($whisper_ok && $t_enabled): ?>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <button type="button" id="tx-now-btn" style="background:#1a2a3a;border:1px solid #2a5a7a;color:#7ad;border-radius:5px;padding:7px 16px;font-size:12px;cursor:pointer">🎙 Transcribe Now</button>
+      <?php if ($last_tx): ?>
+      <span style="font-size:11px;color:#555">Last run: <?= date('M j H:i', $last_tx['ts'] ?? 0) ?></span>
+      <?php endif; ?>
+    </div>
+    <?php if ($last_tx): ?>
+    <div style="background:#0a0a1a;border:1px solid #2a2a4a;border-radius:5px;padding:8px 12px;font-size:11px;color:#888;margin-bottom:4px">
+      <div style="color:#aaa;margin-bottom:3px">Last transcript:</div>
+      <?= htmlspecialchars(substr($last_tx['transcript'] ?? '', 0, 300)) ?>
+      <?php if (!empty($last_tx['parsed'])): ?>
+      <div style="margin-top:4px;color:#7ad">
+        Parsed: <?= htmlspecialchars(implode(' · ', array_map(fn($k,$v)=>"$k: $v", array_keys($last_tx['parsed']), $last_tx['parsed']))) ?>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+    <div id="tx-output" style="display:none;background:#000;border:1px solid #2a2a4a;border-radius:5px;padding:10px;font-family:monospace;font-size:11px;color:#ccc;white-space:pre-wrap;max-height:200px;overflow-y:auto;margin-top:8px"></div>
+    <div id="tx-spinner" style="display:none;font-size:12px;color:#555;margin-top:6px">Transcribing… (may take 30-60s on this hardware)</div>
+    <script>
+    document.getElementById('tx-now-btn').addEventListener('click', function() {
+      var out = document.getElementById('tx-output');
+      var spin = document.getElementById('tx-spinner');
+      out.style.display = 'none'; spin.style.display = 'block';
+      var fd = new FormData();
+      fd.append('act', 'transcribe_now');
+      fd.append('csrf_token', document.querySelector('[name=csrf_token]').value);
+      fetch('', {method:'POST', body:fd})
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+          spin.style.display = 'none';
+          out.textContent = r.output || '(no output)';
+          out.style.display = 'block';
+          out.scrollTop = out.scrollHeight;
+        })
+        .catch(function(e){ spin.style.display='none'; out.textContent='Error: '+e; out.style.display='block'; });
+    });
+    </script>
+    <?php endif; ?>
+  </div>
+</details>
 
 <?php
 $simple_mods = [

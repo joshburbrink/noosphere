@@ -212,11 +212,26 @@ tr:hover td { background:#1a1f35; }
         <td><?= $r['conditions'] ? '<span class="cond-badge">'.htmlspecialchars($r['conditions']).'</span>' : '—' ?></td>
         <td style="white-space:nowrap"><?= htmlspecialchars(trim(($r['wind_dir'] ?? '') . ' ' . ($r['wind_speed'] ?? ''))) ?: '—' ?></td>
         <td><?= $r['humidity'] ? htmlspecialchars($r['humidity']).'%' : '—' ?></td>
-        <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
+        <td class="notes-cell">
+          <?php
+            $note = $r['notes'] ?? '';
+            if (($r['source'] ?? '') === 'nwr-auto' && str_starts_with($note, '[NWR transcript] ')):
+              $transcript = substr($note, strlen('[NWR transcript] '));
+          ?>
+            <details style="font-size:11px">
+              <summary style="cursor:pointer;color:#7ad">📝 View transcript</summary>
+              <div style="margin-top:4px;color:#888;line-height:1.5"><?= htmlspecialchars($transcript) ?></div>
+            </details>
+          <?php else: ?>
+            <?= htmlspecialchars($note) ?>
+          <?php endif ?>
+        </td>
         <td style="white-space:nowrap;color:#aaa">
           <?= htmlspecialchars($r['logged_by'] ?? '') ?>
           <?php if (($r['source'] ?? '') === 'rtl433'): ?>
             <span style="display:inline-block;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:3px;padding:1px 5px;font-size:10px;color:#4af;margin-left:4px">rtl_433</span>
+          <?php elseif (($r['source'] ?? '') === 'nwr-auto'): ?>
+            <span style="display:inline-block;background:#1a2a1a;border:1px solid #2a5a2a;border-radius:3px;padding:1px 5px;font-size:10px;color:#2ecc71;margin-left:4px">NWR Auto</span>
           <?php endif ?>
         </td>
         <?php if ($is_admin): ?>
