@@ -95,6 +95,39 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       <?php endforeach ?>
       <span style="font-size:10px;color:#555;margin-left:6px">NWR is fixed to these 7 channels</span>
     </form>
+    <form method="post" style="margin-top:8px">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="scan_nwr">
+      <button type="submit"
+              onclick="this.disabled=true;this.textContent='Scanning… (~6s, audio briefly off)';this.form.submit();"
+              style="background:#0f0f1a;color:#7ad;border:1px solid #2a4a6a;border-radius:4px;padding:6px 12px;font-size:12px;cursor:pointer">
+        🔍 Scan all channels (find strongest signal)
+      </button>
+    </form>
+    <?php if (!empty($scan_results)):
+      $max_db = max($scan_results);
+      $min_db = min($scan_results);
+      $best   = array_keys($scan_results, $max_db)[0];
+    ?>
+    <div style="margin-top:8px;padding:8px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:5px">
+      <div style="font-size:11px;color:#888;margin-bottom:6px">Scan results (strongest first) — best: <strong style="color:#2ecc71;font-family:monospace"><?= $best ?> MHz</strong></div>
+      <?php
+        arsort($scan_results);
+        $range = max(1, $max_db - $min_db);
+        foreach ($scan_results as $ch => $db):
+          $pct = ($db - $min_db) / $range * 100;
+          $is_best = ($ch === $best);
+      ?>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:11px;font-family:monospace">
+        <span style="width:60px;color:<?= $is_best ? '#2ecc71' : '#7ad' ?>"><?= $ch ?></span>
+        <div style="flex:1;height:10px;background:#000;border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:<?= number_format($pct,1) ?>%;background:<?= $is_best ? '#2ecc71' : '#4a6a8a' ?>"></div>
+        </div>
+        <span style="width:55px;text-align:right;color:<?= $is_best ? '#2ecc71' : '#aaa' ?>"><?= number_format($db,1) ?> dB</span>
+      </div>
+      <?php endforeach ?>
+    </div>
+    <?php endif ?>
   </div>
   <?php endif ?>
 </div>
