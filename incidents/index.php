@@ -41,13 +41,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             }
             $token = bin2hex(random_bytes(16));
             $now   = time();
+
+            $meta = null;
+            if ($type === 'damage') {
+                $dm = incident_collect_damage_meta($_POST);
+                if ($dm) $meta = json_encode($dm, JSON_UNESCAPED_SLASHES);
+                if (!$sev && !empty($dm['damage_level'])) {
+                    $sev = damage_level_to_severity($dm['damage_level']);
+                }
+            }
+
             $stmt = $db->prepare("INSERT INTO incidents
                 (submitted_at, updated_at, type, severity, title, description, location_text,
-                 lat, lng, reporter_name, creator_token, photo_path, status)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'open')");
+                 lat, lng, reporter_name, creator_token, photo_path, status, meta)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'open',?)");
             $stmt->execute([
                 $now, $now, $type, $sev, $title, $desc ?: null, $loc ?: null,
-                $lat, $lng, $rep ?: null, $token, $photo,
+                $lat, $lng, $rep ?: null, $token, $photo, $meta,
             ]);
             $msg = 'Incident reported.';
         }
@@ -250,6 +260,56 @@ tr:hover td { background:#1a1f35; }
         <label>Photo (optional)</label>
         <input type="file" name="photo" accept="image/*" capture="environment" style="color:#aaa;font-size:12px">
       </div>
+
+      <!-- Damage-specific (visible when Type = Damage) -->
+      <div class="form-full damage-fields" style="display:none;border-top:1px solid #2a2a4a;padding-top:10px;margin-top:6px">
+        <div style="font-size:11px;color:#7aa7d9;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Damage Details</div>
+        <div class="form-grid">
+          <div>
+            <label>Structure Type</label>
+            <select name="damage_structure_type">
+              <?php foreach (DAMAGE_STRUCTURE_TYPES as $k => $v): ?>
+                <option value="<?= $k ?>"><?= esc($v) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
+            <label>Damage Level</label>
+            <select name="damage_level">
+              <?php foreach (DAMAGE_LEVELS as $k => $v): ?>
+                <option value="<?= $k ?>"<?= $k === 'minor' ? ' selected' : '' ?>><?= esc($v) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
+            <label>Occupants Accounted For</label>
+            <select name="damage_accounted">
+              <?php foreach (DAMAGE_ACCOUNTED as $k => $v): ?>
+                <option value="<?= $k ?>"<?= $k === 'unknown' ? ' selected' : '' ?>><?= esc($v) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
+            <label>Number of Occupants (if known)</label>
+            <input type="number" name="damage_occupant_count" min="0" max="999" placeholder="—">
+          </div>
+          <div class="form-full">
+            <label>Utilities Affected</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;padding:6px 0">
+              <?php foreach (DAMAGE_UTILITIES as $k => $v): ?>
+              <label style="display:flex;align-items:center;gap:5px;color:#ccc;cursor:pointer;margin-bottom:0">
+                <input type="checkbox" name="damage_utilities[]" value="<?= $k ?>" style="width:auto"> <?= esc($v) ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+          <div class="form-full">
+            <label>Hazards Present</label>
+            <textarea name="damage_hazards" placeholder="Gas leak, structural collapse, flooding, downed lines…"></textarea>
+          </div>
+        </div>
+      </div>
+
       <?php if ($maps_on): ?>
       <div class="form-full">
         <label>Pin on Map <span style="color:#555;font-weight:normal">(optional — tap to mark exact location)</span></label>
@@ -344,6 +404,24 @@ tr:hover td { background:#1a1f35; }
             <?php if ($r['description']): ?>
               <div style="color:#aaa;font-size:11px;margin-top:2px;max-width:280px"><?= esc(mb_strimwidth($r['description'], 0, 140, '…')) ?></div>
             <?php endif; ?>
+            <?php if ($r['type'] === 'damage' && !empty($r['meta'])):
+              $dm = json_decode($r['meta'], true) ?: [];
+              $bits = [];
+              if (!empty($dm['structure_type'])) $bits[] = DAMAGE_STRUCTURE_TYPES[$dm['structure_type']] ?? $dm['structure_type'];
+              if (!empty($dm['damage_level']))   $bits[] = DAMAGE_LEVELS[$dm['damage_level']] ?? $dm['damage_level'];
+              if (isset($dm['occupants_accounted'])) {
+                $a = DAMAGE_ACCOUNTED[$dm['occupants_accounted']] ?? '?';
+                if (isset($dm['occupant_count'])) $a .= ' (' . (int)$dm['occupant_count'] . ')';
+                $bits[] = 'occupants: ' . $a;
+              }
+              if (!empty($dm['utilities_affected'])) $bits[] = 'utils off: ' . implode(',', $dm['utilities_affected']);
+              if ($bits): ?>
+                <div style="color:#7aa7d9;font-size:10px;margin-top:3px"><?= esc(implode(' · ', $bits)) ?></div>
+              <?php endif;
+              if (!empty($dm['hazards'])): ?>
+                <div style="color:#f39c12;font-size:11px;margin-top:2px">⚠ <?= esc($dm['hazards']) ?></div>
+              <?php endif;
+            endif; ?>
             <?php if ($r['photo_path']): ?>
               <a href="/incident-photos/<?= urlencode($r['photo_path']) ?>" target="_blank" style="font-size:10px;color:#7ad;display:inline-block;margin-top:3px">📷 photo</a>
             <?php endif; ?>
@@ -389,6 +467,19 @@ tr:hover td { background:#1a1f35; }
   <div id="mapview"></div>
   <?php endif; ?>
 </div>
+
+<script>
+// Always: toggle damage-specific fields when Type = Damage
+(function() {
+  var typeSel = document.querySelector('select[name="type"]');
+  var damageFields = document.querySelector('.damage-fields');
+  if (typeSel && damageFields) {
+    var sync = function() { damageFields.style.display = typeSel.value === 'damage' ? '' : 'none'; };
+    typeSel.addEventListener('change', sync);
+    sync();
+  }
+})();
+</script>
 
 <?php if ($maps_on): ?>
 <script>

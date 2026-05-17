@@ -77,6 +77,53 @@ const INCIDENT_SEVERITY_COLORS = [
 
 const INCIDENT_PHOTO_DIR = '/var/lib/noosphere/incident_photos';
 
+// Damage-specific (used when type=damage; stored in meta JSON)
+const DAMAGE_STRUCTURE_TYPES = [
+    'residence'      => 'Residence',
+    'commercial'     => 'Commercial',
+    'agricultural'   => 'Agricultural',
+    'infrastructure' => 'Infrastructure',
+    'other'          => 'Other',
+];
+const DAMAGE_LEVELS = [
+    'none'         => 'None / Undamaged',
+    'minor'        => 'Minor',
+    'major'        => 'Major',
+    'destroyed'    => 'Destroyed',
+    'inaccessible' => 'Inaccessible',
+];
+const DAMAGE_ACCOUNTED = ['yes'=>'Yes','no'=>'No','unknown'=>'Unknown'];
+const DAMAGE_UTILITIES = ['electric'=>'Electric','gas'=>'Gas','water'=>'Water'];
+
+function damage_level_to_severity(?string $lvl): ?string {
+    return match($lvl) {
+        'destroyed'    => 'critical',
+        'major'        => 'serious',
+        'inaccessible' => 'serious',
+        'minor'        => 'minor',
+        'none'         => 'info',
+        default        => null,
+    };
+}
+
+function incident_collect_damage_meta(array $post): array {
+    $meta = [];
+    $st = $post['damage_structure_type'] ?? '';
+    if (isset(DAMAGE_STRUCTURE_TYPES[$st])) $meta['structure_type'] = $st;
+    $dl = $post['damage_level'] ?? '';
+    if (isset(DAMAGE_LEVELS[$dl])) $meta['damage_level'] = $dl;
+    $ac = $post['damage_accounted'] ?? '';
+    if (isset(DAMAGE_ACCOUNTED[$ac])) $meta['occupants_accounted'] = $ac;
+    if (strlen(trim((string)($post['damage_occupant_count'] ?? '')))) {
+        $meta['occupant_count'] = (int)$post['damage_occupant_count'];
+    }
+    $utils = array_values(array_intersect(array_keys(DAMAGE_UTILITIES), (array)($post['damage_utilities'] ?? [])));
+    if ($utils) $meta['utilities_affected'] = $utils;
+    $hz = trim((string)($post['damage_hazards'] ?? ''));
+    if ($hz !== '') $meta['hazards'] = $hz;
+    return $meta;
+}
+
 function incidents_command_mode(): bool {
     return get_setting('show_incidents_command', '0') === '1';
 }

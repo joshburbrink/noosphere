@@ -48,8 +48,6 @@ if (get_setting('show_weather','0')==='1')
     $tiles[] = ['href'=>'/weather/',  'icon'=>'⛅', 'label'=>get_setting('weather_label','Weather Log'), 'desc'=>'Log weather observations &amp; conditions'];
 if (get_setting('show_radio','0')==='1')
     $tiles[] = ['href'=>'/radio/',    'icon'=>'📻', 'label'=>get_setting('radio_label','Radio Net Log'),  'desc'=>'Log radio contacts, traffic &amp; net check-ins'];
-if (get_setting('show_damage','0')==='1')
-    $tiles[] = ['href'=>'/damage/',  'icon'=>'🏚', 'label'=>'Damage Reports', 'desc'=>'Submit and view address-level damage assessments'];
 if (get_setting('show_incidents','0')==='1') {
     $inc_cmd = get_setting('show_incidents_command','0')==='1';
     $tiles[] = ['href'=>'/incidents/', 'icon'=>'📍',

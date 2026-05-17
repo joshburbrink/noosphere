@@ -2470,7 +2470,6 @@ $simple_mods = [
     ['show_weather',  't_weather',  'Weather Log'],
     ['show_radio',    't_radio',    'Radio Net Log'],
     ['show_runners',  't_runners',  'Runner Board'],
-    ['show_damage',   't_damage',   'Damage Reports'],
     ['show_incidents','t_incidents','Incident / Map Reports'],
     ['show_incidents_command','t_inc_cmd','Incident Command Mode (severity, status, assignment)'],
     ['show_triage',   't_triage',   'Triage Log'],

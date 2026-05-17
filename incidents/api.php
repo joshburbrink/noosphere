@@ -87,13 +87,22 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = bin2hex(random_bytes(16));
     $now   = time();
 
+    $meta = null;
+    if ($type === 'damage') {
+        $dm = incident_collect_damage_meta($_POST);
+        if ($dm) $meta = json_encode($dm, JSON_UNESCAPED_SLASHES);
+        if (!$sev && !empty($dm['damage_level'])) {
+            $sev = damage_level_to_severity($dm['damage_level']);
+        }
+    }
+
     $stmt = $db->prepare("INSERT INTO incidents
         (submitted_at, updated_at, type, severity, title, description, location_text,
          lat, lng, reporter_name, creator_token, photo_path, status, meta)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $stmt->execute([
         $now, $now, $type, $sev, $title, $desc ?: null, $loc ?: null,
-        $lat, $lng, $rep ?: null, $token, $photo, 'open', null,
+        $lat, $lng, $rep ?: null, $token, $photo, 'open', $meta,
     ]);
     $id = (int)$db->lastInsertId();
     echo json_encode(['ok'=>true, 'id'=>$id, 'token'=>$token, 'photo'=>$photo]);
