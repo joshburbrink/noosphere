@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
+if (get_setting('show_files','1') !== '1') { http_response_code(404); exit; }
 
 $upload_dir = '/var/lib/noosphere/files/';
 if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);

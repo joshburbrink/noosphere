@@ -3,10 +3,7 @@ require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
 
-if (get_setting('show_topo','1') !== '1') {
-    http_response_code(403);
-    die('<p style="font-family:sans-serif;padding:2rem;color:#e94560;background:#0f0f1a;min-height:100vh;margin:0">Topo maps are not enabled.</p>');
-}
+if (get_setting('show_topo','1') !== '1') { http_response_code(404); exit; }
 
 $pdf_dir = '/var/www/noosphere/maps/topo/';
 $files   = glob($pdf_dir . '*.pdf') ?: [];

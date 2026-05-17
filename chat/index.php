@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
+if (get_setting('show_chat','1') !== '1') { http_response_code(404); exit; }
 
 $db = new PDO('sqlite:/var/lib/noosphere/chat.db');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

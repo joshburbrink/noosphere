@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
+if (get_setting('show_maps','1') !== '1') { http_response_code(404); exit; }
 $is_admin    = !empty($_SESSION['admin']);
 $is_readonly = is_readonly();
 ?>

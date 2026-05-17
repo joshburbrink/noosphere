@@ -3,13 +3,14 @@ require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
 
-if (get_setting('show_calendar','1') !== '1') { header('Location: /'); exit; }
+if (get_setting('show_calendar','1') !== '1') { http_response_code(404); exit; }
 
 $msg = $err = '';
 
 try {
     $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
     $cdb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $cdb->exec('PRAGMA journal_mode=WAL');
     $cdb->exec("CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL, event_date TEXT NOT NULL,

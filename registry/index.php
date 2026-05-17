@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
-require_once '/var/www/noosphere/shared/analytics.php';
 sec_session_start();
+if (get_setting('show_registry','1') !== '1') { http_response_code(404); exit; }
 
 $db = new SQLite3('/var/lib/noosphere/registry.db');
+$db->exec('PRAGMA journal_mode=WAL');
 $db->exec("CREATE TABLE IF NOT EXISTS registry (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
