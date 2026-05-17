@@ -56,6 +56,29 @@ for svc in nginx php8.4-fpm mariadb kiwix mbtileserver dnsmasq wifi-reconnect; d
     check_service "$svc"
 done
 
+# Optional SDR services — only warn if enabled but not running
+SDR_MODE=""
+if command -v sqlite3 &>/dev/null; then
+    SDR_MODE=$(sqlite3 /var/lib/noosphere/settings.db "SELECT value FROM settings WHERE key='radio_mode' LIMIT 1" 2>/dev/null || echo "")
+fi
+if [[ -n "$SDR_MODE" && "$SDR_MODE" != "off" ]]; then
+    [[ $QUIET -eq 0 ]] && echo "" && echo "  SDR (mode=$SDR_MODE)"
+    case "$SDR_MODE" in
+      nwr)     check_service "noaa-weather" ;;
+      scanner) check_service "scanner-waterfall" ;;
+      rtl433)  check_service "noosphere-rtl433" ;;
+      aprs)    check_service "noosphere-aprs"; check_service "noosphere-aprs-writer" ;;
+    esac
+    # RTL-SDR dongle presence
+    if command -v rtlsdr-detect.sh &>/dev/null; then
+        if /usr/local/bin/rtlsdr-detect.sh 2>/dev/null | grep -q "Status:    OK"; then
+            _ok "RTL-SDR dongle detected"
+        else
+            _warn "RTL-SDR dongle not detected — SDR mode=$SDR_MODE but dongle missing?"
+        fi
+    fi
+fi
+
 # Ports
 [[ $QUIET -eq 0 ]] && echo "" && echo "  Ports"
 check_port "nginx"        127.0.0.1 80

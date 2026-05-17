@@ -1,0 +1,13 @@
+[Unit]
+Description=Noosphere rtl_433 weather sensor bridge
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/noosphere/rtl433.conf
+ExecStart=/bin/sh -c 'rtl_433 -F json -G 4 2>/dev/null | /usr/local/bin/noosphere-rtl433-bridge.py'
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

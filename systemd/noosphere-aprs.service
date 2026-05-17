@@ -1,0 +1,13 @@
+[Unit]
+Description=Noosphere APRS receive (Direwolf)
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/noosphere/aprs.conf
+ExecStart=/usr/bin/direwolf -c /etc/noosphere/direwolf.conf -r 24000 -t 0 -q hd
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

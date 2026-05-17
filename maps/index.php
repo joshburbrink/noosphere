@@ -5,6 +5,7 @@ sec_session_start();
 if (get_setting('show_maps','1') !== '1') { http_response_code(404); exit; }
 $is_admin    = !empty($_SESSION['admin']);
 $is_readonly = is_readonly();
+$aprs_active = (get_setting('radio_mode','off') === 'aprs');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,6 +78,9 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <button class="theme-btn" data-theme="hc"    onclick="setTheme('hc')">Hi-Vis</button>
     <button class="theme-btn" id="btn-satellite" onclick="toggleSatellite()">Satellite</button>
   </div>
+<?php if ($aprs_active): ?>
+  <button class="theme-btn" id="btn-aprs" onclick="toggleAprs()" title="Toggle APRS station markers">APRS</button>
+<?php endif; ?>
 <?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs →</a><?php endif; ?>
 </header>
 <?php if (!$is_readonly): ?>
@@ -115,6 +119,7 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <script>
 var IS_ADMIN    = <?= $is_admin    ? 'true' : 'false' ?>;
 var IS_READONLY = <?= $is_readonly ? 'true' : 'false' ?>;
+var APRS_ACTIVE = <?= $aprs_active ? 'true' : 'false' ?>;
 
 var THEMES = {
     dark: {
@@ -477,6 +482,83 @@ function esc(s) {
 
 loadMarkers();
 setInterval(loadMarkers, 20000);
+
+// ── APRS layer ─────────────────────────────────────────────────────────────────
+var aprsMarkers = {};
+var aprsVisible = false;
+
+function fmtAge(ts) {
+    var secs = Math.floor(Date.now() / 1000) - ts;
+    if (secs < 60)   return secs + 's ago';
+    if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+    return Math.floor(secs / 3600) + 'h ' + Math.floor((secs % 3600) / 60) + 'm ago';
+}
+
+function aprsPopup(r) {
+    return '<div style="min-width:160px">' +
+        '<b style="font-family:monospace;font-size:14px">' + esc(r.callsign) + '</b>' +
+        '<div style="font-size:11px;color:#888;margin-top:3px">Last heard: ' + fmtAge(r.last_heard) + '</div>' +
+        (r.symbol  ? '<div style="font-size:11px;color:#aaa;margin-top:2px">Symbol: ' + esc(r.symbol) + '</div>' : '') +
+        (r.comment ? '<div style="font-size:12px;margin-top:4px">' + esc(r.comment) + '</div>' : '') +
+        '</div>';
+}
+
+function loadAprs() {
+    if (!aprsVisible) return;
+    fetch('/maps/aprs.php')
+        .then(function(r) { return r.json(); })
+        .then(function(rows) {
+            var seen = {};
+            rows.forEach(function(r) {
+                seen[r.callsign] = true;
+                if (aprsMarkers[r.callsign]) {
+                    aprsMarkers[r.callsign]._popup.setHTML(aprsPopup(r));
+                    return;
+                }
+                var el = document.createElement('div');
+                el.style.cssText = 'width:28px;height:28px;border-radius:50%;background:#ff8c00;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.6)';
+                el.textContent = r.callsign.charAt(0);
+                var popup = new maplibregl.Popup({ offset: 16 }).setHTML(aprsPopup(r));
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    popup.isOpen() ? popup.remove() : popup.setLngLat([r.lng, r.lat]).addTo(map);
+                });
+                var mk = new maplibregl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat([r.lng, r.lat]).addTo(map);
+                mk._popup = popup;
+                aprsMarkers[r.callsign] = mk;
+            });
+            // Remove expired
+            Object.keys(aprsMarkers).forEach(function(cs) {
+                if (!seen[cs]) {
+                    aprsMarkers[cs]._popup.remove();
+                    aprsMarkers[cs].remove();
+                    delete aprsMarkers[cs];
+                }
+            });
+        })
+        .catch(function(e) { console.warn('APRS poll failed:', e); });
+}
+
+function clearAprs() {
+    Object.values(aprsMarkers).forEach(function(mk) { mk._popup.remove(); mk.remove(); });
+    aprsMarkers = {};
+}
+
+function toggleAprs() {
+    aprsVisible = !aprsVisible;
+    var btn = document.getElementById('btn-aprs');
+    if (btn) btn.classList.toggle('active', aprsVisible);
+    if (aprsVisible) {
+        loadAprs();
+    } else {
+        clearAprs();
+    }
+}
+
+if (APRS_ACTIVE) {
+    setInterval(loadAprs, 30000);
+}
 </script>
 </body>
 </html>

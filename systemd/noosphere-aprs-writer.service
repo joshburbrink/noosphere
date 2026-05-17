@@ -1,0 +1,14 @@
+[Unit]
+Description=Noosphere APRS station writer (Direwolf AGW consumer)
+After=noosphere-aprs.service
+BindsTo=noosphere-aprs.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/noosphere-aprs-writer.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -18,8 +18,10 @@ $db->exec("CREATE TABLE IF NOT EXISTS weather_log (
     wind_speed TEXT,
     humidity   TEXT,
     notes      TEXT,
-    logged_by  TEXT
+    logged_by  TEXT,
+    source     TEXT
 )");
+@$db->exec("ALTER TABLE weather_log ADD COLUMN source TEXT");
 
 $CONDITIONS = ['Clear','Partly Cloudy','Cloudy','Overcast','Rain','Heavy Rain',
                'Thunderstorm','Snow','Fog','Smoke','Haze','Other'];
@@ -211,7 +213,12 @@ tr:hover td { background:#1a1f35; }
         <td style="white-space:nowrap"><?= htmlspecialchars(trim(($r['wind_dir'] ?? '') . ' ' . ($r['wind_speed'] ?? ''))) ?: '—' ?></td>
         <td><?= $r['humidity'] ? htmlspecialchars($r['humidity']).'%' : '—' ?></td>
         <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
-        <td style="white-space:nowrap;color:#aaa"><?= htmlspecialchars($r['logged_by'] ?? '') ?></td>
+        <td style="white-space:nowrap;color:#aaa">
+          <?= htmlspecialchars($r['logged_by'] ?? '') ?>
+          <?php if (($r['source'] ?? '') === 'rtl433'): ?>
+            <span style="display:inline-block;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:3px;padding:1px 5px;font-size:10px;color:#4af;margin-left:4px">rtl_433</span>
+          <?php endif ?>
+        </td>
         <?php if ($is_admin): ?>
         <td>
           <form method="post" onsubmit="return confirm('Delete this entry?')">

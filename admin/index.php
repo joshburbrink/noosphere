@@ -93,7 +93,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $arg = '';
         if ($act === 'sdr_diag_log' || $act === 'sdr_diag_restart') {
             $svc = preg_replace('/[^a-z\-]/', '', $_POST['service'] ?? 'noaa-weather');
-            $arg = in_array($svc, ['noaa-weather','scanner-waterfall']) ? $svc : 'noaa-weather';
+            $arg = in_array($svc, ['noaa-weather','scanner-waterfall','noosphere-rtl433','noosphere-aprs','noosphere-aprs-writer']) ? $svc : 'noaa-weather';
         }
         $diag_cmds = [
             'sdr_diag_usb'      => 'sudo /usr/local/bin/sdr-diag.sh usb',
@@ -423,7 +423,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         // --- SDR radio mode (off|nwr|scanner) — invokes helper if changed ---
         if (isset($_POST['radio_mode'])) {
-            $valid_modes = ['off','nwr','scanner'];
+            $valid_modes = ['off','nwr','scanner','rtl433','aprs'];
             $new_mode = in_array($_POST['radio_mode'], $valid_modes, true) ? $_POST['radio_mode'] : 'off';
             $old_mode = get_setting('radio_mode', 'off');
             $freq = trim($_POST['radio_freq'] ?? '162.550M') ?: '162.550M';
@@ -435,6 +435,23 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             set_setting('radio_gain', $gain);
             set_setting('radio_ppm', $ppm);
             set_setting('radio_same_fips', $fips);
+            // rtl_433 sub-settings
+            $rtl433_sid   = preg_replace('/[^0-9a-zA-Z_\-]/', '', $_POST['rtl433_sensor_id'] ?? '');
+            $rtl433_model = substr(preg_replace('/[^0-9a-zA-Z_ \-\.]/', '', $_POST['rtl433_sensor_model'] ?? ''), 0, 60);
+            set_setting('rtl433_sensor_id',    $rtl433_sid);
+            set_setting('rtl433_sensor_model', $rtl433_model);
+            // APRS sub-settings
+            $aprs_freq_raw = trim($_POST['aprs_freq'] ?? '144.3900');
+            $aprs_freq = preg_match('/^\d+\.?\d*$/', $aprs_freq_raw) ? $aprs_freq_raw : '144.3900';
+            $aprs_expiry = (string)max(1, min(48, (int)($_POST['aprs_expiry_hours'] ?? 2)));
+            set_setting('aprs_freq',         $aprs_freq);
+            set_setting('aprs_expiry_hours', $aprs_expiry);
+            // Write rtl433 conf so bridge picks it up on next read
+            @file_put_contents('/etc/noosphere/rtl433.conf',
+                "sensor_id=$rtl433_sid\nsensor_model=$rtl433_model\n");
+            // Write aprs conf so radio-mode.sh picks it up
+            @file_put_contents('/etc/noosphere/aprs.conf',
+                "APRS_FREQ=$aprs_freq\n");
             // Apply unless mode is off AND nothing changed
             $cmd = sprintf('sudo /usr/local/bin/noosphere-radio-mode.sh %s %s %s %s %s 2>&1',
                 escapeshellarg($new_mode),
@@ -1988,7 +2005,14 @@ $sdr_freq = get_setting("radio_freq", "162.550M");
 $sdr_gain = get_setting("radio_gain", "49.6");
 $sdr_ppm  = get_setting("radio_ppm", "0");
 $sdr_fips = get_setting("radio_same_fips", "018005,018013");
-$svc_state = trim(shell_exec("systemctl is-active noaa-weather.service 2>/dev/null") ?? "");
+$svc_state        = trim(shell_exec("systemctl is-active noaa-weather.service 2>/dev/null") ?? "");
+$svc_rtl433       = trim(shell_exec("systemctl is-active noosphere-rtl433.service 2>/dev/null") ?? "");
+$svc_aprs         = trim(shell_exec("systemctl is-active noosphere-aprs.service 2>/dev/null") ?? "");
+$svc_aprs_writer  = trim(shell_exec("systemctl is-active noosphere-aprs-writer.service 2>/dev/null") ?? "");
+$rtl433_sid       = get_setting('rtl433_sensor_id',    '');
+$rtl433_model     = get_setting('rtl433_sensor_model', '');
+$aprs_freq        = get_setting('aprs_freq',         '144.3900');
+$aprs_expiry      = get_setting('aprs_expiry_hours', '2');
 $status_box_bg  = $sdr_ok ? "#0a2a1a" : "#2a0a0a";
 $status_box_br  = $sdr_ok ? "#2a4a3a" : "#5a3a3a";
 $status_box_fg  = $sdr_ok ? "#7ad"   : "#e94560";
@@ -1996,7 +2020,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
 ?>
 <div class="mod-section" style="border-color:<?= $card_border ?>">
   <div class="mod-header">
-    <span style="font-size:15px">📡 SDR Radio <span style="font-size:11px;color:#888;font-weight:normal">— hardware-driven NOAA Weather Radio &amp; spectrum monitor</span></span>
+    <span style="font-size:15px">📡 SDR Radio <span style="font-size:11px;color:#888;font-weight:normal">— NOAA Weather Radio, spectrum scanner, rtl_433 sensors, APRS</span></span>
   </div>
   <div class="mod-body">
 
@@ -2005,9 +2029,11 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
     <div class="field-label" style="margin-top:4px">Mode <span style="color:#555;font-weight:normal">— only one can hold the dongle at a time</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       <?php foreach ([
-        ["off",     "Off",                  "Dongle idle. Nothing in /weather/ or /radio/ SDR sections."],
+        ["off",     "Off",                  "Dongle idle. No SDR sections active."],
         ["nwr",     "NOAA Weather Radio",   "Decode SAME alerts &amp; stream live audio. Section appears in /weather/."],
         ["scanner", "Spectrum Scanner",     "Waterfall display. Section appears in /radio/."],
+        ["rtl433",  "rtl_433 Sensors",      "Auto-log 433 MHz weather sensors to the Weather Log."],
+        ["aprs",    "APRS Receive",         "Decode 144.390 MHz APRS packets; stations appear as map markers."],
       ] as [$mval,$mlbl,$mdesc]):
         $active = ($sdr_mode === $mval);
         $bcol = $active ? "#e94560" : "#2a2a4a";
@@ -2053,6 +2079,49 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
       <span style="margin-left:auto;font-size:11px;color:#555">Save Settings to apply mode + tuning changes</span>
     </div>
 
+    <div class="field-label" style="margin-top:18px">rtl_433 Sensor Filter <span style="color:#555;font-weight:normal">— leave blank to accept all sensors nearby</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Sensor ID</div>
+        <input type="text" name="rtl433_sensor_id" value="<?= htmlspecialchars($rtl433_sid) ?>" style="width:100%" placeholder="e.g. 42">
+        <div style="font-size:10px;color:#555;margin-top:3px">Numeric ID from rtl_433 JSON output</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Sensor Model</div>
+        <input type="text" name="rtl433_sensor_model" value="<?= htmlspecialchars($rtl433_model) ?>" style="width:100%" placeholder="e.g. Acurite-606TX">
+        <div style="font-size:10px;color:#555;margin-top:3px">Model string from rtl_433 JSON output</div>
+      </div>
+    </div>
+
+    <div class="field-label" style="margin-top:18px">APRS Receive Settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Frequency (MHz)</div>
+        <input type="text" name="aprs_freq" value="<?= htmlspecialchars($aprs_freq) ?>" style="width:100%" placeholder="144.3900">
+        <div style="font-size:10px;color:#555;margin-top:3px">144.390 = North American APRS</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px">Station expiry (hours)</div>
+        <input type="number" name="aprs_expiry_hours" value="<?= htmlspecialchars($aprs_expiry) ?>" min="1" max="48" style="width:100%" placeholder="2">
+        <div style="font-size:10px;color:#555;margin-top:3px">Stations fade from map after this long</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666">
+      <?php
+      $svcs = [
+          'noaa-weather' => $svc_state,
+          'noosphere-rtl433' => $svc_rtl433,
+          'noosphere-aprs' => $svc_aprs,
+          'noosphere-aprs-writer' => $svc_aprs_writer,
+      ];
+      foreach ($svcs as $sname => $sstate): ?>
+        <span style="font-family:monospace;color:<?= $sstate === 'active' ? '#7ad' : '#555' ?>">
+          <?= htmlspecialchars($sname) ?> = <?= htmlspecialchars($sstate ?: 'inactive') ?>
+        </span>
+      <?php endforeach; ?>
+      <span style="margin-left:auto;font-size:11px;color:#555">Save Settings to apply</span>
+    </div>
 
     <details style="margin-top:16px;border:1px solid #2a2a4a;border-radius:6px">
       <summary style="padding:8px 12px;font-size:12px;color:#888;cursor:pointer;user-select:none">🔧 Diagnostics &amp; Troubleshooting</summary>
@@ -2064,8 +2133,12 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_rtltest" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📡 rtl_test (~8s)</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noaa-weather" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 NWR Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="scanner-waterfall" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 Scanner Log</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noosphere-rtl433" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 rtl_433 Log</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noosphere-aprs" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 APRS Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="noaa-weather" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart noaa-weather.service?')">↺ Restart NWR</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="scanner-waterfall" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart scanner-waterfall.service?')">↺ Restart Scanner</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="noosphere-rtl433" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart noosphere-rtl433.service?')">↺ Restart rtl_433</button>
+          <button type="button" class="sdr-diag-btn" data-act="sdr_diag_restart" data-service="noosphere-aprs" style="background:#111126;border:1px solid #e9456022;color:#e94560;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Restart noosphere-aprs.service?')">↺ Restart APRS</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_blacklist" style="background:#111126;border:1px solid #e9456022;color:#f39c12;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" onclick="return confirm('Re-write blacklist and unload DVB modules?')">🛡 Re-apply Blacklist</button>
         </div>
 
