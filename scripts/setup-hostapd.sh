@@ -182,6 +182,23 @@ dhcp-option=6,$AP_IP
 address=/#/$AP_IP
 EOF
 
+    # iptables: clear any stale DNAT rules and set captive portal rules for AP
+    info "Configuring iptables captive portal rules..."
+    _clear_stale_dnat "192.168.8.2"
+    # Redirect HTTP from AP clients (not already targeting server) to portal
+    iptables -t nat -C PREROUTING -i "$AP_INTERFACE" -p tcp --dport 80 ! -d "$AP_IP" \
+        -j DNAT --to-destination "${AP_IP}:80" 2>/dev/null || \
+    iptables -t nat -A PREROUTING -i "$AP_INTERFACE" -p tcp --dport 80 ! -d "$AP_IP" \
+        -j DNAT --to-destination "${AP_IP}:80"
+    # Redirect HTTPS to HTTP portal (prevents silent timeout for HTTPS captive checks)
+    iptables -t nat -C PREROUTING -i "$AP_INTERFACE" -p tcp --dport 443 \
+        -j DNAT --to-destination "${AP_IP}:80" 2>/dev/null || \
+    iptables -t nat -A PREROUTING -i "$AP_INTERFACE" -p tcp --dport 443 \
+        -j DNAT --to-destination "${AP_IP}:80"
+    # Allow forwarding from AP interface
+    iptables -C FORWARD -i "$AP_INTERFACE" -j ACCEPT 2>/dev/null || \
+    iptables -A FORWARD -i "$AP_INTERFACE" -j ACCEPT
+
     # Update nginx captive portal redirect IPs
     info "Updating nginx captive portal (${AP_IP})..."
     _update_nginx_ip "192.168.8.2" "$AP_IP"
@@ -234,9 +251,18 @@ cmd_disable() {
         rm -f "$DNSMASQ_DROP"
     fi
 
+    # iptables: clear AP captive portal rules and restore external-router rules
+    info "Restoring iptables for external router..."
+    if [ -f "$AP_CONF" ]; then source "$AP_CONF"; fi
+    _clear_stale_dnat "${AP_IP:-192.168.4.1}"
+    iptables -t nat -C PREROUTING -p tcp --dport 80 -j DNAT --to-destination "192.168.8.2:80" 2>/dev/null || \
+    iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to-destination "192.168.8.2:80"
+    iptables -t nat -C PREROUTING -p tcp --dport 443 -j DNAT --to-destination "192.168.8.2:80" 2>/dev/null || \
+    iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination "192.168.8.2:80"
+
     # Restore nginx captive portal IPs to external router
     info "Restoring nginx captive portal (192.168.8.2)..."
-    _update_nginx_ip "$AP_IP" "192.168.8.2"
+    _update_nginx_ip "${AP_IP:-192.168.4.1}" "192.168.8.2"
 
     # Release AP interface IP if we set it
     if [ -f "$AP_CONF" ]; then
@@ -299,6 +325,18 @@ cmd_status() {
 }
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+# Remove all PREROUTING DNAT rules targeting a given IP
+_clear_stale_dnat() {
+    local target_ip="$1"
+    # Loop until no more matching rules exist
+    while iptables -t nat -L PREROUTING -n 2>/dev/null | grep -q "to:${target_ip}:"; do
+        rule=$(iptables -t nat -L PREROUTING -n --line-numbers 2>/dev/null | \
+               awk "/to:${target_ip}:/{print \$1; exit}")
+        [ -n "$rule" ] && iptables -t nat -D PREROUTING "$rule" 2>/dev/null || break
+    done
+}
+
 _update_nginx_ip() {
     local from="$1" to="$2"
     if [ -f "$NGINX_CONF" ]; then
