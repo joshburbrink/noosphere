@@ -6,11 +6,12 @@ set -u
 CONF=/etc/noosphere/weather.conf
 [ -f "$CONF" ] && . "$CONF"
 
-FREQUENCY="${FREQUENCY:-162.550M}"
+FREQUENCY="${FREQUENCY:-162.525M}"
 GAIN="${GAIN:-49.6}"
 PPM="${PPM:-0}"
-SAMPLE_RATE="${SAMPLE_RATE:-22050}"
-SQUELCH="${SQUELCH:-150}"
+CAPTURE_RATE="${CAPTURE_RATE:-200k}"
+OUTPUT_RATE="${OUTPUT_RATE:-22050}"
+SQUELCH="${SQUELCH:-100}"
 SAME_FIPS="${SAME_FIPS:-}"
 
 DATA=/var/lib/noosphere/weather
@@ -98,8 +99,8 @@ find "$STREAM_DIR" -name "seg*.ts" -delete 2>/dev/null
 rm -f "$STREAM_DIR/live.m3u8" 2>/dev/null
 
 # Fanout: rtl_fm -> tee -> (ffmpeg HLS) + (multimon-ng SAME)
-rtl_fm -f "$FREQUENCY" -M fm -s "$SAMPLE_RATE" -g "$GAIN" -p "$PPM" -l "$SQUELCH" -E deemp -E dc 2>>"$LOG" \
-  | tee >(ffmpeg -hide_banner -loglevel warning -f s16le -ar "$SAMPLE_RATE" -ac 1 -i - -c:a aac -b:a 32k -f hls -hls_time 2 -hls_list_size 6 -hls_flags delete_segments+omit_endlist+independent_segments -hls_segment_filename "$STREAM_DIR/seg%05d.ts" "$STREAM_DIR/live.m3u8" 2>>"$LOG") \
+rtl_fm -f "$FREQUENCY" -M fm -s "$CAPTURE_RATE" -r "$OUTPUT_RATE" -g "$GAIN" -p "$PPM" -l "$SQUELCH" -A fast -E deemp -E dc 2>>"$LOG" \
+  | tee >(ffmpeg -hide_banner -loglevel warning -f s16le -ar "$OUTPUT_RATE" -ac 1 -i - -c:a aac -b:a 32k -f hls -hls_time 2 -hls_list_size 6 -hls_flags delete_segments+omit_endlist+independent_segments -hls_segment_filename "$STREAM_DIR/seg%05d.ts" "$STREAM_DIR/live.m3u8" 2>>"$LOG") \
   | multimon-ng -t raw -a EAS -q - 2>>"$LOG" \
   | stdbuf -oL grep --line-buffered '^EAS:' | tee -a "$LOG" | /usr/local/bin/noaa-log-alert.py >> "$LOG" 2>&1
 
