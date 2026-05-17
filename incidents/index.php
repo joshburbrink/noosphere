@@ -176,13 +176,33 @@ tr:hover td { background:#1a1f35; }
 .status-open { color:#e94560; }
 .status-acknowledged { color:#f39c12; }
 .status-resolved { color:#2ecc71; }
-.tab-bar { display:flex; gap:4px; margin-bottom:1rem; border-bottom:1px solid #2a2a4a; }
-.tab-btn { background:none; border:none; border-bottom:2px solid transparent; color:#aaa; padding:8px 14px; cursor:pointer; font-size:13px; }
-.tab-btn.active { color:#e94560; border-bottom-color:#e94560; }
-#mapview { display:none; height:520px; border:1px solid #2a2a4a; border-radius:6px; overflow:hidden; }
+.report-grid { display:grid; grid-template-columns:1fr; gap:14px; }
+@media (min-width:900px) {
+  .report-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items:start; }
+  .report-grid > .map-wrap { position:sticky; top:1rem; }
+}
+.map-wrap { position:relative; }
+#mainmap { width:100%; height:60vh; min-height:380px; border:1px solid #2a2a4a; border-radius:6px; overflow:hidden; }
+@media (max-width:899px) { #mainmap { height:45vh; min-height:300px; } }
+#mainmap:fullscreen { height:100vh !important; min-height:0 !important; border-radius:0; border:0; }
+.drop-pin-banner { position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  background:rgba(233,69,96,.95); color:#fff; padding:6px 14px; border-radius:6px;
+  font-size:12px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,.5); z-index:5;
+  display:none; pointer-events:none; }
+body.drop-pin-mode .drop-pin-banner { display:block; }
+body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !important; }
+.pin-pick-btn { background:#0f0f1a; border:1px solid #2a2a4a; color:#eee;
+  padding:8px 14px; border-radius:5px; font-size:13px; cursor:pointer; }
+.pin-pick-btn:hover { border-color:#e94560; color:#e94560; }
+.pin-pick-btn.has-pin { border-color:#2ecc71; color:#2ecc71; }
+.pin-pick-btn.active { background:#e94560; color:#fff; border-color:#e94560; }
 .maplibregl-popup-content { background:#16213e !important; color:#eee !important; border:1px solid #2a2a4a; border-radius:6px; font-size:12px; padding:10px; }
 .maplibregl-popup-tip { border-top-color:#16213e !important; border-bottom-color:#16213e !important; }
 .maplibregl-popup-content a { color:#7aa7d9; }
+.maplibregl-ctrl-group { background:#16213e !important; border:1px solid #2a2a4a !important; }
+.maplibregl-ctrl-group button { background:#16213e !important; }
+.maplibregl-ctrl-group button:hover { background:#1f2c4d !important; }
+.maplibregl-ctrl-scale { background:rgba(15,15,26,.7) !important; color:#eee !important; border-color:#2a2a4a !important; }
 </style>
 </head>
 <body>
@@ -312,14 +332,13 @@ tr:hover td { background:#1a1f35; }
 
       <?php if ($maps_on): ?>
       <div class="form-full">
-        <label>Pin on Map <span style="color:#555;font-weight:normal">(optional — tap to mark exact location)</span></label>
+        <label>Pin Location <span style="color:#555;font-weight:normal">(optional)</span></label>
         <input type="hidden" name="lat" id="inc-lat">
         <input type="hidden" name="lng" id="inc-lng">
-        <div id="inc-map-wrap" style="height:220px;border:1px solid #2a2a4a;border-radius:6px;overflow:hidden;position:relative;cursor:crosshair">
-          <div id="inc-map" style="height:100%"></div>
-          <div id="inc-map-hint" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#aaa;font-size:11px;padding:3px 10px;border-radius:4px;pointer-events:none">Tap to pin location</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="pin-pick-btn" id="inc-pick-btn">📍 Choose location on map</button>
+          <span id="inc-pin-status" style="font-size:12px;color:#888"></span>
         </div>
-        <div id="inc-pin-status" style="font-size:11px;color:#555;margin-top:4px"></div>
       </div>
       <?php endif; ?>
       <div class="form-full">
@@ -331,13 +350,6 @@ tr:hover td { background:#1a1f35; }
 <?php endif; ?>
 
 <div class="card">
-  <div class="tab-bar">
-    <button type="button" class="tab-btn active" id="tab-list">List</button>
-    <?php if ($maps_on): ?>
-    <button type="button" class="tab-btn" id="tab-map">Map</button>
-    <?php endif; ?>
-  </div>
-
   <div class="filter-bar">
     <a href="?" class="filter-btn<?= !$f_type && !$f_status ? ' active' : '' ?>">All</a>
     <?php foreach (INCIDENT_TYPES as $k => $v): ?>
@@ -354,6 +366,7 @@ tr:hover td { background:#1a1f35; }
     <a href="export.php" style="margin-left:auto" class="filter-btn">⬇ CSV</a>
   </div>
 
+  <div class="report-grid">
   <div id="listview">
     <?php if (!$rows): ?>
       <div style="text-align:center;color:#555;padding:2rem">No incidents<?= ($f_type || $f_status || !$show_resolved) ? ' match this filter' : ' yet' ?>.</div>
@@ -464,8 +477,12 @@ tr:hover td { background:#1a1f35; }
   </div>
 
   <?php if ($maps_on): ?>
-  <div id="mapview"></div>
+  <div class="map-wrap">
+    <div id="mainmap"></div>
+    <div class="drop-pin-banner">📍 Tap the map to set incident location · ESC to cancel</div>
+  </div>
   <?php endif; ?>
+  </div><!-- /report-grid -->
 </div>
 
 <script>
@@ -484,9 +501,15 @@ tr:hover td { background:#1a1f35; }
 <?php if ($maps_on): ?>
 <script>
 (function() {
-  // Shared map style builder
-  function buildStyle() {
-    return {
+  var TYPE_EMOJI = { damage:'🏚', medical:'🏥', hazard:'⚠️', missing:'🔍', resource:'📦', general:'📍' };
+  var SEV_COLOR  = { critical:'#e94560', serious:'#e67e22', minor:'#f39c12', info:'#7aa7d9' };
+  var TYPE_COLOR = { damage:'#e67e22', medical:'#e94560', hazard:'#f39c12', missing:'#9b59b6', resource:'#2ecc71', general:'#7aa7d9' };
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  var map = new maplibregl.Map({
+    container: 'mainmap',
+    style: {
       version: 8,
       glyphs: '/maps/fonts/{fontstack}/{range}.pbf',
       sources: { counties: { type:'vector', tiles:[window.location.origin+'/tiles/counties/tiles/{z}/{x}/{y}.pbf'], minzoom:4, maxzoom:14 } },
@@ -498,90 +521,17 @@ tr:hover td { background:#1a1f35; }
           layout:{'text-field':['get','name:latin'],'text-size':12,'text-font':['Noto Sans Regular']},
           paint:{'text-color':'#b0b0cc','text-halo-color':'#0a0a1a','text-halo-width':1.5} },
       ]
-    };
-  }
+    },
+    center: [-85.90, 39.20], zoom: 10, maxZoom: 19, minZoom: 6,
+    attributionControl: false,
+  });
+  map.addControl(new maplibregl.NavigationControl({visualizePitch:true}), 'top-right');
+  map.addControl(new maplibregl.FullscreenControl({container: document.getElementById('mainmap')}), 'top-right');
+  map.addControl(new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true}, trackUserLocation:true, showUserHeading:true}), 'top-right');
+  map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:'imperial'}), 'bottom-left');
 
-  // ── Submission map (pin-drop, with existing incidents shown for context)
-  var pinMapEl = document.getElementById('inc-map');
-  if (pinMapEl) {
-    var pmap = new maplibregl.Map({
-      container: 'inc-map',
-      style: buildStyle(),
-      center: [-85.90, 39.20], zoom: 11, maxZoom: 19, minZoom: 7,
-      attributionControl: false,
-    });
-    var pinMarker = null;
-    var hint = document.getElementById('inc-map-hint');
-    var status = document.getElementById('inc-pin-status');
-    pmap.on('click', function(e) {
-      var lat = e.lngLat.lat.toFixed(6);
-      var lng = e.lngLat.lng.toFixed(6);
-      document.getElementById('inc-lat').value = lat;
-      document.getElementById('inc-lng').value = lng;
-      if (pinMarker) pinMarker.remove();
-      var el = document.createElement('div');
-      el.style.cssText = 'width:22px;height:22px;border-radius:50%;background:#e94560;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.6);z-index:10';
-      pinMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([parseFloat(lng), parseFloat(lat)]).addTo(pmap);
-      if (hint) hint.style.display = 'none';
-      if (status) { status.textContent = 'Pinned at ' + lat + ', ' + lng + ' — tap again to move'; status.style.color = '#2ecc71'; }
-    });
-
-    // Show existing incidents as context (smaller, dimmer than the new-pin marker)
-    var TYPE_EMOJI = { damage:'🏚', medical:'🏥', hazard:'⚠️', missing:'🔍', resource:'📦', general:'📍' };
-    var SEV_COLOR  = { critical:'#e94560', serious:'#e67e22', minor:'#f39c12', info:'#7aa7d9' };
-    var TYPE_COLOR = { damage:'#e67e22', medical:'#e94560', hazard:'#f39c12', missing:'#9b59b6', resource:'#2ecc71', general:'#7aa7d9' };
-    fetch('/incidents/api.php?action=list&only_pinned=1').then(function(r){ return r.json(); }).then(function(rows){
-      var bounds = null;
-      rows.forEach(function(r) {
-        if (r.lat == null || r.lng == null) return;
-        var color = r.severity ? (SEV_COLOR[r.severity] || '#7aa7d9') : (TYPE_COLOR[r.type] || '#7aa7d9');
-        var dim = r.status === 'resolved' ? 'opacity:.4;' : 'opacity:.75;';
-        var el = document.createElement('div');
-        el.style.cssText = 'width:18px;height:18px;border-radius:4px;background:'+color+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:pointer;'+dim;
-        el.textContent = TYPE_EMOJI[r.type] || '📍';
-        el.title = r.title + (r.severity ? ' ('+r.severity+')' : '');
-        new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([r.lng, r.lat])
-          .setPopup(new maplibregl.Popup({offset:12}).setHTML('<b>'+r.title.replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];})+'</b>'))
-          .addTo(pmap);
-        if (!bounds) bounds = new maplibregl.LngLatBounds([r.lng,r.lat],[r.lng,r.lat]);
-        else bounds.extend([r.lng,r.lat]);
-      });
-      if (bounds) pmap.fitBounds(bounds, {padding:30, maxZoom:13, duration:0});
-    }).catch(function(){});
-  }
-
-  // ── List/Map view tabs
-  var tabList = document.getElementById('tab-list');
-  var tabMap  = document.getElementById('tab-map');
-  var lv = document.getElementById('listview');
-  var mv = document.getElementById('mapview');
-  var bigMap = null;
+  // ── Existing-pin layer (auto-refresh) ──────────────────────────────────────
   var markerLayer = [];
-  var refreshTimer = null;
-
-  function showList() {
-    tabList.classList.add('active'); tabMap && tabMap.classList.remove('active');
-    lv.style.display = ''; mv.style.display = 'none';
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-  }
-  function showMap() {
-    tabMap.classList.add('active'); tabList.classList.remove('active');
-    lv.style.display = 'none'; mv.style.display = 'block';
-    if (!bigMap) {
-      bigMap = new maplibregl.Map({
-        container: 'mapview',
-        style: buildStyle(),
-        center: [-85.90, 39.20], zoom: 10, maxZoom: 19, minZoom: 6,
-        attributionControl: false,
-      });
-      bigMap.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }
-    loadMarkers();
-    if (!refreshTimer) refreshTimer = setInterval(loadMarkers, 30000);
-  }
-
   function loadMarkers() {
     var withResolved = <?= $show_resolved ? 'true' : 'false' ?>;
     var typeFilter = <?= $f_type ? "'".addslashes($f_type)."'" : 'null' ?>;
@@ -592,11 +542,11 @@ tr:hover td { background:#1a1f35; }
       var bounds = null;
       rows.forEach(function(r) {
         if (r.lat == null || r.lng == null) return;
-        var color = r.severity ? ({critical:'#e94560',serious:'#e67e22',minor:'#f39c12',info:'#7aa7d9'}[r.severity] || '#7aa7d9')
-                               : ({damage:'#e67e22',medical:'#e94560',hazard:'#f39c12',missing:'#9b59b6',resource:'#2ecc71',general:'#7aa7d9'}[r.type] || '#7aa7d9');
+        var color = r.severity ? (SEV_COLOR[r.severity] || '#7aa7d9') : (TYPE_COLOR[r.type] || '#7aa7d9');
         var dim = r.status === 'resolved' ? 'opacity:.4;' : '';
         var el = document.createElement('div');
-        el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:'+color+';border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.5);cursor:pointer;'+dim;
+        el.style.cssText = 'width:24px;height:24px;border-radius:4px;background:'+color+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 4px rgba(0,0,0,.5);cursor:pointer;'+dim;
+        el.textContent = TYPE_EMOJI[r.type] || '📍';
         var popup = new maplibregl.Popup({offset:14}).setHTML(
           '<div style="font-weight:bold;color:'+color+';margin-bottom:4px">'+escapeHtml(r.title)+'</div>'
           + '<div style="color:#aaa;font-size:11px;margin-bottom:4px">'
@@ -607,18 +557,66 @@ tr:hover td { background:#1a1f35; }
           + (r.reporter_name ? '<div style="color:#aaa;font-size:11px">— '+escapeHtml(r.reporter_name)+'</div>' : '')
           + (r.photo_path ? '<div style="margin-top:4px"><a href="/incident-photos/'+encodeURIComponent(r.photo_path)+'" target="_blank">📷 photo</a></div>' : '')
         );
-        var m = new maplibregl.Marker({element:el, anchor:'center'}).setLngLat([r.lng, r.lat]).setPopup(popup).addTo(bigMap);
+        var m = new maplibregl.Marker({element:el, anchor:'center'}).setLngLat([r.lng, r.lat]).setPopup(popup).addTo(map);
         markerLayer.push(m);
         if (!bounds) bounds = new maplibregl.LngLatBounds([r.lng,r.lat],[r.lng,r.lat]);
         else bounds.extend([r.lng,r.lat]);
       });
-      if (bounds && bigMap.getZoom() < 8) bigMap.fitBounds(bounds, {padding:60, maxZoom:14});
-    });
+      if (bounds && map.getZoom() < 9 && !pickingPin) {
+        map.fitBounds(bounds, {padding:60, maxZoom:14, duration:0});
+      }
+    }).catch(function(){});
   }
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  map.on('load', loadMarkers);
+  setInterval(loadMarkers, 30000);
 
-  if (tabList) tabList.addEventListener('click', showList);
-  if (tabMap)  tabMap.addEventListener('click', showMap);
+  // ── Drop-pin mode for the submit form ──────────────────────────────────────
+  var newPinMarker = null;
+  var pickingPin   = false;
+  var pickBtn = document.getElementById('inc-pick-btn');
+  var statusEl = document.getElementById('inc-pin-status');
+  var latIn  = document.getElementById('inc-lat');
+  var lngIn  = document.getElementById('inc-lng');
+
+  function startPick() {
+    pickingPin = true;
+    document.body.classList.add('drop-pin-mode');
+    if (pickBtn) { pickBtn.classList.add('active'); pickBtn.textContent = '× Cancel'; }
+    document.getElementById('mainmap').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  function endPick() {
+    pickingPin = false;
+    document.body.classList.remove('drop-pin-mode');
+    if (pickBtn) {
+      pickBtn.classList.remove('active');
+      if (latIn.value && lngIn.value) {
+        pickBtn.classList.add('has-pin');
+        pickBtn.textContent = '📍 Change location';
+      } else {
+        pickBtn.classList.remove('has-pin');
+        pickBtn.textContent = '📍 Choose location on map';
+      }
+    }
+  }
+  function setPin(lng, lat) {
+    latIn.value = lat.toFixed(6);
+    lngIn.value = lng.toFixed(6);
+    if (newPinMarker) newPinMarker.remove();
+    var el = document.createElement('div');
+    el.style.cssText = 'width:30px;height:30px;border-radius:50%;background:#e94560;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 3px 10px rgba(0,0,0,.7);z-index:10';
+    el.textContent = '📍';
+    el.title = 'New incident location';
+    newPinMarker = new maplibregl.Marker({element:el, anchor:'center'}).setLngLat([lng, lat]).addTo(map);
+    if (statusEl) { statusEl.textContent = 'Pinned at ' + lat.toFixed(5) + ', ' + lng.toFixed(5); statusEl.style.color = '#2ecc71'; }
+  }
+
+  if (pickBtn) pickBtn.addEventListener('click', function() { pickingPin ? endPick() : startPick(); });
+  map.on('click', function(e) {
+    if (!pickingPin) return;
+    setPin(e.lngLat.lng, e.lngLat.lat);
+    endPick();
+  });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && pickingPin) endPick(); });
 })();
 </script>
 <?php endif; ?>
