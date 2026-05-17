@@ -69,6 +69,14 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       </div>
       <span id="nwr-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
     </div>
+    <?php if ($is_admin): ?>
+    <div id="nwr-squelch-bar" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#888">
+      <span title="Browser-side gate. Mutes when live audio RMS falls below threshold. Server keeps streaming so adjustment is instant — no audio gap.">Squelch</span>
+      <input id="nwr-squelch" type="range" min="-80" max="0" step="1" value="-80" style="flex:1">
+      <span id="nwr-squelch-val" style="font-family:monospace;min-width:54px;text-align:right">off</span>
+      <span id="nwr-squelch-state" style="font-family:monospace;min-width:46px;text-align:right;color:#555">—</span>
+    </div>
+    <?php endif ?>
   </div>
   <?php if ($is_admin):
     $cur_freq = rtrim($nwr_status['frequency'] ?? '', 'M');
@@ -167,9 +175,29 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
   }
   initHls();
 
-  var specCtx = null, analyser = null;
+  var specCtx = null, analyser = null, sqGain = null, sqTime = null;
   var canvas = document.getElementById('nwr-spectrum');
   var label  = document.getElementById('nwr-spectrum-label');
+  var sqSlider = document.getElementById('nwr-squelch');
+  var sqVal    = document.getElementById('nwr-squelch-val');
+  var sqState  = document.getElementById('nwr-squelch-state');
+  var sqThreshold = -Infinity; // dBFS; -Infinity => squelch off
+  if (sqSlider) {
+    try {
+      var saved = parseFloat(localStorage.getItem('nwrSquelch'));
+      if (!isNaN(saved) && saved > -80 && saved < 0) {
+        sqThreshold = saved;
+        sqSlider.value = saved;
+        sqVal.textContent = saved + ' dBFS';
+      }
+    } catch(e) {}
+    sqSlider.addEventListener('input', function(){
+      var v = parseFloat(sqSlider.value);
+      if (v <= -80) { sqThreshold = -Infinity; sqVal.textContent = 'off'; }
+      else { sqThreshold = v; sqVal.textContent = v + ' dBFS'; }
+      try { localStorage.setItem('nwrSquelch', v); } catch(e) {}
+    });
+  }
 
   function initSpectrum() {
     if (analyser) return;
@@ -178,10 +206,14 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       ctx.resume();
       var src2 = ctx.createMediaElementSource(audio);
       analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
+      analyser.fftSize = 1024;
       analyser.smoothingTimeConstant = 0.8;
+      sqGain = ctx.createGain();
+      sqGain.gain.value = 1;
       src2.connect(analyser);
-      analyser.connect(ctx.destination);
+      analyser.connect(sqGain);
+      sqGain.connect(ctx.destination);
+      sqTime = new Uint8Array(analyser.fftSize);
       specCtx = canvas.getContext('2d');
       label.textContent = 'Signal';
       drawSpectrum();
@@ -190,6 +222,25 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
 
   function drawSpectrum() {
     requestAnimationFrame(drawSpectrum);
+    // Compute time-domain RMS for client-side squelch gate
+    analyser.getByteTimeDomainData(sqTime);
+    var sum = 0;
+    for (var k = 0; k < sqTime.length; k++) {
+      var s = (sqTime[k] - 128) / 128;
+      sum += s * s;
+    }
+    var rms = Math.sqrt(sum / sqTime.length);
+    var dbfs = rms > 0 ? 20 * Math.log10(rms) : -120;
+    if (sqThreshold === -Infinity || dbfs >= sqThreshold) {
+      sqGain.gain.value = 1;
+      if (sqState) {
+        sqState.textContent = 'open';
+        sqState.style.color = (sqThreshold === -Infinity) ? '#7ad' : '#2ecc71';
+      }
+    } else {
+      sqGain.gain.value = 0;
+      if (sqState) { sqState.textContent = 'muted'; sqState.style.color = '#555'; }
+    }
     var W = canvas.clientWidth, H = canvas.clientHeight;
     if (canvas.width !== W) canvas.width = W;
     var data = new Uint8Array(analyser.frequencyBinCount);
