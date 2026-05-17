@@ -199,7 +199,19 @@ EOF
     iptables -C FORWARD -i "$AP_INTERFACE" -j ACCEPT 2>/dev/null || \
     iptables -A FORWARD -i "$AP_INTERFACE" -j ACCEPT
 
-    # Update nginx captive portal redirect IPs
+    # Ensure SSL cert exists for HTTPS captive portal interception
+    if [ ! -f /etc/nginx/ssl/noosphere/portal.crt ]; then
+        info "Generating self-signed cert for HTTPS captive portal..."
+        mkdir -p /etc/nginx/ssl/noosphere
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout /etc/nginx/ssl/noosphere/portal.key \
+            -out /etc/nginx/ssl/noosphere/portal.crt \
+            -subj "/CN=noosphere.local/O=Noosphere/C=US" \
+            -addext "subjectAltName=IP:${AP_IP},DNS:noosphere.local" \
+            2>/dev/null
+    fi
+
+    # Update nginx captive portal redirect IPs (both HTTP and HTTPS blocks)
     info "Updating nginx captive portal (${AP_IP})..."
     _update_nginx_ip "192.168.8.2" "$AP_IP"
 
