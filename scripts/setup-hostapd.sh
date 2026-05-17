@@ -11,7 +11,7 @@ set -e
 
 AP_CONF="/etc/noosphere/ap.conf"
 NET_CONF="/etc/noosphere/network.conf"
-HOSTAPD_CONF="/etc/hostapd/noosphere.conf"
+HOSTAPD_CONF="/etc/hostapd/hostapd.conf"
 DNSMASQ_DROP="/etc/dnsmasq.d/noosphere-ap.conf"
 NGINX_CONF="/etc/nginx/sites-enabled/noosphere"
 AP_IP="192.168.4.1"
