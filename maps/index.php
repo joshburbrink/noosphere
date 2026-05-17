@@ -88,38 +88,39 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <?php endif; ?>
 <?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs →</a><?php endif; ?>
 </header>
-<?php if (!$is_readonly): ?>
-<div class="tap-hint">Tap map to add a marker</div>
+<?php if (!$is_readonly && $incidents_active): ?>
+<div class="tap-hint">Tap map to drop a pin</div>
 <?php endif; ?>
 <div id="map"></div>
+<?php if ($incidents_active): ?>
 <div id="mk-veil" class="veil">
   <div class="modal">
-    <h2>Add Marker</h2>
+    <h2>Drop a Pin</h2>
     <label>Type</label>
     <select id="mk-type">
-      <option value="pin">📍  Pin — general</option>
-      <option value="search">🔍  Search area</option>
-      <option value="camp">⛺  Camp / staging</option>
+      <option value="general">📍  General / Observation</option>
+      <option value="damage">🏚  Damage</option>
+      <option value="medical">🏥  Medical</option>
       <option value="hazard">⚠️  Hazard</option>
-      <option value="medical">🏥  Medical / first aid</option>
-      <option value="resource">📦  Resource / supply</option>
-      <option value="blocked">🚫  Blocked / impassable</option>
+      <option value="missing">🔍  Missing Person</option>
+      <option value="resource">📦  Resource</option>
     </select>
     <label>Title *</label>
-    <input type="text" id="mk-title" placeholder="e.g. Water distribution point" maxlength="80">
-    <label>Note</label>
+    <input type="text" id="mk-title" placeholder="Short summary — e.g. 'Tree across Marr Rd'" maxlength="100">
+    <label>Description</label>
     <textarea id="mk-note" placeholder="Optional details…"></textarea>
-    <label>Your name (optional)</label>
-    <input type="text" id="mk-by" placeholder="Leave blank to stay anonymous" maxlength="40">
+    <label>Reporter name (optional)</label>
+    <input type="text" id="mk-by" placeholder="Leave blank to stay anonymous" maxlength="80">
     <label>Photo <span style="font-size:10px;color:#555">(optional — auto-resized)</span></label>
     <input type="file" id="mk-photo" accept="image/*" capture="environment"
            style="padding:5px 0;background:none;border:none;color:#888;font-size:12px;cursor:pointer">
     <div class="modal-btns">
-      <button class="btn-red" onclick="submitMarker()">Add Marker</button>
+      <button class="btn-red" onclick="submitIncident()">Submit</button>
       <button class="btn-cancel" onclick="closeMkDialog()">Cancel</button>
     </div>
   </div>
 </div>
+<?php endif; ?>
 <script src="/maps/lib/maplibre-gl.js"></script>
 <script>
 var IS_ADMIN    = <?= $is_admin    ? 'true' : 'false' ?>;
@@ -328,169 +329,82 @@ function toggleSatellite() {
     document.getElementById('btn-satellite').classList.toggle('active', satelliteOn);
 }
 
-// ── Markers ───────────────────────────────────────────────────────────────────
-var mlMarkers = {};
-var MTYPE = {
-    pin:      { color: '#4a9eff', glyph: '●', name: 'Pin' },
-    search:   { color: '#f8c000', glyph: '◎', name: 'Search' },
-    camp:     { color: '#2ecc71', glyph: '▲', name: 'Camp' },
-    hazard:   { color: '#e94560', glyph: '!',  name: 'Hazard' },
-    medical:  { color: '#ff6b9d', glyph: '+',  name: 'Medical' },
-    resource: { color: '#9b59b6', glyph: '◆',  name: 'Resource' },
-    blocked:  { color: '#e67e22', glyph: '✖',  name: 'Blocked' },
-};
-
-function mkTokens() {
-    try { return JSON.parse(localStorage.getItem('mk_tokens') || '{}'); } catch(e) { return {}; }
-}
-function saveToken(id, token) {
-    var t = mkTokens(); t[id] = token;
-    localStorage.setItem('mk_tokens', JSON.stringify(t));
-}
-
-function mkEl(mtype) {
-    var cfg = MTYPE[mtype] || MTYPE.pin;
-    var el = document.createElement('div');
-    el.className = 'mk-icon';
-    el.style.background = cfg.color;
-    el.innerHTML = cfg.glyph;
-    return el;
-}
-
-function popupHtml(row, myToken) {
-    var cfg = MTYPE[row.mtype] || MTYPE.pin;
-    var d = new Date(parseInt(row.created_at) * 1000);
-    var ts = d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' +
-             d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    var canDelete = IS_ADMIN || !!myToken;
-    var deleteBtn = canDelete
-        ? '<button onclick="deleteMarker(' + parseInt(row.id) + ')" ' +
-          'style="margin-top:10px;background:#e94560;color:#fff;border:none;' +
-          'padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">Delete</button>'
-        : '';
-    var photoHtml = row.photo
-        ? '<a href="/marker-photos/' + encodeURIComponent(row.photo) + '" target="_blank">' +
-          '<img src="/marker-photos/' + encodeURIComponent(row.photo) + '" ' +
-          'style="width:100%;max-height:180px;object-fit:cover;border-radius:5px;margin-top:10px;display:block;cursor:zoom-in"></a>'
-        : '';
-    return '<div style="min-width:180px;max-width:260px">' +
-        '<b style="display:block;margin-bottom:4px">' + esc(row.title) + '</b>' +
-        '<span style="font-size:11px;color:#888">' + cfg.name + ' · ' + ts + '</span>' +
-        (row.note       ? '<p style="margin:6px 0 0;font-size:12px">'                 + esc(row.note)       + '</p>' : '') +
-        (row.created_by ? '<p style="margin:4px 0 0;font-size:11px;color:#888">By: ' + esc(row.created_by) + '</p>' : '') +
-        photoHtml +
-        deleteBtn +
-        '</div>';
-}
-
-function addMarkerToMap(row) {
-    var id = parseInt(row.id);
-    if (mlMarkers[id]) return;
-    var myToken = row.my_token || mkTokens()[id] || null;
-    var el = mkEl(row.mtype);
-    var popup = new maplibregl.Popup({ offset: 18 }).setHTML(popupHtml(row, myToken));
-    el.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (popup.isOpen()) {
-            popup.remove();
-        } else {
-            popup.setLngLat([parseFloat(row.lng), parseFloat(row.lat)]).addTo(map);
-        }
-    });
-    var marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([parseFloat(row.lng), parseFloat(row.lat)])
-        .addTo(map);
-    marker._mkId = id;
-    marker._popup = popup;
-    mlMarkers[id] = marker;
-}
-
-function loadMarkers() {
-    fetch('/maps/markers.php?action=list')
-        .then(function(r) { return r.json(); })
-        .then(function(rows) { rows.forEach(addMarkerToMap); })
-        .catch(function(e) { console.warn('marker poll failed:', e); });
-}
-
-function deleteMarker(id) {
-    if (!confirm('Delete this marker?')) return;
-    var token = IS_ADMIN ? '' : (mkTokens()[id] || '');
-    fetch('/maps/markers.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=delete&id=' + id + '&token=' + encodeURIComponent(token) + '&_csrf=' + encodeURIComponent(CSRF_TOKEN),
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (!d.ok) return;
-        if (mlMarkers[id]) { mlMarkers[id]._popup.remove(); mlMarkers[id].remove(); delete mlMarkers[id]; }
-        var t = mkTokens(); delete t[id]; localStorage.setItem('mk_tokens', JSON.stringify(t));
-    });
-}
-
-// ── Add marker dialog ─────────────────────────────────────────────────────────
-var pendingLL = null;
-
-map.on('click', function(e) {
-    if (IS_READONLY) return;
-    if (e.originalEvent && e.originalEvent.target.closest && e.originalEvent.target.closest('.mk-icon')) return;
-    pendingLL = e.lngLat;
-    document.getElementById('mk-type').value  = 'pin';
-    document.getElementById('mk-title').value = '';
-    document.getElementById('mk-note').value  = '';
-    document.getElementById('mk-by').value    = localStorage.getItem('mk_name') || '';
-    document.getElementById('mk-veil').classList.add('open');
-    setTimeout(function() { document.getElementById('mk-title').focus(); }, 60);
-});
-
-function closeMkDialog() {
-    document.getElementById('mk-veil').classList.remove('open');
-    document.getElementById('mk-photo').value = '';
-    pendingLL = null;
-}
-
-function submitMarker() {
-    if (!pendingLL) return;
-    var title = document.getElementById('mk-title').value.trim();
-    if (!title) { document.getElementById('mk-title').focus(); return; }
-    var ll    = pendingLL;
-    var mtype = document.getElementById('mk-type').value;
-    var note  = document.getElementById('mk-note').value.trim();
-    var by    = document.getElementById('mk-by').value.trim();
-    if (by) localStorage.setItem('mk_name', by);
-    closeMkDialog();
-    var fd = new FormData();
-    fd.append('action',     'add');
-    fd.append('lat',        ll.lat);
-    fd.append('lng',        ll.lng);
-    fd.append('title',      title);
-    fd.append('note',       note);
-    fd.append('mtype',      mtype);
-    fd.append('created_by', by);
-    fd.append('_csrf',      CSRF_TOKEN);
-    var photoFile = document.getElementById('mk-photo').files[0];
-    if (photoFile) fd.append('photo', photoFile);
-
-    fetch('/maps/markers.php', { method: 'POST', body: fd })
-    .then(function(r) { return r.json(); }).then(function(d) {
-        if (!d.ok) return;
-        saveToken(d.id, d.token);
-        addMarkerToMap({ id: d.id, lat: ll.lat, lng: ll.lng, title: title,
-                         note: note, mtype: mtype, created_by: by,
-                         created_at: Math.floor(Date.now() / 1000),
-                         my_token: d.token, photo: d.photo || null });
-    }).catch(function(e) { console.warn('marker add failed:', e); });
-}
-
-document.getElementById('mk-title').addEventListener('keydown', function(e) { if (e.key === 'Enter') submitMarker(); });
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeMkDialog(); });
-
+// ── Add-pin dialog (posts to /incidents/api.php) ─────────────────────────────
 function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-loadMarkers();
-setInterval(loadMarkers, 20000);
+function incTokens() {
+    try { return JSON.parse(localStorage.getItem('inc_tokens') || '{}'); } catch(e) { return {}; }
+}
+function saveIncToken(id, token) {
+    var t = incTokens(); t[id] = token;
+    localStorage.setItem('inc_tokens', JSON.stringify(t));
+}
 
-// ── Incidents layer ──────────────────────────────────────────────────────────
+var pendingLL = null;
+
+map.on('click', function(e) {
+    if (IS_READONLY || !INCIDENTS_ACTIVE) return;
+    if (e.originalEvent && e.originalEvent.target.closest && e.originalEvent.target.closest('.maplibregl-marker')) return;
+    var veil = document.getElementById('mk-veil');
+    if (!veil) return;
+    pendingLL = e.lngLat;
+    document.getElementById('mk-type').value  = 'general';
+    document.getElementById('mk-title').value = '';
+    document.getElementById('mk-note').value  = '';
+    document.getElementById('mk-by').value    = localStorage.getItem('inc_name') || '';
+    veil.classList.add('open');
+    setTimeout(function() { document.getElementById('mk-title').focus(); }, 60);
+});
+
+function closeMkDialog() {
+    var veil = document.getElementById('mk-veil');
+    if (veil) veil.classList.remove('open');
+    var photo = document.getElementById('mk-photo');
+    if (photo) photo.value = '';
+    pendingLL = null;
+}
+
+function submitIncident() {
+    if (!pendingLL) return;
+    var title = document.getElementById('mk-title').value.trim();
+    if (!title) { document.getElementById('mk-title').focus(); return; }
+    var ll   = pendingLL;
+    var type = document.getElementById('mk-type').value;
+    var note = document.getElementById('mk-note').value.trim();
+    var by   = document.getElementById('mk-by').value.trim();
+    if (by) localStorage.setItem('inc_name', by);
+    closeMkDialog();
+
+    var fd = new FormData();
+    fd.append('action',        'add');
+    fd.append('lat',           ll.lat);
+    fd.append('lng',           ll.lng);
+    fd.append('type',          type);
+    fd.append('title',         title);
+    fd.append('description',   note);
+    fd.append('reporter_name', by);
+    fd.append('_csrf',         CSRF_TOKEN);
+    var photoFile = document.getElementById('mk-photo').files[0];
+    if (photoFile) fd.append('photo', photoFile);
+
+    fetch('/incidents/api.php', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.ok) return;
+        saveIncToken(d.id, d.token);
+        // Refresh incidents layer to pick up the new pin immediately.
+        if (typeof loadIncidents === 'function') {
+            if (!incVisible) { toggleIncidents(); } else { loadIncidents(); }
+        }
+    }).catch(function(e) { console.warn('incident add failed:', e); });
+}
+
+var mkTitle = document.getElementById('mk-title');
+if (mkTitle) mkTitle.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitIncident(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeMkDialog(); });
+
+// ── Incidents layer (default ON when enabled — it IS the pin layer) ──────────
 var incMarkers = {};
 var incVisible = false;
 var incTimer   = null;
@@ -537,6 +451,12 @@ function incPopup(r) {
     if (r.meta.hazards) meta += '<div style="font-size:12px;color:#f39c12;margin-top:3px">⚠ ' + esc(r.meta.hazards) + '</div>';
   }
 
+  var myToken = (typeof incTokens === 'function') ? (incTokens()[r.id] || null) : null;
+  var canDelete = IS_ADMIN || !!myToken;
+  var delBtn = canDelete
+    ? '<button onclick="deleteIncident(' + r.id + ')" style="margin-top:8px;background:#e94560;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">Delete</button>'
+    : '';
+
   return '<div style="min-width:200px;max-width:280px">' +
     '<b style="display:block;margin-bottom:4px;color:' + color + '">' + esc(r.title) + '</b>' +
     '<span style="font-size:11px;padding:1px 7px;border-radius:3px;background:' + tcfg.color + '22;color:' + tcfg.color + ';border:1px solid ' + tcfg.color + '44">' + tcfg.icon + ' ' + tcfg.label + '</span>' +
@@ -547,7 +467,24 @@ function incPopup(r) {
     (r.location_text ? '<p style="margin:4px 0 0;font-size:11px;color:#888">📍 ' + esc(r.location_text) + '</p>' : '') +
     '<p style="margin:4px 0 0;font-size:11px;color:#555">' + ts + (r.reporter_name ? ' · ' + esc(r.reporter_name) : '') + '</p>' +
     (r.photo_path ? '<p style="margin:4px 0 0"><a href="/incident-photos/' + encodeURIComponent(r.photo_path) + '" target="_blank" style="font-size:11px">📷 photo</a></p>' : '') +
+    delBtn +
     '</div>';
+}
+
+function deleteIncident(id) {
+  if (!confirm('Delete this pin?')) return;
+  var token = IS_ADMIN ? '' : (incTokens()[id] || '');
+  var fd = new FormData();
+  fd.append('action', 'delete');
+  fd.append('id', id);
+  fd.append('token', token);
+  fd.append('_csrf', CSRF_TOKEN);
+  fetch('/incidents/api.php', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); }).then(function(d) {
+      if (!d.ok) { alert(d.err || 'delete failed'); return; }
+      if (incMarkers[id]) { incMarkers[id]._popup.remove(); incMarkers[id].remove(); delete incMarkers[id]; }
+      var t = incTokens(); delete t[id]; localStorage.setItem('inc_tokens', JSON.stringify(t));
+    });
 }
 
 function loadIncidents() {
@@ -602,6 +539,9 @@ function toggleIncidents() {
     if (incTimer) { clearInterval(incTimer); incTimer = null; }
   }
 }
+
+// Auto-show incidents layer if module is enabled — pins are the primary map content now.
+if (INCIDENTS_ACTIVE) { toggleIncidents(); }
 
 // ── APRS layer ─────────────────────────────────────────────────────────────────
 var aprsMarkers = {};
