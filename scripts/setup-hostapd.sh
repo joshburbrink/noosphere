@@ -86,11 +86,19 @@ cmd_configure() {
         CHANNEL=6
     fi
 
+    read -rp "  Friendly hostname [noosphere.net]: " HOSTNAME
+    HOSTNAME=${HOSTNAME:-noosphere.net}
+    # Strip protocol if user typed it
+    HOSTNAME="${HOSTNAME#http://}"
+    HOSTNAME="${HOSTNAME#https://}"
+    HOSTNAME="${HOSTNAME%/}"
+
     echo ""
-    echo "  AP IP:   $AP_IP/24"
-    echo "  SSID:    $SSID"
-    echo "  Channel: $CHANNEL"
-    [ -n "$PASSWORD" ] && echo "  Auth:    WPA2-PSK" || echo "  Auth:    Open (no password)"
+    echo "  AP IP:    $AP_IP/24"
+    echo "  SSID:     $SSID"
+    echo "  Channel:  $CHANNEL"
+    echo "  URL:      http://$HOSTNAME/"
+    [ -n "$PASSWORD" ] && echo "  Auth:     WPA2-PSK" || echo "  Auth:     Open (no password)"
     echo ""
     read -rp "  Save this configuration? [Y/n]: " confirm
     confirm=${confirm:-Y}
@@ -105,6 +113,7 @@ AP_SSID=$SSID
 AP_CHANNEL=$CHANNEL
 AP_PASSWORD=$PASSWORD
 AP_IP=$AP_IP
+AP_HOSTNAME=$HOSTNAME
 EOF
 
     echo ""
@@ -170,6 +179,10 @@ EOF
         echo "auth_algs=1" >> "$HOSTAPD_CONF"
     fi
 
+    # Hostname — fall back to IP if not set
+    AP_HOSTNAME="${AP_HOSTNAME:-$AP_IP}"
+    PORTAL_URL="http://${AP_HOSTNAME}/"
+
     # Write dnsmasq drop-in for AP
     info "Writing dnsmasq config..."
     cat > "$DNSMASQ_DROP" <<EOF
@@ -179,6 +192,8 @@ bind-interfaces
 dhcp-range=$AP_DHCP_START,$AP_DHCP_END,$AP_NETMASK,12h
 dhcp-option=3,$AP_IP
 dhcp-option=6,$AP_IP
+# Resolve friendly hostname to server IP (explicit + catch-all)
+address=/$AP_HOSTNAME/$AP_IP
 address=/#/$AP_IP
 EOF
 
@@ -199,9 +214,9 @@ EOF
     iptables -C FORWARD -i "$AP_INTERFACE" -j ACCEPT 2>/dev/null || \
     iptables -A FORWARD -i "$AP_INTERFACE" -j ACCEPT
 
-    # Update nginx captive portal redirect IPs (both HTTP and HTTPS blocks)
-    info "Updating nginx captive portal (${AP_IP})..."
-    _update_nginx_ip "192.168.8.2" "$AP_IP"
+    # Update nginx captive portal redirect URLs (both HTTP and HTTPS blocks)
+    info "Updating nginx captive portal → ${PORTAL_URL}..."
+    _update_nginx_url "192.168.8.2" "$AP_HOSTNAME"
 
     # Configure hostapd default config path
     sed -i "s|^#DAEMON_CONF=.*|DAEMON_CONF=\"$HOSTAPD_CONF\"|; s|^DAEMON_CONF=.*|DAEMON_CONF=\"$HOSTAPD_CONF\"|" \
@@ -213,6 +228,8 @@ NETWORK_MODE=hostapd
 AP_INTERFACE=$AP_INTERFACE
 AP_IP=$AP_IP
 AP_SSID=$AP_SSID
+AP_HOSTNAME=$AP_HOSTNAME
+PORTAL_URL=$PORTAL_URL
 EOF
 
     # Reload/restart services
@@ -227,8 +244,10 @@ EOF
     info "AP mode enabled."
     info "SSID: $AP_SSID  |  IP: $AP_IP  |  Interface: $AP_INTERFACE"
     [ -n "$AP_PASSWORD" ] && info "Password: $AP_PASSWORD" || info "Network is open (no password)"
+    info "URL:  ${PORTAL_URL}"
     echo ""
-    echo "Clients connect to '$AP_SSID' and are captive-portaled to http://$AP_IP/"
+    echo "Connect to '$AP_SSID' — browser redirects to ${PORTAL_URL}"
+    echo "Or type ${PORTAL_URL} directly in any browser."
     echo ""
     echo "To stop: setup-hostapd.sh disable"
 }
@@ -260,9 +279,10 @@ cmd_disable() {
     iptables -t nat -C PREROUTING -p tcp --dport 443 -j DNAT --to-destination "192.168.8.2:80" 2>/dev/null || \
     iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination "192.168.8.2:80"
 
-    # Restore nginx captive portal IPs to external router
-    info "Restoring nginx captive portal (192.168.8.2)..."
-    _update_nginx_ip "${AP_IP:-192.168.4.1}" "192.168.8.2"
+    # Restore nginx captive portal to external router IP
+    info "Restoring nginx captive portal → 192.168.8.2..."
+    local old_host="${AP_HOSTNAME:-${AP_IP:-192.168.4.1}}"
+    _update_nginx_url "$old_host" "192.168.8.2"
 
     # Release AP interface IP if we set it
     if [ -f "$AP_CONF" ]; then
@@ -308,6 +328,7 @@ cmd_status() {
         echo "  AP Interface: ${AP_INTERFACE:-?}"
         echo "  AP IP:        ${AP_IP:-?}"
         echo "  SSID:         ${AP_SSID:-?}"
+        echo "  URL:          ${PORTAL_URL:-http://${AP_IP:-?}/}"
         echo ""
         local svc_state
         svc_state=$(systemctl is-active hostapd 2>/dev/null || echo "unknown")
@@ -337,12 +358,14 @@ _clear_stale_dnat() {
     done
 }
 
-_update_nginx_ip() {
+# _update_nginx_url from_host to_host
+# Replaces http://<from_host>/ with http://<to_host>/ throughout the nginx config
+_update_nginx_url() {
     local from="$1" to="$2"
     if [ -f "$NGINX_CONF" ]; then
         sed -i "s|http://${from}/|http://${to}/|g" "$NGINX_CONF"
     else
-        echo "  WARNING: $NGINX_CONF not found — update captive portal IPs manually"
+        echo "  WARNING: $NGINX_CONF not found — update captive portal URLs manually"
     fi
 }
 

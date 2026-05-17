@@ -71,10 +71,14 @@ if [[ -f /etc/noosphere/network.conf ]]; then
     AP_IFACE_MOTD="$AP_INTERFACE"
 fi
 
+# PORTAL_URL and AP_HOSTNAME are sourced directly from network.conf above
+[[ -z "$PORTAL_URL" && -n "$AP_HOSTNAME" ]] && PORTAL_URL="http://${AP_HOSTNAME}/"
+[[ -z "$PORTAL_URL" && -n "$AP_IP_MOTD"  ]] && PORTAL_URL="http://${AP_IP_MOTD}/"
+
 if [[ "$NET_MODE" == "hostapd" ]]; then
     if systemctl is-active --quiet hostapd 2>/dev/null; then
-        printf "${G}✓ AP (hostapd)${X}  SSID: ${W}%s${X}  IP: %s  [%s]\n" \
-            "$AP_SSID_MOTD" "${AP_IP_MOTD:-192.168.4.1}" "$AP_IFACE_MOTD"
+        printf "${G}✓ AP (hostapd)${X}  SSID: ${W}%s${X}  %s\n" \
+            "$AP_SSID_MOTD" "${PORTAL_URL:-http://$AP_IP_MOTD/}"
     else
         printf "${R}✗ AP (hostapd)${X}  configured but hostapd STOPPED — run: ${C}systemctl start hostapd${X}\n"
     fi

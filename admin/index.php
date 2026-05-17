@@ -1474,6 +1474,8 @@ $ap_mode      = _ap_conf_val('NETWORK_MODE', $_net_conf) ?: 'external-router';
 $ap_iface     = _ap_conf_val('AP_INTERFACE', $_net_conf) ?: _ap_conf_val('AP_INTERFACE', $_ap_conf);
 $ap_ip        = _ap_conf_val('AP_IP',        $_net_conf) ?: '192.168.4.1';
 $ap_ssid      = _ap_conf_val('AP_SSID',      $_net_conf) ?: _ap_conf_val('AP_SSID', $_ap_conf);
+$ap_hostname  = _ap_conf_val('AP_HOSTNAME',  $_net_conf) ?: _ap_conf_val('AP_HOSTNAME', $_ap_conf);
+$portal_url   = _ap_conf_val('PORTAL_URL',   $_net_conf) ?: ($ap_hostname ? "http://{$ap_hostname}/" : "http://{$ap_ip}/");
 $ap_conf_ssid = _ap_conf_val('AP_SSID',      $_ap_conf);
 $ap_conf_iface= _ap_conf_val('AP_INTERFACE', $_ap_conf);
 $ap_has_conf  = !empty($ap_conf_ssid);
@@ -1496,6 +1498,7 @@ $hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'i
         <div style="font-size:13px;font-weight:bold;margin-bottom:4px">Hostapd (Built-in AP)</div>
         <?php if ($ap_mode === 'hostapd'): ?>
           <div style="font-size:12px;color:#aaa">SSID: <strong><?= esc($ap_ssid) ?></strong></div>
+          <div style="font-size:12px;color:#aaa">URL: <a href="<?= esc($portal_url) ?>" style="color:#4a9eff"><?= esc($portal_url) ?></a></div>
           <div style="font-size:12px;color:#aaa">IP: <?= esc($ap_ip) ?> &nbsp;|&nbsp; Iface: <?= esc($ap_iface) ?></div>
           <div style="font-size:12px;color:#aaa">hostapd: <span style="color:<?= $hostapd_svc==='active'?'#2ecc71':'#e94560' ?>"><?= esc($hostapd_svc) ?></span></div>
         <?php elseif ($ap_has_conf): ?>
