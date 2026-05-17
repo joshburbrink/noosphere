@@ -42,7 +42,7 @@ const BW=(W-BPAD*(BRICK_COLS+1))/BRICK_COLS,BH=18;
 const BRICK_COLORS=['#e94560','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6'];
 
 function initGame(){
-  paddle={x:W/2-40,y:H-30,w:80,h=12,speed:0};
+  paddle={x:W/2-40,y:H-30,w:80,h:12,speed:0};
   ball={x:W/2,y:H-50,r:8,dx:3,dy:-3};
   launched=false;score=0;lives=3;
   document.getElementById('sc').textContent=0;document.getElementById('lv').textContent=3;
