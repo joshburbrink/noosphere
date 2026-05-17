@@ -138,6 +138,7 @@ function esc($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 <?php if ($maps_on): ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
 <script src="/maps/lib/maplibre-gl.js"></script>
+<script src="/shared/js/incidents-map.js"></script>
 <?php endif; ?>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -501,11 +502,8 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
 <?php if ($maps_on): ?>
 <script>
 (function() {
-  var TYPE_EMOJI = { damage:'🏚', medical:'🏥', hazard:'⚠️', missing:'🔍', resource:'📦', general:'📍' };
-  var SEV_COLOR  = { critical:'#e94560', serious:'#e67e22', minor:'#f39c12', info:'#7aa7d9' };
-  var TYPE_COLOR = { damage:'#e67e22', medical:'#e94560', hazard:'#f39c12', missing:'#9b59b6', resource:'#2ecc71', general:'#7aa7d9' };
-
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  var NI = window.NoosphereIncidents;
+  var IS_COMMAND = <?= $is_command ? 'true' : 'false' ?>;
 
   var map = new maplibregl.Map({
     container: 'mainmap',
@@ -542,22 +540,8 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
       var bounds = null;
       rows.forEach(function(r) {
         if (r.lat == null || r.lng == null) return;
-        var color = r.severity ? (SEV_COLOR[r.severity] || '#7aa7d9') : (TYPE_COLOR[r.type] || '#7aa7d9');
-        var dim = r.status === 'resolved' ? 'opacity:.4;' : '';
-        var el = document.createElement('div');
-        el.style.cssText = 'width:24px;height:24px;border-radius:4px;background:'+color+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 4px rgba(0,0,0,.5);cursor:pointer;'+dim;
-        el.textContent = TYPE_EMOJI[r.type] || '📍';
-        var popup = new maplibregl.Popup({offset:14}).setHTML(
-          '<div style="font-weight:bold;color:'+color+';margin-bottom:4px">'+escapeHtml(r.title)+'</div>'
-          + '<div style="color:#aaa;font-size:11px;margin-bottom:4px">'
-          +   (r.type||'') + (r.severity?' · '+r.severity:'') + ' · '+r.status
-          + '</div>'
-          + (r.description ? '<div style="font-size:12px;margin-bottom:4px">'+escapeHtml(r.description.slice(0,200))+(r.description.length>200?'…':'')+'</div>' : '')
-          + (r.location_text ? '<div style="color:#aaa;font-size:11px">📍 '+escapeHtml(r.location_text)+'</div>' : '')
-          + (r.reporter_name ? '<div style="color:#aaa;font-size:11px">— '+escapeHtml(r.reporter_name)+'</div>' : '')
-          + (r.photo_path ? '<div style="margin-top:4px"><a href="/incident-photos/'+encodeURIComponent(r.photo_path)+'" target="_blank">📷 photo</a></div>' : '')
-        );
-        var m = new maplibregl.Marker({element:el, anchor:'center'}).setLngLat([r.lng, r.lat]).setPopup(popup).addTo(map);
+        var m = NI.addToMap(map, r, { command: IS_COMMAND });
+        if (!m) return;
         markerLayer.push(m);
         if (!bounds) bounds = new maplibregl.LngLatBounds([r.lng,r.lat],[r.lng,r.lat]);
         else bounds.extend([r.lng,r.lat]);
