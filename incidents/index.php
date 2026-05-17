@@ -501,7 +501,7 @@ tr:hover td { background:#1a1f35; }
     };
   }
 
-  // ── Submission map (pin-drop)
+  // ── Submission map (pin-drop, with existing incidents shown for context)
   var pinMapEl = document.getElementById('inc-map');
   if (pinMapEl) {
     var pmap = new maplibregl.Map({
@@ -520,12 +520,36 @@ tr:hover td { background:#1a1f35; }
       document.getElementById('inc-lng').value = lng;
       if (pinMarker) pinMarker.remove();
       var el = document.createElement('div');
-      el.style.cssText = 'width:22px;height:22px;border-radius:50%;background:#e94560;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.6)';
+      el.style.cssText = 'width:22px;height:22px;border-radius:50%;background:#e94560;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.6);z-index:10';
       pinMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([parseFloat(lng), parseFloat(lat)]).addTo(pmap);
       if (hint) hint.style.display = 'none';
       if (status) { status.textContent = 'Pinned at ' + lat + ', ' + lng + ' — tap again to move'; status.style.color = '#2ecc71'; }
     });
+
+    // Show existing incidents as context (smaller, dimmer than the new-pin marker)
+    var TYPE_EMOJI = { damage:'🏚', medical:'🏥', hazard:'⚠️', missing:'🔍', resource:'📦', general:'📍' };
+    var SEV_COLOR  = { critical:'#e94560', serious:'#e67e22', minor:'#f39c12', info:'#7aa7d9' };
+    var TYPE_COLOR = { damage:'#e67e22', medical:'#e94560', hazard:'#f39c12', missing:'#9b59b6', resource:'#2ecc71', general:'#7aa7d9' };
+    fetch('/incidents/api.php?action=list&only_pinned=1').then(function(r){ return r.json(); }).then(function(rows){
+      var bounds = null;
+      rows.forEach(function(r) {
+        if (r.lat == null || r.lng == null) return;
+        var color = r.severity ? (SEV_COLOR[r.severity] || '#7aa7d9') : (TYPE_COLOR[r.type] || '#7aa7d9');
+        var dim = r.status === 'resolved' ? 'opacity:.4;' : 'opacity:.75;';
+        var el = document.createElement('div');
+        el.style.cssText = 'width:18px;height:18px;border-radius:4px;background:'+color+';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:pointer;'+dim;
+        el.textContent = TYPE_EMOJI[r.type] || '📍';
+        el.title = r.title + (r.severity ? ' ('+r.severity+')' : '');
+        new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([r.lng, r.lat])
+          .setPopup(new maplibregl.Popup({offset:12}).setHTML('<b>'+r.title.replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];})+'</b>'))
+          .addTo(pmap);
+        if (!bounds) bounds = new maplibregl.LngLatBounds([r.lng,r.lat],[r.lng,r.lat]);
+        else bounds.extend([r.lng,r.lat]);
+      });
+      if (bounds) pmap.fitBounds(bounds, {padding:30, maxZoom:13, duration:0});
+    }).catch(function(){});
   }
 
   // ── List/Map view tabs
