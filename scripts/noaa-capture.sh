@@ -6,7 +6,7 @@ set -u
 CONF=/etc/noosphere/weather.conf
 [ -f "$CONF" ] && . "$CONF"
 
-FREQUENCY="${FREQUENCY:-162.525M}"
+FREQUENCY="${FREQUENCY:-162.550M}"
 GAIN="${GAIN:-49.6}"
 PPM="${PPM:-0}"
 CAPTURE_RATE="${CAPTURE_RATE:-200k}"
