@@ -57,6 +57,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $msg = 'Entry logged.';
     }
 
+    if ($act === 'set_nwr_freq' && $is_admin) {
+        $freq = $_POST['freq'] ?? '';
+        $allowed = ['162.400','162.425','162.450','162.475','162.500','162.525','162.550'];
+        if (in_array($freq, $allowed, true)) {
+            $out = []; $code = 0;
+            exec('sudo -n /usr/local/bin/noosphere-set-nwr-freq.sh ' . escapeshellarg($freq) . ' 2>&1', $out, $code);
+            if ($code === 0) {
+                $msg = "NWR frequency set to {$freq} MHz — capture restarting…";
+            } else {
+                $error = 'Could not change frequency: ' . htmlspecialchars(implode(' ', $out));
+            }
+        } else {
+            $error = 'Invalid NWR frequency.';
+        }
+    }
+
     if ($act === 'delete' && $is_admin) {
         $id = (int)($_POST['id'] ?? 0);
         if ($id) $db->exec("DELETE FROM weather_log WHERE id=$id");
@@ -121,6 +137,7 @@ tr:hover td { background:#1a1f35; }
 </div>
 
 <?php if ($msg): ?><div class="msg"><?= htmlspecialchars($msg) ?></div><?php endif ?>
+<?php if ($error): ?><div class="msg" style="background:#3a1a1a;border-color:#e94560;color:#e94560"><?= $error ?></div><?php endif ?>
 
 <?php include __DIR__ . "/_nwr_section.php"; ?>
 

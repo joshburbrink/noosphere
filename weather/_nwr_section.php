@@ -70,6 +70,33 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       <span id="nwr-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
     </div>
   </div>
+  <?php if ($is_admin):
+    $cur_freq = rtrim($nwr_status['frequency'] ?? '', 'M');
+    $nwr_channels = ['162.400','162.425','162.450','162.475','162.500','162.525','162.550'];
+  ?>
+  <div style="border-top:1px solid #2a2a4a;margin-top:10px;padding-top:10px">
+    <div style="font-size:11px;color:#888;margin-bottom:6px">Admin · Change channel (restarts capture, ~3s audio gap):</div>
+    <form method="post" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="set_nwr_freq">
+      <?php foreach ($nwr_channels as $ch):
+        $active = ($ch === $cur_freq);
+      ?>
+        <button type="submit" name="freq" value="<?= $ch ?>"
+                title="<?= $active ? 'Currently tuned' : 'Switch to ' . $ch . ' MHz' ?>"
+                style="background:<?= $active ? '#e94560' : '#0f0f1a' ?>;
+                       color:<?= $active ? '#fff' : '#7ad' ?>;
+                       border:1px solid <?= $active ? '#e94560' : '#2a4a6a' ?>;
+                       border-radius:4px;padding:5px 10px;font-size:12px;
+                       font-family:monospace;cursor:<?= $active ? 'default' : 'pointer' ?>"
+                <?= $active ? 'disabled' : '' ?>>
+          <?= $ch ?>
+        </button>
+      <?php endforeach ?>
+      <span style="font-size:10px;color:#555;margin-left:6px">NWR is fixed to these 7 channels</span>
+    </form>
+  </div>
+  <?php endif ?>
 </div>
 <?php else: ?>
 <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#555">
