@@ -196,6 +196,64 @@ printf "  ${C}nano /etc/nginx/sites-enabled/noosphere${X}\n"
 printf "  ${C}nginx -t && systemctl reload nginx${X}   (test then reload)\n\n"
 
 
+# ── 9. WIFI ACCESS POINT ─────────────────────────────────────────────────────
+printf "${W}━━  9. WiFi ACCESS POINT (HOSTAPD)  ━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Noosphere supports two WiFi modes:\n"
+printf "  ${W}Hostapd${X}       — laptop broadcasts its own WiFi network (USB adapter required)\n"
+printf "  ${W}Ext. router${X}   — GL.iNet or any router connected via ethernet (eno1)\n\n"
+
+printf "Check current mode:\n"
+printf "  ${C}setup-hostapd.sh status${X}\n\n"
+
+printf "${W}First-time AP setup (hostapd mode):${X}\n"
+printf "  1. Plug in USB WiFi adapter\n"
+printf "  2. ${C}setup-hostapd.sh configure${X}   (pick interface, set SSID/password)\n"
+printf "  3. ${C}setup-hostapd.sh enable${X}       (starts AP — clients can connect immediately)\n\n"
+
+printf "Enable / disable AP mode:\n"
+printf "  ${C}setup-hostapd.sh enable${X}          start AP mode\n"
+printf "  ${C}setup-hostapd.sh disable${X}         stop AP / revert to external router mode\n\n"
+
+printf "AP mode details when active:\n"
+printf "  Adapter IP:   192.168.4.1\n"
+printf "  DHCP range:   192.168.4.100 – 192.168.4.200\n"
+printf "  Captive portal redirects all clients to http://192.168.4.1/\n\n"
+
+printf "External router mode:\n"
+printf "  Connect eno1 ethernet port → router LAN port\n"
+printf "  Captive portal redirects clients to http://192.168.8.2/\n"
+printf "  Run setup-router.sh if router needs initial config\n\n"
+
+printf "${Y}Problem:${X} USB WiFi adapter not detected\n"
+printf "${G}Fix:${X}     Check if interface appears:\n"
+printf "  ${C}ip link show${X}                   (look for wlan1 or wlx* entries)\n"
+printf "  ${C}lsusb${X}                          (verify adapter is seen by USB)\n"
+printf "  ${C}dmesg | tail -20${X}               (driver load messages)\n\n"
+
+printf "${Y}Problem:${X} Clients connect to AP but get no IP / no captive portal\n"
+printf "${G}Fix:${X}     dnsmasq not running or not bound to AP interface.\n"
+printf "  ${C}systemctl status dnsmasq${X}\n"
+printf "  ${C}systemctl restart dnsmasq${X}\n"
+printf "  ${C}cat /etc/dnsmasq.d/noosphere-ap.conf${X}   (verify interface name matches)\n\n"
+
+printf "${Y}Problem:${X} AP mode was enabled but hostapd stopped after reboot\n"
+printf "${G}Fix:${X}\n"
+printf "  ${C}systemctl enable hostapd${X}       (make it start on boot)\n"
+printf "  ${C}systemctl start hostapd${X}\n\n"
+
+printf "${Y}Problem:${X} hostapd fails — \"nl80211: Could not configure driver\"\n"
+printf "${G}Fix:${X}     Interface may be in use as a client. Pick the correct interface.\n"
+printf "  ${C}setup-hostapd.sh configure${X}\n"
+printf "  ${C}journalctl -u hostapd -n 30${X}\n\n"
+
+printf "Config files:\n"
+printf "  ${C}/etc/noosphere/ap.conf${X}              saved SSID, interface, channel\n"
+printf "  ${C}/etc/noosphere/network.conf${X}         active mode (hostapd / external-router)\n"
+printf "  ${C}/etc/hostapd/noosphere.conf${X}         generated hostapd config\n"
+printf "  ${C}/etc/dnsmasq.d/noosphere-ap.conf${X}    DHCP + captive DNS for AP interface\n\n"
+
+
 # ── 8. REBOOT & SHUTDOWN ─────────────────────────────────────────────────────
 printf "${W}━━  8. REBOOT & SHUTDOWN  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
 

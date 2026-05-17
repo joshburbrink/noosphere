@@ -58,6 +58,38 @@ WIFI_IP=$(ip -4 addr show "$WIFI_IF" 2>/dev/null | grep -oP '(?<=inet )\S+' | he
 [[ -n "$ETH_IP"  ]] && printf "${G}✓ ethernet${X}  %s\n" "$ETH_IP"  || printf "${Y}– ethernet   not connected${X}\n"
 [[ -n "$WIFI_IP" ]] && printf "${G}✓ wifi${X}      %s\n" "$WIFI_IP" || printf "${Y}– wifi       not connected${X}\n"
 
+# AP mode status
+NET_MODE=""
+AP_SSID_MOTD=""
+AP_IP_MOTD=""
+AP_IFACE_MOTD=""
+if [[ -f /etc/noosphere/network.conf ]]; then
+    source /etc/noosphere/network.conf
+    NET_MODE="$NETWORK_MODE"
+    AP_SSID_MOTD="$AP_SSID"
+    AP_IP_MOTD="$AP_IP"
+    AP_IFACE_MOTD="$AP_INTERFACE"
+fi
+
+if [[ "$NET_MODE" == "hostapd" ]]; then
+    if systemctl is-active --quiet hostapd 2>/dev/null; then
+        printf "${G}✓ AP (hostapd)${X}  SSID: ${W}%s${X}  IP: %s  [%s]\n" \
+            "$AP_SSID_MOTD" "${AP_IP_MOTD:-192.168.4.1}" "$AP_IFACE_MOTD"
+    else
+        printf "${R}✗ AP (hostapd)${X}  configured but hostapd STOPPED — run: ${C}systemctl start hostapd${X}\n"
+    fi
+elif [[ "$NET_MODE" == "external-router" ]]; then
+    printf "${C}○ external router${X}  eno1 → GL.iNet  (captive → 192.168.8.2)\n"
+elif [[ -f /etc/noosphere/ap.conf ]]; then
+    printf "${Y}○ AP mode configured but not enabled${X}\n"
+    printf "  Run: ${C}setup-hostapd.sh enable${X}   to start AP\n"
+    printf "       ${C}setup-hostapd.sh disable${X}  to use external router\n"
+else
+    printf "${Y}○ WiFi mode not set up${X}  —  no AP config found\n"
+    printf "  First time? Run: ${C}setup-hostapd.sh configure${X}  (USB WiFi adapter required)\n"
+    printf "  External router? Connect eno1 to router LAN port — no extra setup needed\n"
+fi
+
 CONNECT_IP=${ETH_IP:-$WIFI_IP}
 [[ -n "$CONNECT_IP" ]] && printf "\n  ${W}Connect:${X} http://%s/\n" "${CONNECT_IP%/*}"
 
@@ -74,13 +106,17 @@ df -h 2>/dev/null | awk 'NR>1 && /^\// && !seen[$1]++ {
 echo ""
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 printf "  ${W}Quick commands${X}\n\n"
-printf "  ${C}noosphere-selftest${X}           full health check\n"
-printf "  ${C}noosphere-help${X}               paged troubleshooting guide\n"
-printf "  ${C}systemctl restart nginx${X}      restart web server\n"
-printf "  ${C}systemctl restart php8.4-fpm${X} restart PHP\n"
-printf "  ${C}journalctl -u nginx -n 50${X}    last 50 nginx log lines\n"
-printf "  ${C}journalctl -u php8.4-fpm -n 50${X}\n"
-printf "  ${C}hostname -I${X}                  show all IP addresses\n"
-printf "  ${C}df -h${X}                        disk usage\n"
+printf "  ${C}noosphere-selftest${X}               full health check\n"
+printf "  ${C}noosphere-help${X}                   paged troubleshooting guide\n"
+printf "  ${C}systemctl restart nginx${X}          restart web server\n"
+printf "  ${C}systemctl restart php8.4-fpm${X}     restart PHP\n"
+printf "  ${C}journalctl -u nginx -n 50${X}        last 50 nginx log lines\n"
+printf "  ${C}hostname -I${X}                      show all IP addresses\n"
+printf "  ${C}df -h${X}                            disk usage\n"
+printf "\n  ${W}WiFi AP${X}\n"
+printf "  ${C}setup-hostapd.sh configure${X}       first-time AP setup (pick adapter, SSID)\n"
+printf "  ${C}setup-hostapd.sh enable${X}          start AP mode (laptop broadcasts WiFi)\n"
+printf "  ${C}setup-hostapd.sh disable${X}         stop AP / switch to external router\n"
+printf "  ${C}setup-hostapd.sh status${X}          show current network mode\n"
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 echo ""
