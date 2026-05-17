@@ -444,7 +444,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','show_runners','show_damage','show_triage','show_games','show_wiki','readonly'];
+                        'show_weather','show_radio','show_runners','show_damage','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -2386,6 +2386,9 @@ $simple_mods = [
     ['show_triage',   't_triage',   'Triage Log'],
     ['show_games',    't_games',    'Games'],
     ['show_wiki',     't_wiki',     'Local Knowledge Wiki'],
+    ['show_supplies', 't_supplies', 'Supply Inventory'],
+    ['show_seeds',    't_seeds',    'Seed Library'],
+    ['show_tools',    't_tools',    'Tool Lending'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>
