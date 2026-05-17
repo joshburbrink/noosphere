@@ -635,6 +635,41 @@ tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --out
     <li>Select the detected port, choose brand and model, pick county data, click Program</li>
   </ol>
   <div class=note>The radio model cannot be auto-detected from USB — always select the correct model before programming. Programming the wrong model may corrupt the radio's memory; verify with the CHIRP channel preview before hitting Program.</div>
+
+  <h3>USB Ethernet Adapter</h3>
+  <p><strong>Enables:</strong> Wired backbone connection to the GL.iNet router (or any switch), freeing the server's internal WiFi for internet uplink or client connections. Also useful when deploying to a location without a wireless uplink — the server runs entirely over ethernet.</p>
+  <h4>Recommended adapters</h4>
+  <ul>
+    <li><strong>ASIX AX88179 / AX88179A</strong> — USB 3.0 Gigabit; best-in-class Linux support, driver built into Debian kernel; look for brands like Cable Matters, Anker, j5create (~$15–25)</li>
+    <li><strong>Realtek RTL8153</strong> — USB 3.0 Gigabit; also well-supported in Debian, very common in Amazon Basics and Uni adapters (~$12–20)</li>
+    <li><strong>ASIX AX88772</strong> — USB 2.0 100 Mbps; plenty fast for this use case, extremely reliable (~$10)</li>
+    <li>Avoid adapters that require proprietary drivers or Windows-only setup utilities</li>
+  </ul>
+  <h4>Linux detection</h4>
+  <p>USB ethernet adapters appear as <code>enx&lt;mac&gt;</code> (e.g. <code>enx00051bb11b57</code>) under Debian's predictable naming scheme. Verify detection:</p>
+  <pre>ip link show            # look for enx* interface
+dmesg | grep -i ax88   # ASIX driver messages
+dmesg | grep -i r8152  # Realtek driver messages</pre>
+  <h4>Setup — production wired mode (router backbone)</h4>
+  <ol>
+    <li>Plug adapter into a USB 3.0 port on the server</li>
+    <li>Run <code>setup-usb-ethernet.sh detect</code> to confirm the adapter and interface name</li>
+    <li>Run <code>setup-usb-ethernet.sh static</code> to configure static <code>192.168.8.2/24</code> and persist across reboots</li>
+    <li>Plug the other end into a LAN port on the GL.iNet router (not the WAN port)</li>
+    <li>Verify with <code>setup-usb-ethernet.sh status</code> or Admin → Network → USB Ethernet</li>
+  </ol>
+  <h4>Setup — DHCP / home network mode</h4>
+  <ol>
+    <li>Plug adapter into the server and into any DHCP network</li>
+    <li>Run <code>setup-usb-ethernet.sh dhcp</code> to request an address immediately</li>
+    <li>For persistent DHCP on boot, run <code>setup-usb-ethernet.sh dhcp --persist</code></li>
+  </ol>
+  <h4>Monitoring and troubleshooting</h4>
+  <p>Use <strong>Admin → Network → USB Ethernet</strong> to check link state, IP address, run a ping test, or request DHCP without SSH.</p>
+  <pre>setup-usb-ethernet.sh status    # current state of all USB ethernet interfaces
+setup-usb-ethernet.sh ping      # ping gateway via USB ethernet
+setup-usb-ethernet.sh detect    # show hardware info and driver</pre>
+  <div class=note>If the adapter shows NO-CARRIER, the cable is not plugged in at both ends or the switch/router port is off. If it shows UP but no IP, run <code>setup-usb-ethernet.sh dhcp</code> or check <code>/etc/network/interfaces.d/</code> for a stale static config.</div>
 </div>
 
 </div><!-- /container -->

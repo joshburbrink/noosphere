@@ -96,6 +96,27 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+
+    // --- USB ethernet actions (AJAX) ---
+    if (in_array($act, ['eth_dhcp','eth_static','eth_ping','eth_remove','eth_up'])) {
+        header('Content-Type: application/json');
+        $iface = trim($_POST['iface'] ?? '');
+        $allowed = [];
+        foreach (glob('/sys/class/net/enx*') as $p) {
+            $n = basename($p);
+            $dev = realpath($p . '/device') ?: '';
+            if (strpos($dev, '/usb') !== false) $allowed[] = $n;
+        }
+        if (!$iface || !in_array($iface, $allowed)) {
+            echo json_encode(['ok'=>False,'output'=>'Invalid or missing interface.']); exit;
+        }
+        $subcmd_map = ['eth_dhcp'=>'dhcp','eth_static'=>'static','eth_ping'=>'ping','eth_remove'=>'remove','eth_up'=>'up'];
+        $subcmd = $subcmd_map[$act];
+        $out = shell_exec('sudo /usr/local/bin/setup-usb-ethernet.sh ' . escapeshellarg($subcmd) . ' ' . escapeshellarg($iface) . ' 2>&1') ?? '(no output)';
+        echo json_encode(['ok'=>True,'output'=>$out]);
+        exit;
+    }
+
     // --- NWR channel scan (AJAX — returns JSON of freq→dB) ---
     if ($act === 'sdr_nwr_scan') {
         header('Content-Type: application/json');
@@ -1635,6 +1656,83 @@ $hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'i
   </div>
 </details>
 
+
+<details class="cpanel" open>
+  <summary>USB Ethernet Adapter</summary>
+  <div class="cpbody">
+<?php
+function get_usb_eth_ifaces() {
+    $out = [];
+    foreach (glob('/sys/class/net/enx*') ?: [] as $p) {
+        $n   = basename($p);
+        $dev = realpath($p . '/device') ?: '';
+        if (strpos($dev, '/usb') !== false) $out[] = $n;
+    }
+    return $out;
+}
+$usb_eths = get_usb_eth_ifaces();
+if (!$usb_eths): ?>
+    <div style="color:#555;font-size:13px;padding:6px 0">
+      No USB ethernet adapter detected. Plug one in and refresh.
+      <br><span style="font-size:11px;color:#444">Expected prefix: <code>enx*</code>&nbsp;&middot;&nbsp;See Admin &rarr; Wiki &rarr; Optional Hardware</span>
+    </div>
+<?php else: foreach ($usb_eths as $_eth):
+    $_operstate = trim(@file_get_contents("/sys/class/net/{$_eth}/operstate") ?: 'unknown');
+    $_ip        = trim(shell_exec("ip -4 addr show " . escapeshellarg($_eth) . " 2>/dev/null | awk '/inet /{print $2}' | head -1") ?: '');
+    $_gw        = trim(shell_exec("ip route show dev " . escapeshellarg($_eth) . " 2>/dev/null | awk '/default/{print $3}' | head -1") ?: '');
+    $_mac       = trim(@file_get_contents("/sys/class/net/{$_eth}/address") ?: '');
+    $_speed_raw = @file_get_contents("/sys/class/net/{$_eth}/speed");
+    $_speed_str = ($_speed_raw && (int)$_speed_raw > 0) ? (int)$_speed_raw . ' Mbps' : '&mdash;';
+    $_driver    = basename(realpath("/sys/class/net/{$_eth}/device/driver") ?: '');
+    $_has_cfg   = file_exists("/etc/network/interfaces.d/{$_eth}");
+    $_cfg_type  = '';
+    if ($_has_cfg) {
+        $_cfg_raw  = file_get_contents("/etc/network/interfaces.d/{$_eth}");
+        $_cfg_type = strpos($_cfg_raw, 'dhcp') !== false ? 'DHCP' : (strpos($_cfg_raw, 'static') !== false ? 'Static' : 'Custom');
+    }
+    $_prod_mode = $_ip && strpos($_ip, '192.168.8.') === 0;
+    $_home_mode = $_ip && strpos($_ip, '192.168.8.') !== 0;
+    $_link_color = $_operstate === 'up' ? '#2ecc71' : ($_operstate === 'dormant' ? '#f39c12' : '#e94560');
+?>
+    <div style="background:#0f0f1f;border:1px solid #2a2a4a;border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-size:18px">&#128268;</span>
+        <strong style="font-size:14px"><?= esc($_eth) ?></strong>
+        <span style="font-family:monospace;font-size:11px;color:#555"><?= esc($_mac) ?></span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:12px;color:<?= $_link_color ?>">
+          <span style="width:8px;height:8px;border-radius:50%;background:<?= $_link_color ?>"></span>
+          <?= esc(ucfirst($_operstate)) ?>
+        </span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:12px">
+        <div><span style="color:#555">IP</span>&nbsp;
+          <strong style="font-family:monospace"><?= esc($_ip ?: '&mdash;') ?></strong>
+          <?php if ($_prod_mode): ?><span style="color:#2ecc71;font-size:10px;margin-left:4px">&#9679; production</span><?php endif ?>
+          <?php if ($_home_mode): ?><span style="color:#f39c12;font-size:10px;margin-left:4px">&#9679; home/test</span><?php endif ?>
+        </div>
+        <div><span style="color:#555">Gateway</span>&nbsp; <span style="font-family:monospace"><?= esc($_gw ?: '&mdash;') ?></span></div>
+        <div><span style="color:#555">Speed</span>&nbsp; <?= $_speed_str ?></div>
+        <div><span style="color:#555">Driver</span>&nbsp; <?= esc($_driver ?: '&mdash;') ?></div>
+        <div style="grid-column:1/-1"><span style="color:#555">Persist</span>&nbsp;
+          <?php if ($_has_cfg): ?>
+            <span style="color:#7ad"><?= esc($_cfg_type) ?></span>
+            <span style="color:#555;font-size:10px">/etc/network/interfaces.d/<?= esc($_eth) ?></span>
+          <?php else: ?><span style="color:#444">none (lost on reboot)</span><?php endif ?>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn-sm" onclick="ethAction('eth_dhcp',<?= json_encode($_eth) ?>,this)">Request DHCP</button>
+        <button class="btn-sm" onclick="ethAction('eth_static',<?= json_encode($_eth) ?>,this)" title="Set static 192.168.8.2/24 for router/production mode">Set Static (192.168.8.2)</button>
+        <button class="btn-sm" onclick="ethAction('eth_ping',<?= json_encode($_eth) ?>,this)">Ping Gateway</button>
+        <button class="btn-sm" onclick="ethAction('eth_up',<?= json_encode($_eth) ?>,this)">Bring Up</button>
+        <button class="btn-sm" onclick="ethAction('eth_remove',<?= json_encode($_eth) ?>,this)" style="color:#e94560;border-color:#e94560">Release &amp; Remove Config</button>
+      </div>
+      <div id="eth-out-<?= esc($_eth) ?>" style="display:none;font-size:11px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;white-space:pre-wrap;max-height:160px;overflow-y:auto"></div>
+    </div>
+<?php endforeach; endif; ?>
+  </div>
+</details>
+
 </div><!-- #tab-network -->
 
 <!-- CONTENT -->
@@ -2717,6 +2815,31 @@ function removeField(btn) { btn.closest('.rf-row').remove(); }
 document.getElementById('new-rf-label') && document.getElementById('new-rf-label').addEventListener('keydown', function(e){
   if (e.key === 'Enter') { e.preventDefault(); addField(); }
 });
+
+
+function ethAction(act, iface, btn) {
+  var outEl = document.getElementById('eth-out-' + iface);
+  var origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  if (outEl) { outEl.style.display = 'block'; outEl.textContent = 'Running…'; }
+  var csrf = document.querySelector('input[name="_csrf"]');
+  var fd = new FormData();
+  fd.append('act', act);
+  fd.append('iface', iface);
+  if (csrf) fd.append('_csrf', csrf.value);
+  fetch('', {method:'POST', body:fd})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      btn.disabled = false; btn.textContent = origText;
+      if (outEl) outEl.textContent = d.output || '(no output)';
+      setTimeout(function(){ location.reload(); }, 2500);
+    })
+    .catch(function(e){
+      btn.disabled = false; btn.textContent = origText;
+      if (outEl) outEl.textContent = 'Error: ' + e;
+    });
+}
 
 function apToggle(act) {
   var btn = document.getElementById('btn-ap-enable') || document.getElementById('btn-ap-disable');
