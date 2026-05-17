@@ -1,0 +1,221 @@
+#!/bin/bash
+# Noosphere operator troubleshooting guide — pipe to less -R for color paging
+
+G='\e[32m'; Y='\e[33m'; R='\e[31m'; C='\e[36m'; B='\e[34m'; W='\e[1m'; X='\e[0m'
+
+{
+printf "${W}${C}
+╔══════════════════════════════════════════════════════════════╗
+║           NOOSPHERE — OPERATOR TROUBLESHOOTING GUIDE        ║
+╚══════════════════════════════════════════════════════════════╝${X}
+
+This guide walks through diagnosing and fixing common problems.
+Use arrow keys to scroll, press Q to quit.
+
+"
+
+# ── 1. CHECK STATUS ─────────────────────────────────────────────────────────
+printf "${W}━━  1. CHECK STATUS  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Run the built-in health check:\n"
+printf "  ${C}noosphere-selftest${X}\n\n"
+
+printf "Check a single service:\n"
+printf "  ${C}systemctl status nginx${X}\n"
+printf "  ${C}systemctl status php8.4-fpm${X}\n"
+printf "  ${C}systemctl status kiwix${X}\n"
+printf "  ${C}systemctl status mbtileserver${X}\n"
+printf "  ${C}systemctl status wifi-reconnect${X}\n\n"
+
+printf "See all services at once:\n"
+printf "  ${C}systemctl list-units --type=service --state=failed${X}   (show broken)\n"
+printf "  ${C}systemctl list-units --type=service --state=running${X}  (show running)\n\n"
+
+printf "Check if the web server is answering:\n"
+printf "  ${C}curl -s -o /dev/null -w '%%{http_code}' http://localhost/${X}\n"
+printf "  (should print 200 — anything else means the web server is broken)\n\n"
+
+
+# ── 2. RESTART SERVICES ─────────────────────────────────────────────────────
+printf "${W}━━  2. RESTART SERVICES  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Restart the web server (fixes most browser errors):\n"
+printf "  ${C}systemctl restart nginx${X}\n"
+printf "  ${C}systemctl restart php8.4-fpm${X}\n\n"
+
+printf "Restart everything at once:\n"
+printf "  ${C}systemctl restart nginx php8.4-fpm kiwix mbtileserver${X}\n\n"
+
+printf "Start something that is stopped:\n"
+printf "  ${C}systemctl start nginx${X}         (replace nginx with any service name)\n\n"
+
+printf "Stop something:\n"
+printf "  ${C}systemctl stop nginx${X}\n\n"
+
+printf "Make a service start automatically on boot:\n"
+printf "  ${C}systemctl enable nginx${X}\n\n"
+
+printf "After editing a config file, reload nginx without dropping connections:\n"
+printf "  ${C}nginx -t${X}                      (test config first — fix errors before reloading)\n"
+printf "  ${C}systemctl reload nginx${X}\n\n"
+
+
+# ── 3. VIEW LOGS ─────────────────────────────────────────────────────────────
+printf "${W}━━  3. VIEW LOGS  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Last 50 lines from a service log:\n"
+printf "  ${C}journalctl -u nginx -n 50${X}\n"
+printf "  ${C}journalctl -u php8.4-fpm -n 50${X}\n"
+printf "  ${C}journalctl -u kiwix -n 50${X}\n\n"
+
+printf "Follow a log in real time (Ctrl+C to stop):\n"
+printf "  ${C}journalctl -u nginx -f${X}\n\n"
+
+printf "See all recent system messages:\n"
+printf "  ${C}journalctl -n 100${X}\n\n"
+
+printf "Nginx error log (direct file):\n"
+printf "  ${C}tail -50 /var/log/nginx/error.log${X}\n\n"
+
+printf "PHP error log:\n"
+printf "  ${C}tail -50 /var/log/php8.4-fpm.log${X}\n\n"
+
+printf "Weather radio log:\n"
+printf "  ${C}journalctl -u noaa-weather -n 50${X}\n\n"
+
+
+# ── 4. NETWORK ───────────────────────────────────────────────────────────────
+printf "${W}━━  4. NETWORK  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Show all IP addresses:\n"
+printf "  ${C}hostname -I${X}\n"
+printf "  ${C}ip addr show${X}                  (detailed — look for 'inet' lines)\n\n"
+
+printf "Show just wifi IP:\n"
+printf "  ${C}ip -4 addr show wlan0${X}         (may be wlan0, wlan1, etc.)\n\n"
+
+printf "Show ethernet IP:\n"
+printf "  ${C}ip -4 addr show eno1${X}\n\n"
+
+printf "Test internet connectivity (will fail in offline mode — that is normal):\n"
+printf "  ${C}ping -c 3 8.8.8.8${X}\n\n"
+
+printf "Test that devices can reach this server:\n"
+printf "  ${C}curl http://localhost/${X}         (from this machine)\n"
+printf "  From another device, open a browser and go to http://<IP from hostname -I>/\n\n"
+
+printf "WiFi is not connecting — force reconnect:\n"
+printf "  ${C}systemctl restart wifi-reconnect${X}\n"
+printf "  ${C}ip link set wlan0 down && ip link set wlan0 up${X}\n\n"
+
+printf "Check what is listening on network ports:\n"
+printf "  ${C}ss -tlnp${X}                      (shows port, service name)\n\n"
+
+
+# ── 5. DISK ──────────────────────────────────────────────────────────────────
+printf "${W}━━  5. DISK SPACE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Show disk usage:\n"
+printf "  ${C}df -h${X}                         (all filesystems, human readable)\n"
+printf "  ${C}df -h /${X}                       (just the main drive)\n\n"
+
+printf "Find what is using the most space:\n"
+printf "  ${C}du -sh /var/lib/noosphere/*${X}   (noosphere databases)\n"
+printf "  ${C}du -sh /var/www/noosphere/*${X}   (web files)\n"
+printf "  ${C}du -sh /var/lib/kiwix/zim/*${X}   (ZIM files — can be large)\n\n"
+
+printf "If / is full, check logs first:\n"
+printf "  ${C}du -sh /var/log/*${X}\n"
+printf "  ${C}journalctl --disk-usage${X}\n"
+printf "  ${C}journalctl --vacuum-size=200M${X}  (trim logs to 200MB)\n\n"
+
+
+# ── 6. COMMON PROBLEMS ───────────────────────────────────────────────────────
+printf "${W}━━  6. COMMON PROBLEMS & FIXES  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "${Y}Problem:${X} Browser shows \"502 Bad Gateway\"\n"
+printf "${G}Fix:${X}     PHP-FPM is stopped.\n"
+printf "  ${C}systemctl restart php8.4-fpm${X}\n\n"
+
+printf "${Y}Problem:${X} Browser shows \"503 Service Unavailable\"\n"
+printf "${G}Fix:${X}     Nginx or PHP-FPM crashed.\n"
+printf "  ${C}systemctl restart nginx php8.4-fpm${X}\n\n"
+
+printf "${Y}Problem:${X} Can't reach the server from phone/laptop\n"
+printf "${G}Fix:${X}     Find current IP and make sure nginx is running.\n"
+printf "  ${C}hostname -I${X}                   (find IP)\n"
+printf "  ${C}systemctl status nginx${X}         (check nginx)\n"
+printf "  ${C}systemctl restart nginx${X}\n\n"
+
+printf "${Y}Problem:${X} WiFi says connected but no clients can join\n"
+printf "${G}Fix:${X}     Check dnsmasq (captive portal DHCP server).\n"
+printf "  ${C}systemctl status dnsmasq${X}\n"
+printf "  ${C}systemctl restart dnsmasq${X}\n\n"
+
+printf "${Y}Problem:${X} Maps not loading / blank tile area\n"
+printf "${G}Fix:${X}     mbtileserver is stopped.\n"
+printf "  ${C}systemctl restart mbtileserver${X}\n\n"
+
+printf "${Y}Problem:${X} Library / Wikipedia not working\n"
+printf "${G}Fix:${X}     Kiwix stopped.\n"
+printf "  ${C}systemctl restart kiwix${X}\n\n"
+
+printf "${Y}Problem:${X} Database error on a web page\n"
+printf "${G}Fix:${X}     Check disk space first (SQLite fails if disk is full).\n"
+printf "  ${C}df -h /${X}\n"
+printf "  ${C}ls -lh /var/lib/noosphere/*.db${X}   (check DB files exist)\n\n"
+
+printf "${Y}Problem:${X} noosphere-selftest shows WARN for NRestarts > 5\n"
+printf "${G}Fix:${X}     Service is crashing and restarting in a loop — check its log.\n"
+printf "  ${C}journalctl -u <service-name> -n 100${X}\n\n"
+
+printf "${Y}Problem:${X} Server very slow\n"
+printf "${G}Fix:${X}     Check memory and CPU.\n"
+printf "  ${C}free -h${X}                       (memory — if Avail is near 0, something is leaking)\n"
+printf "  ${C}top${X}                           (live process list — press Q to quit)\n"
+printf "  ${C}ps aux --sort=-%mem | head -10${X}  (top memory users)\n\n"
+
+printf "${Y}Problem:${X} Can't log in to Nextcloud\n"
+printf "${G}Fix:${X}     Credentials are  admin / noosphere2024\n"
+printf "  If that fails: ${C}sudo -u www-data php /var/www/nextcloud/occ user:resetpassword admin${X}\n\n"
+
+
+# ── 7. FILES & PATHS ─────────────────────────────────────────────────────────
+printf "${W}━━  7. KEY FILE PATHS  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "  ${C}/var/www/noosphere/${X}           web app files\n"
+printf "  ${C}/var/lib/noosphere/${X}           databases (.db files)\n"
+printf "  ${C}/var/lib/kiwix/zim/${X}           ZIM files (offline Wikipedia, etc.)\n"
+printf "  ${C}/etc/nginx/sites-enabled/${X}     nginx config\n"
+printf "  ${C}/etc/noosphere/${X}               noosphere config files\n"
+printf "  ${C}/usr/local/bin/noosphere-*${X}    noosphere scripts\n"
+printf "  ${C}/var/log/nginx/${X}               nginx access + error logs\n\n"
+
+printf "Edit nginx config:\n"
+printf "  ${C}nano /etc/nginx/sites-enabled/noosphere${X}\n"
+printf "  ${C}nginx -t && systemctl reload nginx${X}   (test then reload)\n\n"
+
+
+# ── 8. REBOOT & SHUTDOWN ─────────────────────────────────────────────────────
+printf "${W}━━  8. REBOOT & SHUTDOWN  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "Reboot the system:\n"
+printf "  ${C}reboot${X}\n\n"
+
+printf "Shut down:\n"
+printf "  ${C}shutdown now${X}\n\n"
+
+printf "Reboot in 5 minutes (gives users time to wrap up):\n"
+printf "  ${C}shutdown -r +5 'System rebooting in 5 minutes'${X}\n\n"
+
+printf "Cancel a scheduled shutdown:\n"
+printf "  ${C}shutdown -c${X}\n\n"
+
+
+# ── FOOTER ───────────────────────────────────────────────────────────────────
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
+printf "  Run ${C}noosphere-selftest${X} for an automated health check.\n"
+printf "  GitHub: ${C}https://github.com/joshburbrink/noosphere${X}\n"
+printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+} | less -R

@@ -27,7 +27,7 @@ $CONDITIONS = ['Clear','Partly Cloudy','Cloudy','Overcast','Rain','Heavy Rain',
                'Thunderstorm','Snow','Fog','Smoke','Haze','Other'];
 $WIND_DIRS  = ['','N','NE','E','SE','S','SW','W','NW','Variable'];
 
-$msg = ''; $error = '';
+$msg = ''; $error = ''; $scan_results = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
     csrf_verify();
@@ -55,6 +55,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $s->bindValue(8, $by, SQLITE3_TEXT);
         $s->execute();
         $msg = 'Entry logged.';
+    }
+
+    if ($act === 'set_nwr_freq' && $is_admin) {
+        $freq = $_POST['freq'] ?? '';
+        $allowed = ['162.400','162.425','162.450','162.475','162.500','162.525','162.550'];
+        if (in_array($freq, $allowed, true)) {
+            $out = []; $code = 0;
+            exec('sudo -n /usr/local/bin/noosphere-set-nwr-freq.sh ' . escapeshellarg($freq) . ' 2>&1', $out, $code);
+            if ($code === 0) {
+                $msg = "NWR frequency set to {$freq} MHz — capture restarting…";
+            } else {
+                $error = 'Could not change frequency: ' . htmlspecialchars(implode(' ', $out));
+            }
+        } else {
+            $error = 'Invalid NWR frequency.';
+        }
+    }
+
+    if ($act === 'scan_nwr' && $is_admin) {
+        $out = []; $code = 0;
+        exec('sudo -n /usr/local/bin/noosphere-scan-nwr.sh 2>&1', $out, $code);
+        $channels = [];
+        foreach ($out as $line) {
+            if (preg_match('/^(\d+\.\d+)=(-?\d+\.\d+)$/', trim($line), $m)) {
+                $channels[$m[1]] = (float)$m[2];
+            }
+        }
+        // AJAX response: return JSON and exit (no page reload, audio keeps playing)
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => !empty($channels), 'channels' => $channels, 'raw' => implode("\n", $out)]);
+            exit;
+        }
+        if (!empty($channels)) {
+            $scan_results = $channels;
+            $msg = 'Scan complete — strongest channel highlighted below.';
+        } else {
+            $error = 'Scan failed: ' . htmlspecialchars(implode(' ', $out));
+        }
     }
 
     if ($act === 'delete' && $is_admin) {
@@ -121,6 +160,7 @@ tr:hover td { background:#1a1f35; }
 </div>
 
 <?php if ($msg): ?><div class="msg"><?= htmlspecialchars($msg) ?></div><?php endif ?>
+<?php if ($error): ?><div class="msg" style="background:#3a1a1a;border-color:#e94560;color:#e94560"><?= $error ?></div><?php endif ?>
 
 <?php include __DIR__ . "/_nwr_section.php"; ?>
 
@@ -212,11 +252,26 @@ tr:hover td { background:#1a1f35; }
         <td><?= $r['conditions'] ? '<span class="cond-badge">'.htmlspecialchars($r['conditions']).'</span>' : '—' ?></td>
         <td style="white-space:nowrap"><?= htmlspecialchars(trim(($r['wind_dir'] ?? '') . ' ' . ($r['wind_speed'] ?? ''))) ?: '—' ?></td>
         <td><?= $r['humidity'] ? htmlspecialchars($r['humidity']).'%' : '—' ?></td>
-        <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
+        <td class="notes-cell">
+          <?php
+            $note = $r['notes'] ?? '';
+            if (($r['source'] ?? '') === 'nwr-auto' && str_starts_with($note, '[NWR transcript] ')):
+              $transcript = substr($note, strlen('[NWR transcript] '));
+          ?>
+            <details style="font-size:11px">
+              <summary style="cursor:pointer;color:#7ad">📝 View transcript</summary>
+              <div style="margin-top:4px;color:#888;line-height:1.5"><?= htmlspecialchars($transcript) ?></div>
+            </details>
+          <?php else: ?>
+            <?= htmlspecialchars($note) ?>
+          <?php endif ?>
+        </td>
         <td style="white-space:nowrap;color:#aaa">
           <?= htmlspecialchars($r['logged_by'] ?? '') ?>
           <?php if (($r['source'] ?? '') === 'rtl433'): ?>
             <span style="display:inline-block;background:#1a2a3a;border:1px solid #2a4a6a;border-radius:3px;padding:1px 5px;font-size:10px;color:#4af;margin-left:4px">rtl_433</span>
+          <?php elseif (($r['source'] ?? '') === 'nwr-auto'): ?>
+            <span style="display:inline-block;background:#1a2a1a;border:1px solid #2a5a2a;border-radius:3px;padding:1px 5px;font-size:10px;color:#2ecc71;margin-left:4px">NWR Auto</span>
           <?php endif ?>
         </td>
         <?php if ($is_admin): ?>

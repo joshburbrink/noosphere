@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>2048 — Noosphere</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:sans-serif;background:#1a1a2e;color:#eee;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:1rem;touch-action:none}
+h2{color:#e94560;margin:.5rem 0}
+#scorebar{display:flex;gap:2rem;margin:.5rem 0;font-size:.95rem;color:#aaa}
+#scorebar span{color:#eee;font-weight:bold}
+#board{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#16213e;padding:10px;border-radius:10px;border:2px solid #e94560;width:min(340px,90vw)}
+.cell{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:clamp(1rem,4vw,1.5rem);background:#0f0f1a;color:#eee;transition:background .1s}
+#msg{margin-top:.75rem;font-size:1.1rem;color:#e94560;min-height:1.4em;text-align:center}
+.btns{display:flex;gap:.5rem;margin-top:.5rem}
+button{background:#16213e;border:1px solid #e94560;color:#eee;padding:7px 16px;border-radius:6px;font-size:.9rem;cursor:pointer;transition:.15s}
+button:hover{background:#e94560}
+#hint{font-size:.8rem;color:#555;margin-top:.5rem}
+.back{margin-top:1rem;font-size:.85rem}
+.back a{color:#555;text-decoration:none;border:1px solid #333;padding:4px 12px;border-radius:5px}
+.back a:hover{color:#e94560;border-color:#e94560}
+</style>
+</head>
+<body>
+<h2>🔢 2048</h2>
+<div id="scorebar">Score: <span id="sc">0</span> &nbsp; Best: <span id="hi">0</span></div>
+<div id="board"></div>
+<div id="msg"></div>
+<div class="btns"><button id="newBtn">New Game</button></div>
+<div id="hint">Arrow keys or swipe to slide tiles · Combine matching numbers · Reach 2048!</div>
+<div class="back"><a href="/games/">← Games</a></div>
+<script>
+const board=document.getElementById('board');
+let grid,score,best,won;
+best=+localStorage.getItem('2048_best')||0;
+document.getElementById('hi').textContent=best;
+
+const COLORS={
+  0:'#0f0f1a',2:'#0f3460',4:'#16213e',8:'#1a4a7a',16:'#1e5799',32:'#2980b9',
+  64:'#3498db',128:'#e67e22',256:'#e74c3c',512:'#c0392b',1024:'#9b59b6',2048:'#e94560'
+};
+function cellColor(v){return COLORS[v]||(v>2048?'#e94560':'#8e44ad')}
+
+function newGrid(){return Array.from({length:4},()=>Array(4).fill(0))}
+function addTile(g){
+  const empty=[];
+  g.forEach((row,y)=>row.forEach((v,x)=>{if(!v)empty.push({x,y})}));
+  if(!empty.length)return;
+  const {x,y}=empty[Math.floor(Math.random()*empty.length)];
+  g[y][x]=Math.random()<.9?2:4;
+}
+function render(){
+  board.innerHTML='';
+  grid.forEach(row=>row.forEach(v=>{
+    const d=document.createElement('div');
+    d.className='cell';
+    d.style.background=cellColor(v);
+    if(v){d.textContent=v;if(v>=1000)d.style.fontSize='clamp(.8rem,3vw,1.1rem)'}
+    board.appendChild(d);
+  }));
+  document.getElementById('sc').textContent=score;
+  if(score>best){best=score;localStorage.setItem('2048_best',best);document.getElementById('hi').textContent=best}
+}
+function slide(row){
+  let r=row.filter(v=>v);
+  for(let i=0;i<r.length-1;i++){if(r[i]===r[i+1]){r[i]*=2;score+=r[i];r.splice(i+1,1);i++}}
+  while(r.length<4)r.push(0);
+  return r;
+}
+function move(dx,dy){
+  let changed=false;
+  const ng=newGrid();
+  if(dy===0){
+    for(let y=0;y<4;y++){
+      const row=dx>0?[...grid[y]].reverse():[...grid[y]];
+      const slid=slide(row);
+      const out=dx>0?[...slid].reverse():slid;
+      for(let x=0;x<4;x++){ng[y][x]=out[x];if(ng[y][x]!==grid[y][x])changed=true}
+    }
+  }else{
+    for(let x=0;x<4;x++){
+      const col=dy>0?[3,2,1,0].map(y=>grid[y][x]):[0,1,2,3].map(y=>grid[y][x]);
+      const slid=slide(col);
+      for(let i=0;i<4;i++){
+        const y=dy>0?3-i:i;
+        ng[y][x]=slid[i];if(ng[y][x]!==grid[y][x])changed=true;
+      }
+    }
+  }
+  if(changed){grid=ng;addTile(grid)}
+  render();checkState();
+}
+function checkState(){
+  if(!won&&grid.some(r=>r.some(v=>v===2048))){
+    won=true;document.getElementById('msg').textContent='You reached 2048! 🎉 Keep going!';return;
+  }
+  // check if any moves left
+  if(grid.every(r=>r.every(v=>v))){
+    let stuck=true;
+    for(let y=0;y<4&&stuck;y++)for(let x=0;x<4&&stuck;x++){
+      if(x<3&&grid[y][x]===grid[y][x+1])stuck=false;
+      if(y<3&&grid[y][x]===grid[y+1][x])stuck=false;
+    }
+    if(stuck)document.getElementById('msg').textContent='Game over!';
+  }
+}
+function startGame(){
+  grid=newGrid();score=0;won=false;
+  addTile(grid);addTile(grid);
+  document.getElementById('msg').textContent='';
+  render();
+}
+document.getElementById('newBtn').onclick=startGame;
+
+const keyMap={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+document.addEventListener('keydown',e=>{if(keyMap[e.key]){move(...keyMap[e.key]);e.preventDefault()}});
+
+let tx=0,ty=0;
+document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+document.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)>Math.abs(dy)){if(Math.abs(dx)>20)move(dx>0?1:-1,0)}
+  else{if(Math.abs(dy)>20)move(0,dy>0?1:-1)}
+},{passive:true});
+
+startGame();
+</script>
+</body>
+</html>

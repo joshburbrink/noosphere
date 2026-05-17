@@ -50,6 +50,12 @@ if (get_setting('show_radio','0')==='1')
     $tiles[] = ['href'=>'/radio/',    'icon'=>'📻', 'label'=>get_setting('radio_label','Radio Net Log'),  'desc'=>'Log radio contacts, traffic &amp; net check-ins'];
 if (get_setting('show_damage','0')==='1')
     $tiles[] = ['href'=>'/damage/',  'icon'=>'🏚', 'label'=>'Damage Reports', 'desc'=>'Submit and view address-level damage assessments'];
+if (get_setting('show_games','0')==='1')
+    $tiles[] = ['href'=>'/games/',  'icon'=>'🎮', 'label'=>'Games',        'desc'=>'Browser-based games — Snake, Tetris, 2048 and more'];
+if (get_setting('show_wiki','1')==='1')
+    $tiles[] = ['href'=>'/wiki/',    'icon'=>'📖', 'label'=>'Local Knowledge Wiki', 'desc'=>'Community-editable reference — roads, water, skills, local know-how'];
+if (get_setting('show_supplies','0')==='1' || get_setting('show_seeds','0')==='1' || get_setting('show_tools','0')==='1')
+    $tiles[] = ['href'=>'/resources/', 'icon'=>'🗃️', 'label'=>'Resources', 'desc'=>'Supply inventory, seed library &amp; tool lending'];
 if (get_setting('show_triage','0')==='1')
     $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking — START triage priority, print patient tags'];
 ?>

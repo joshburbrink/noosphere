@@ -213,6 +213,40 @@ td { padding:9px 10px; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
 
 <div class="content">
 
+<details style="background:#0d1a0d;border:1px solid #2a4a2a;border-radius:8px;padding:0;margin-bottom:18px">
+  <summary style="padding:10px 14px;cursor:pointer;font-size:13px;color:#2ecc71;font-weight:bold;list-style:none;display:flex;align-items:center;gap:8px">
+    <span>🏥</span> <span>START Triage Quick Reference</span>
+    <span style="margin-left:auto;font-size:11px;color:#555;font-weight:normal">tap to expand</span>
+  </summary>
+  <div style="padding:0 14px 14px;font-size:12px;line-height:1.7">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px">
+      <div style="background:#2a0a12;border:1px solid #e9456044;border-radius:6px;padding:10px">
+        <div style="color:#e94560;font-weight:bold;margin-bottom:4px">🔴 IMMEDIATE</div>
+        <div style="color:#ccc">Breathing only after repositioning airway — or respirations &gt;30/min — or poor radial pulse / capillary refill &gt;2s — or cannot follow commands</div>
+      </div>
+      <div style="background:#2a1a00;border:1px solid #f39c1244;border-radius:6px;padding:10px">
+        <div style="color:#f39c12;font-weight:bold;margin-bottom:4px">🟡 DELAYED</div>
+        <div style="color:#ccc">Breathing &lt;30/min · good pulse/cap refill · follows commands · injuries that can wait for treatment</div>
+      </div>
+      <div style="background:#0a2a12;border:1px solid #2ecc7144;border-radius:6px;padding:10px">
+        <div style="color:#2ecc71;font-weight:bold;margin-bottom:4px">🟢 MINOR</div>
+        <div style="color:#ccc">Walking wounded · minor injuries · can follow commands · no immediate life threat</div>
+      </div>
+      <div style="background:#111;border:1px solid #66666644;border-radius:6px;padding:10px">
+        <div style="color:#888;font-weight:bold;margin-bottom:4px">⬛ EXPECTANT</div>
+        <div style="color:#666">Not breathing after repositioning · injuries incompatible with survival given available resources</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;color:#555;font-size:11px">
+      START sequence: <strong style="color:#aaa">1)</strong> Direct walking wounded away (→ Minor) &nbsp;
+      <strong style="color:#aaa">2)</strong> Respirations? If none after reposition → Expectant &nbsp;
+      <strong style="color:#aaa">3)</strong> Resp rate? &gt;30 → Immediate &nbsp;
+      <strong style="color:#aaa">4)</strong> Perfusion (cap refill or radial pulse)? Poor → Immediate &nbsp;
+      <strong style="color:#aaa">5)</strong> Mental status? Can't follow commands → Immediate · Otherwise → Delayed
+    </div>
+  </div>
+</details>
+
 <div class="summary">
 <?php foreach ($PRIORITIES as $pkey => $p): ?>
   <div class="sum-box" style="border-color:<?= $p['color'] ?>;background:<?= $p['bg'] ?>">
@@ -470,8 +504,10 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 // Initial state for add modal priority
 updatePriLabel('add', 'immediate');
 
-// Auto-refresh every 30s
-setTimeout(function() { location.reload(); }, 30000);
+// Auto-refresh only when no modal is open
+setInterval(function() {
+  if (!document.querySelector('.veil.open')) location.reload();
+}, 60000);
 </script>
 </body>
 </html>
