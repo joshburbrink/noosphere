@@ -227,6 +227,24 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
 <div style="margin-top:.75rem;text-align:center">
   <button class="btn btn-sec" id="new-btn" onclick="newRoom()" style="display:none">New Game</button>
 </div>
+<details style="max-width:700px;width:100%;margin-top:.75rem;font-size:.82rem;color:var(--text-muted,#aaa);background:var(--bg-card,#16213e);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:.5rem .75rem">
+  <summary style="cursor:pointer;color:var(--text,#eee);font-weight:bold;list-style:none">📖 How to Play</summary>
+  <div style="margin-top:.6rem;line-height:1.6">
+    <p><strong>Goal:</strong> Sink all 5 of your opponent's ships before they sink yours.</p>
+    <p style="margin-top:.4rem"><strong>Setup:</strong> Each player places 5 ships on their 10×10 grid. Ships cannot overlap or touch diagonally. Click a ship in the tray to select it, press <kbd>R</kbd> to rotate, then click the grid to place it.</p>
+    <p style="margin-top:.4rem"><strong>Ships:</strong></p>
+    <ul style="margin:.3rem 0 .3rem 1.2rem">
+      <li>Carrier — 5 cells</li>
+      <li>Battleship — 4 cells</li>
+      <li>Cruiser — 3 cells</li>
+      <li>Submarine — 3 cells</li>
+      <li>Destroyer — 2 cells</li>
+    </ul>
+    <p style="margin-top:.4rem"><strong>Taking a turn:</strong> Click a cell on your opponent's grid (right side) to fire. 🔴 = hit, ⬜ = miss. Your grid on the left shows incoming shots.</p>
+    <p style="margin-top:.4rem"><strong>Win:</strong> The first player to sink all 5 enemy ships wins. A ship sinks when every one of its cells has been hit.</p>
+    <p style="margin-top:.4rem"><strong>Multiplayer:</strong> Share the link in your browser bar with a second player on the same network.</p>
+  </div>
+</details>
 <div class="back"><a href="/games/">← Games</a></div>
 
 <script>

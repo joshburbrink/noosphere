@@ -268,6 +268,22 @@ canvas{background:#fff;border-radius:8px;border:2px solid var(--border,#2a2a4a);
     <div id="ctrl-area"></div>
   </div>
 </div>
+<details style="max-width:900px;width:100%;margin-top:.75rem;font-size:.82rem;color:var(--text-muted,#aaa);background:var(--bg-card,#16213e);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:.5rem .75rem">
+  <summary style="cursor:pointer;color:var(--text,#eee);font-weight:bold;list-style:none">📖 How to Play</summary>
+  <div style="margin-top:.6rem;line-height:1.6">
+    <p><strong>Goal:</strong> Take turns drawing a secret word while your teammates guess it. More correct guesses = more points.</p>
+    <p style="margin-top:.4rem"><strong>Starting:</strong> Share the link with 2+ players. Anyone can click <em>Start Game</em> once there are at least 2 players in the lobby.</p>
+    <p style="margin-top:.4rem"><strong>Drawing turn (90 seconds):</strong></p>
+    <ul style="margin:.3rem 0 .3rem 1.2rem">
+      <li>The active drawer sees the secret word at the top. Everyone else sees only the canvas.</li>
+      <li>Draw using your mouse or finger. Pick a color and brush size from the toolbar.</li>
+      <li>No writing the word, no spelling it out, no speaking it aloud.</li>
+    </ul>
+    <p style="margin-top:.4rem"><strong>Guessing:</strong> Type your guess in the chat box and press Enter. Correct guesses are highlighted — drawer gets +2 pts, guesser gets +1 pt.</p>
+    <p style="margin-top:.4rem"><strong>Turn ends</strong> when the timer hits zero or everyone has guessed correctly. The next player becomes the drawer.</p>
+    <p style="margin-top:.4rem"><strong>Controls:</strong> Mouse drag or touch drag to draw. Toolbar has 8 colors, 3 brush sizes, and an eraser. Clear button wipes the canvas.</p>
+  </div>
+</details>
 <div class="back"><a href="/games/">← Games</a></div>
 
 <script>

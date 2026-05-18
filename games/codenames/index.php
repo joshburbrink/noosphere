@@ -4,16 +4,64 @@ if (get_setting('show_games','0') !== '1') { http_response_code(404); exit; }
 
 define('GAMES_DB', '/var/lib/noosphere/games.db');
 
-$WORDS = ['shelter','radio','water','fire','map','signal','rope','knife','tent','compass',
-  'flare','rescue','storm','flood','power','fuel','medicine','bandage','splint','stretcher',
-  'food','battery','generator','whistle','mirror','smoke','gate','bridge','road','tower',
-  'creek','hill','barn','school','church','hospital','police','triage','code','net',
-  'relay','channel','frequency','beacon','patrol','volunteer','command','resource','cache','drop',
-  'supply','convoy','route','checkpoint','coordinate','grid','perimeter','sector','zone','ops',
-  'post','base','field','mobile','unit','team','lead','shift','log','report',
-  'alert','warning','all-clear','staging','decon','ppe','hazmat','spill','leak','breach',
-  'radio','scan','monitor','track','mark','flag','tag','pin','wrap','splint',
-  'county','district','township','parcel','trail','ford','ridge','hollow','bottoms','bluff'];
+$WORD_PACKS = [
+  'emergency' => [
+    'shelter','radio','water','fire','map','signal','rope','knife','tent','compass',
+    'flare','rescue','storm','flood','power','fuel','medicine','bandage','splint','stretcher',
+    'food','battery','generator','whistle','mirror','smoke','gate','bridge','road','tower',
+    'creek','hill','barn','school','church','hospital','police','triage','code','net',
+    'relay','channel','frequency','beacon','patrol','volunteer','command','resource','cache','drop',
+    'supply','convoy','route','checkpoint','coordinate','grid','perimeter','sector','zone','ops',
+    'post','base','field','mobile','unit','team','lead','shift','log','report',
+    'alert','warning','staging','decon','ppe','hazmat','spill','leak','breach','dam',
+    'scan','monitor','track','mark','flag','tag','pin','wrap','splint','pump',
+    'county','district','township','trail','ford','ridge','hollow','bottoms','bluff','levee',
+  ],
+  'classic' => [
+    'apple','bank','bar','bat','bolt','book','bow','box','cap','card',
+    'cast','cat','cell','chair','change','charge','check','chip','club','cold',
+    'cook','crane','cross','date','deal','deck','die','dog','door','dream',
+    'drop','duck','ear','face','fall','fan','fight','file','fish','flag',
+    'fly','foot','force','fork','frame','glass','glue','gold','hand','head',
+    'heart','horn','ice','iron','jack','key','kick','king','knife','lamp',
+    'leaf','light','line','lock','log','map','mark','match','mine','mole',
+    'moon','mouse','nail','net','note','nut','palm','park','pass','patch',
+    'pen','piano','pilot','pin','pipe','plane','plant','plate','play','plot',
+    'point','pool','port','post','press','pump','queen','ring','rock','roll',
+  ],
+  'indiana' => [
+    'columbus','nashville','bedford','martinsville','seymour','crothersville','brownstown','edinburgh',
+    'greenwood','franklin','shelbyville','greensburg','madison','north-vernon','scottsburg','salem',
+    'french-lick','paoli','mitchell','loogootee','washington','vincennes','terre-haute','linton',
+    'bloomington','spencer','ellettsville','martinsville','mooresville','danville','plainfield',
+    'crane','muscatatuck','atterbury','camp-atterbury','hoosier','covered-bridge','cardinal',
+    'covered-bridge','peony','limestone','quarry','coal','corn','soybean','tomato','popcorn',
+    '500','brickyard','speedway','colts','pacers','pacer','hoosier','purdue','notre-dame',
+    'wabash','ohio','white-river','blue-river','patoka','deer','turkey','coyote','hawk',
+    'brown-county','monroe-lake','hardy-lake','patoka-lake','brookville-lake','harmonie',
+    'lincoln','mad-anthony','tecumseh','miami','potawatomi','shawnee','delaware',
+    'covered-bridge','grist-mill','barn','silo','creek','bottom','flat','ridge','draw','ford',
+  ],
+  'wilderness' => [
+    'acorn','antler','ash','aspen','badger','bark','beaver','birch','blaze','bluff',
+    'bog','boulder','brook','buck','burrow','cache','canyon','cave','cedar','cliff',
+    'coyote','creek','crow','current','dawn','deer','den','dew','doe','drift',
+    'drought','dusk','eagle','eddy','elk','falls','fawn','fern','flint','flood',
+    'fog','ford','frost','glen','gorge','grass','grove','gulch','hawk','hazel',
+    'hollow','ice','inlet','ivy','jay','kelp','knoll','lake','ledge','lichen',
+    'log','loon','meadow','mesa','mink','mist','moor','moss','mud','nest',
+    'oak','otter','owl','pass','peat','pike','pine','pond','prey','quail',
+    'ravine','reed','ridge','rill','river','robin','rock','root','rush','sage',
+    'sedge','slate','slough','snare','snipe','spawn','spring','spruce','stone','swamp',
+  ],
+];
+
+function get_word_pack($theme) {
+    global $WORD_PACKS;
+    return $WORD_PACKS[$theme] ?? $WORD_PACKS['emergency'];
+}
+
+$WORDS = $WORD_PACKS['emergency'];
 
 function gdb() {
     static $db = null;
@@ -49,18 +97,20 @@ function room_save($id, $state) {
     }
 }
 
-function new_game_state($words_pool) {
-    shuffle($words_pool);
-    $words = array_slice($words_pool, 0, 25);
+function new_game_state($theme = 'emergency') {
+    $pool = get_word_pack($theme);
+    shuffle($pool);
+    $words = array_slice($pool, 0, 25);
     // Colors: 9 red, 8 blue, 7 neutral, 1 assassin (red starts)
     $colors = array_merge(array_fill(0,9,'red'), array_fill(0,8,'blue'), array_fill(0,7,'neutral'), ['assassin']);
     shuffle($colors);
     return [
         'phase'    => 'lobby',
+        'theme'    => $theme,
         'words'    => $words,
         'colors'   => $colors,
         'revealed' => array_fill(0, 25, false),
-        'players'  => [],  // pid => {name, role}
+        'players'  => [],
         'turn'     => 'red',
         'clue'     => null,
         'remaining'=> ['red'=>9,'blue'=>8],
@@ -83,11 +133,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pid  = preg_replace('/[^a-zA-Z0-9]/', '', $body['pid'] ?? '');
     $name = htmlspecialchars(substr($body['name'] ?? 'Player', 0, 20), ENT_QUOTES);
 
-    global $WORDS;
+    $valid_themes = ['emergency','classic','indiana','wilderness'];
+    $req_theme = in_array($body['theme']??'', $valid_themes, true) ? $body['theme'] : 'emergency';
 
     if ($act === 'new_room') {
         $room_id = substr(md5(uniqid('',true)),0,8);
-        room_save($room_id, new_game_state($WORDS));
+        room_save($room_id, new_game_state($req_theme));
         echo json_encode(['ok'=>true,'room'=>$room_id]);
         exit;
     }
@@ -100,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($row) $room_id = $row['id'];
             else {
                 $room_id = substr(md5(uniqid('',true)),0,8);
-                room_save($room_id, new_game_state($WORDS));
+                room_save($room_id, new_game_state($req_theme));
             }
         }
         $room = room_get($room_id);
@@ -233,7 +284,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'new_game') {
         $room = room_get($room_id); if(!$room){echo json_encode(['ok'=>false]);exit;}
         $old_players = $room['state']['players'];
-        $st = new_game_state($WORDS);
+        $old_theme   = $room['state']['theme'] ?? 'emergency';
+        $use_theme   = in_array($body['theme']??'', $valid_themes, true) ? $body['theme'] : $old_theme;
+        $st = new_game_state($use_theme);
         $st['players'] = $old_players;
         foreach ($st['players'] as &$p) $p['role'] = null;
         $st['phase'] = 'lobby';
@@ -356,6 +409,26 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
 
 <div style="text-align:center;margin-bottom:.5rem" id="ctrl-area"></div>
 
+<details style="max-width:700px;width:100%;margin-top:.75rem;font-size:.82rem;color:var(--text-muted,#aaa);background:var(--bg-card,#16213e);border:1px solid var(--border,#2a2a4a);border-radius:8px;padding:.5rem .75rem">
+  <summary style="cursor:pointer;color:var(--text,#eee);font-weight:bold;list-style:none">📖 How to Play</summary>
+  <div style="margin-top:.6rem;line-height:1.6">
+    <p><strong>Goal:</strong> Each team has a Spymaster and at least one Operative. Find all your team's agents before the other team finds theirs.</p>
+    <p style="margin-top:.4rem"><strong>Roles:</strong></p>
+    <ul style="margin:.3rem 0 .3rem 1.2rem">
+      <li><strong>Spymaster</strong> — sees all card colors. Gives one-word clues + a number (how many cards the clue applies to).</li>
+      <li><strong>Operative</strong> — sees the board. Guesses which cards match the clue by clicking them.</li>
+    </ul>
+    <p style="margin-top:.4rem"><strong>Taking a turn:</strong></p>
+    <ol style="margin:.3rem 0 .3rem 1.2rem">
+      <li>Spymaster gives a one-word clue and a count.</li>
+      <li>Operatives discuss, then click cards to guess. You get count+1 guesses max.</li>
+      <li>If you hit your color, keep guessing. Hit the wrong color or run out → your turn ends.</li>
+    </ol>
+    <p style="margin-top:.4rem"><strong>Special cards:</strong> ⬛ Assassin — if you guess it, your team <em>immediately loses</em>. Neutral cards just end your turn.</p>
+    <p style="margin-top:.4rem"><strong>Win:</strong> Reveal all your agents first. Red has 9 cards, Blue has 8 — Red always goes first.</p>
+    <p style="margin-top:.4rem"><strong>Word themes:</strong> Change the word pack in the lobby — Emergency (disaster ops), Classic (everyday nouns), Indiana (local places), Wilderness (nature).</p>
+  </div>
+</details>
 <div class="back"><a href="/games/">← Games</a></div>
 
 <script>
@@ -366,6 +439,8 @@ var room = new URLSearchParams(location.search).get('r') || '';
 var state = null;
 var lastUpdated = 0;
 var pollTimer = null;
+var selectedTheme = localStorage.getItem('cn_theme') || 'emergency';
+var THEMES = {emergency:'🚨 Emergency',classic:'📖 Classic',indiana:'🌽 Indiana',wilderness:'🌲 Wilderness'};
 
 document.getElementById('name-in').value = myName;
 
@@ -418,7 +493,13 @@ function buildActions(st) {
   if (st.phase === 'lobby') {
     var roles = Object.values(st.players).map(function(p){return p.role;});
     var hasBothSM = roles.indexOf('spymaster_red')!==-1 && roles.indexOf('spymaster_blue')!==-1;
-    body.innerHTML = 'Share link: <code style="font-size:.75rem;word-break:break-all">' + location.href + (location.search?'':'?r='+room) + '</code>';
+    var curTheme = st.theme || 'emergency';
+    var themeOpts = Object.entries(THEMES).map(function(kv){
+      return '<option value="'+kv[0]+'"'+(kv[0]===curTheme?' selected':'')+'>'+kv[1]+'</option>';
+    }).join('');
+    body.innerHTML = '<div style="margin-bottom:.5rem"><label style="font-size:.8rem;color:var(--text-muted,#aaa)">Word theme: </label>'
+      +'<select id="theme-sel" onchange="changeTheme(this.value)" style="background:var(--bg-input,#0d0d1a);color:var(--text,#eee);border:1px solid var(--border,#2a2a4a);border-radius:4px;padding:.2rem .4rem;font-size:.82rem">'+themeOpts+'</select></div>'
+      +'Share link: <code style="font-size:.75rem;word-break:break-all">' + location.origin + '/games/codenames/?r=' + room + '</code>';
     if (hasBothSM) ctrl.innerHTML = '<button class="btn" onclick="startGame()">▶ Start Game</button>';
     else ctrl.innerHTML = '<span style="font-size:.82rem;color:var(--text-muted,#aaa)">Need both Spymasters to start</span>';
   } else if (st.phase === 'playing') {
@@ -506,7 +587,12 @@ function giveClue() {
 }
 function passGuess() { api({act:'pass'}).then(function(r){ if(r.ok) applyState(r.state); }); }
 function startGame() { api({act:'start'}).then(function(r){ if(r.ok) applyState(r.state); }); }
-function newGame() { api({act:'new_game'}).then(function(r){ if(r.ok) applyState(r.state); }); }
+function newGame() { api({act:'new_game',theme:selectedTheme}).then(function(r){ if(r.ok) applyState(r.state); }); }
+function changeTheme(t) {
+  selectedTheme = t;
+  localStorage.setItem('cn_theme', t);
+  api({act:'new_game', theme:t}).then(function(r){ if(r.ok) applyState(r.state); });
+}
 
 function startPoll() {
   if (pollTimer) return;
