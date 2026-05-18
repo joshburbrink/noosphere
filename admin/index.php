@@ -1967,7 +1967,7 @@ if (!$usb_eths): ?>
     h += '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">';
     var svc_labels = {'noaa-weather':'NWR','scanner-waterfall':'Scanner','hostapd':'AP','noosphere-rtl433':'rtl_433','noosphere-aprs':'APRS'};
     Object.entries(d.svc_states||{}).forEach(function(kv){
-      h += '<span style="font-family:monospace">'+svc_labels[kv[0]]||kv[0]+': '+svcbadge(kv[1])+'</span>';
+      h += '<span style="font-family:monospace">'+(svc_labels[kv[0]]||kv[0])+': '+svcbadge(kv[1])+'</span>';
     });
     h += '</div></div>';
 
