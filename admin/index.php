@@ -101,7 +101,18 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-
+    // --- Display mode switch (AJAX — returns JSON) ---
+    if ($act === 'display_mode') {
+        header('Content-Type: application/json');
+        $mode = trim($_POST['mode'] ?? '');
+        if (!in_array($mode, ['kiosk', 'command', 'off'])) {
+            echo json_encode(['ok' => false, 'output' => 'Invalid mode']);
+            exit;
+        }
+        $out = shell_exec('sudo /usr/local/bin/noosphere-display-mode ' . escapeshellarg($mode) . ' 2>&1') ?? '(no output)';
+        echo json_encode(['ok' => true, 'output' => $out]);
+        exit;
+    }
     // --- USB ethernet actions (AJAX) ---
     if (in_array($act, ['eth_dhcp','eth_static','eth_ping','eth_remove','eth_up'])) {
         header('Content-Type: application/json');
@@ -1527,6 +1538,15 @@ $ap_conf_ssid = _ap_conf_val('AP_SSID',      $_ap_conf);
 $ap_conf_iface= _ap_conf_val('AP_INTERFACE', $_ap_conf);
 $ap_has_conf  = !empty($ap_conf_ssid);
 $hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'inactive');
+
+// Display mode state
+$_disp_conf   = @file_get_contents('/etc/noosphere/display.conf') ?: '';
+$_disp_mode   = 'off';
+$_disp_url    = 'http://localhost';
+if (preg_match('/^DISPLAY_MODE=(.+)$/m', $_disp_conf, $m)) $_disp_mode = trim($m[1]);
+if (preg_match('/^SERVER_URL=(.+)$/m', $_disp_conf, $m))   $_disp_url  = trim($m[1]);
+$_disp_svc    = trim(shell_exec('systemctl is-active noosphere-display 2>/dev/null') ?: 'inactive');
+$_disp_exists = file_exists('/usr/local/bin/noosphere-display');
 ?>
 
 <details class="cpanel" open>
@@ -1759,7 +1779,52 @@ if (!$usb_eths): ?>
   </div>
 </details>
 
-</div><!-- #tab-network -->
+<details class="cpanel" open>
+  <summary>Local Display</summary>
+  <div class="cpbody">
+    <p style="color:#aaa;font-size:13px;margin-bottom:14px">
+      Attach an HDMI monitor or Raspberry Pi touchscreen to show the kiosk or command view locally.
+      <?php if (!$_disp_exists): ?>
+        <span style="color:#e94560">noosphere-display not installed — run <code>setup-local-display.sh server</code> first.</span>
+      <?php endif; ?>
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <?php
+      $modes = [
+        'kiosk'   => ['label'=>'Kiosk',   'desc'=>'Public view — full-screen kiosk display', 'color'=>'2ecc71', 'bg'=>'0a2a0a', 'border'=>'2a6a2a'],
+        'command' => ['label'=>'Command', 'desc'=>'Operator command dashboard',                'color'=>'4a9eff', 'bg'=>'0a1a2a', 'border'=>'2a4a6a'],
+        'off'     => ['label'=>'Off',     'desc'=>'Turn off local display service',           'color'=>'888',    'bg'=>'161616', 'border'=>'2a2a2a'],
+      ];
+      foreach ($modes as $mkey => $mc):
+        $active = ($_disp_mode === $mkey);
+      ?>
+      <div style="flex:1;min-width:150px;background:#<?= $active ? $mc['bg'] : '111118' ?>;border:1px solid #<?= $active ? $mc['border'] : '222' ?>;border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:#<?= $active ? $mc['color'] : '444' ?>;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">
+          <?= $active ? '● Active' : '○ Inactive' ?>
+        </div>
+        <div style="font-weight:bold;color:#<?= $active ? $mc['color'] : 'aaa' ?>;margin-bottom:4px"><?= $mc['label'] ?></div>
+        <div style="font-size:11px;color:#666;margin-bottom:10px"><?= $mc['desc'] ?></div>
+        <?php if (!$active && $_disp_exists): ?>
+          <button class="btn-sm" onclick="setDisplayMode('<?= $mkey ?>', this)">Switch to <?= $mc['label'] ?></button>
+        <?php elseif ($active): ?>
+          <div style="font-size:11px;color:#555">service: <span style="color:#<?= $_disp_svc==='active'?'2ecc71':'e94560' ?>"><?= esc($_disp_svc) ?></span></div>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <div id="disp-out" style="display:none;font-size:11px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+    <?php if ($_disp_exists): ?>
+    <div style="margin-top:10px;font-size:12px;color:#555">
+      Config: <code>/etc/noosphere/display.conf</code> &nbsp;|&nbsp; URL: <code><?= esc($_disp_url) ?></code>
+      &nbsp;|&nbsp; <a href="javascript:void(0)" onclick="setDisplayMode('<?= esc($_disp_mode) ?>',this)" style="color:#4a9eff">Restart service</a>
+    </div>
+    <?php else: ?>
+    <div style="margin-top:10px;font-size:12px;color:#555">
+      To install: <code>cd /var/www/noosphere/scripts && bash setup-local-display.sh server</code>
+    </div>
+    <?php endif; ?>
+  </div>
+</details></div><!-- #tab-network -->
 
 <!-- CONTENT -->
 <div id="tab-content" class="tab-content">
@@ -2787,6 +2852,24 @@ foreach ($simple_mods as [$key, $id, $label]):
 
 <script>
 function showTab(name) {
+function setDisplayMode(mode, btn) {
+  var orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Switching...';
+  fetch('', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'action=display_mode&mode=' + encodeURIComponent(mode) + '&csrf_token=<?= csrf_token() ?>'
+  }).then(r=>r.json()).then(function(d) {
+    var out = document.getElementById('disp-out');
+    out.style.display = 'block';
+    out.textContent = d.output || '(no output)';
+    setTimeout(function(){ location.reload(); }, 1500);
+  }).catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = orig;
+    alert('Error: ' + e);
+  });
+}
+
   document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
   document.querySelectorAll('.tab').forEach(function(el){ el.classList.remove('active'); });
   document.getElementById('tab-' + name).classList.add('active');

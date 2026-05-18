@@ -302,6 +302,15 @@ printf "  ${C}ROUTER_IP=192.168.1.1 setup-router-generic.sh openwrt${X}\n\n"
 
 printf "${W}Scripts location:${X}  /var/www/noosphere/scripts/\n\n"
 
+printf "${W}Attach a local HDMI monitor or Pi touchscreen:${X}\n"
+printf "  ${C}setup-local-display.sh server${X}       install X11 + Chromium kiosk on this server\n"
+printf "  ${C}setup-local-display.sh pi <url>${X}     configure a Raspberry Pi pointing to the server\n\n"
+printf "Switch display mode:\n"
+printf "  ${C}noosphere-display-mode kiosk${X}        public kiosk view (/kiosk/)\n"
+printf "  ${C}noosphere-display-mode command${X}      operator command view (/command/)\n"
+printf "  ${C}noosphere-display-mode off${X}          turn off local display\n\n"
+printf "  ${C}systemctl enable --now noosphere-display${X}  start display service on boot\n\n"
+
 # ── FOOTER ───────────────────────────────────────────────────────────────────
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 printf "  Run ${C}noosphere-selftest${X} for an automated health check.\n"

@@ -126,5 +126,7 @@ printf "  ${C}setup-router-generic.sh manual${X}   captive portal options (any r
 printf "\n  ${W}Kit maintenance${X}\n"
 printf "  ${C}clone-usb.sh <src> <dst>${X}         clone this drive to backup USB\n"
 printf "  ${C}cache-drivers.sh [dir]${X}           pre-cache NIC drivers for unknown hardware\n"
+printf "  ${C}setup-local-display.sh [server|pi]${X}  attach HDMI monitor or Pi touchscreen\n"
+printf "  ${C}noosphere-display-mode kiosk|command|off${X}  switch local display mode\n"
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 echo ""
