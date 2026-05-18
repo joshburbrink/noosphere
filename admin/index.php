@@ -498,7 +498,8 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
                       'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
                       'tasks_categories','tasks_auto_close_hours',
-                      'radio_freq','radio_gain','radio_ppm','radio_same_fips'];
+                      'radio_freq','radio_gain','radio_ppm','radio_same_fips',
+                      'transcription_backend'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
@@ -2596,51 +2597,111 @@ $t_enabled     = get_setting('transcription_enabled','0') === '1';
 $t_nwr_auto    = get_setting('transcription_nwr_auto','0') === '1';
 $t_nwr_hybrid  = get_setting('transcription_nwr_hybrid','0') === '1';
 $t_talk_post   = get_setting('transcription_talk_post','0') === '1';
-$whisper_ok    = (trim(shell_exec('/opt/noosphere-whisper/bin/python3 -c "import vosk; print(1)" 2>/dev/null') ?? '') === '1') && count(glob('/var/lib/noosphere/vosk-models/vosk-model*')) > 0;
+$t_backend_pref = get_setting('transcription_backend','auto');
+
+// CPU capability
+$cpu_flags = file_exists('/proc/cpuinfo') ? file_get_contents('/proc/cpuinfo') : '';
+$cpu_avx   = (bool)preg_match('/^flags\s*:.*\bavx\b/m', $cpu_flags);
+
+// Backend availability
+$vosk_ok = (trim(shell_exec('/opt/noosphere-whisper/bin/python3 -c "import vosk; print(1)" 2>/dev/null') ?? '') === '1')
+           && count(glob('/var/lib/noosphere/vosk-models/vosk-model*')) > 0;
+$fw_ok   = $cpu_avx
+           && (trim(shell_exec('/opt/noosphere-whisper/bin/python3 -c "import faster_whisper; print(1)" 2>/dev/null') ?? '') === '1');
+
+// Effective backend (mirrors Python select_backend logic)
+if ($t_backend_pref === 'faster-whisper') {
+    $active_backend = ($cpu_avx && $fw_ok) ? 'faster-whisper' : 'vosk';
+} elseif ($t_backend_pref === 'vosk') {
+    $active_backend = 'vosk';
+} else { // auto
+    $active_backend = ($cpu_avx && $fw_ok) ? 'faster-whisper' : 'vosk';
+}
+
+$any_backend_ok = $vosk_ok || $fw_ok;
 $last_tx = [];
 $tx_file = '/var/lib/noosphere/weather/last-transcription.json';
 if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), true) ?? [];
 ?>
 <details class="cpanel" <?= $t_enabled ? 'open' : '' ?>>
-  <summary>🎙 Transcription <span style="font-size:11px;color:#888;font-weight:normal">— Auto-log NWR audio with vosk (offline speech recognition)</span></summary>
+  <summary>🎙 Transcription <span style="font-size:11px;color:#888;font-weight:normal">— Auto-log NWR audio offline (vosk / faster-whisper)</span></summary>
   <div class="cpbody">
-    <?php if (!$whisper_ok): ?>
-    <div style="background:#1a1a00;border:1px solid #554400;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#aa9">
-      <strong style="color:#cc9">vosk or model not found.</strong> Install:<br>
-      <code style="font-size:11px;color:#888">python3 -m venv /opt/noosphere-whisper &amp;&amp; /opt/noosphere-whisper/bin/pip install vosk</code><br>
-      Then download a model into <code style="color:#888">/var/lib/noosphere/vosk-models/</code><br>
-      (e.g. <code style="color:#888">vosk-model-small-en-us-0.15</code> from alphacephei.com/vosk/models)<br>
-      Features below will be unavailable until both are present.
+
+    <!-- CPU + backend status -->
+    <div style="background:#0d0d1a;border:1px solid #2a2a4a;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:12px;display:flex;flex-wrap:wrap;gap:12px">
+      <span>CPU AVX: <?= $cpu_avx ? '<span style="color:#2ecc71">yes</span>' : '<span style="color:#888">no</span>' ?></span>
+      <span>vosk: <?= $vosk_ok ? '<span style="color:#2ecc71">ready</span>' : '<span style="color:#e74c3c">not installed</span>' ?></span>
+      <span>faster-whisper: <?php
+        if (!$cpu_avx)       echo '<span style="color:#555">needs AVX</span>';
+        elseif ($fw_ok)      echo '<span style="color:#2ecc71">ready</span>';
+        else                 echo '<span style="color:#e67e22">not installed</span>';
+      ?></span>
+      <?php if ($any_backend_ok): ?>
+      <span>Active backend: <strong style="color:#7ad"><?= esc($active_backend) ?></strong></span>
+      <?php endif; ?>
     </div>
-    <?php else: ?>
+
+    <?php if (!$vosk_ok): ?>
+    <div style="background:#1a1a00;border:1px solid #554400;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#aa9">
+      <strong style="color:#cc9">vosk not found.</strong> Install:<br>
+      <code style="font-size:11px;color:#888">python3 -m venv /opt/noosphere-whisper &amp;&amp; /opt/noosphere-whisper/bin/pip install vosk</code><br>
+      Then download a model into <code style="color:#888">/var/lib/noosphere/vosk-models/</code>
+      (e.g. <code style="color:#888">vosk-model-small-en-us-0.15</code> from alphacephei.com/vosk/models)<br>
+      Features below will be unavailable until vosk or faster-whisper is ready.
+    </div>
+    <?php endif; ?>
+
+    <?php if ($cpu_avx && !$fw_ok): ?>
+    <div style="background:#1a1200;border:1px solid #554400;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#ca8">
+      <strong style="color:#fc9">This CPU supports AVX — faster-whisper is available for higher accuracy.</strong><br>
+      Install: <code style="font-size:11px;color:#888">/opt/noosphere-whisper/bin/pip install faster-whisper</code><br>
+      The first run will download the <code style="color:#888">tiny.en</code> model (~39 MB) to
+      <code style="color:#888">/var/lib/noosphere/whisper-models/</code>.
+    </div>
+    <?php endif; ?>
+
+    <?php if ($vosk_ok): ?>
     <?php $vmodel = basename(glob("/var/lib/noosphere/vosk-models/vosk-model*")[0] ?? ""); ?>
-    <div style="font-size:12px;color:#2ecc71;margin-bottom:10px">&#x2714; vosk ready &mdash; model: <?= esc($vmodel) ?></div>
+    <div style="font-size:12px;color:#2ecc71;margin-bottom:4px">&#x2714; vosk model: <?= esc($vmodel) ?></div>
+    <?php endif; ?>
+    <?php if ($fw_ok): ?>
+    <div style="font-size:12px;color:#2ecc71;margin-bottom:10px">&#x2714; faster-whisper ready</div>
     <?php endif; ?>
 
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px">
-        <input type="checkbox" name="transcription_enabled" <?= $t_enabled?'checked':'' ?> <?= !$whisper_ok?'disabled':'' ?>>
+        <input type="checkbox" name="transcription_enabled" <?= $t_enabled?'checked':'' ?> <?= !$any_backend_ok?'disabled':'' ?>>
         Enable transcription
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
-        <input type="checkbox" name="transcription_nwr_auto" <?= $t_nwr_auto?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        <input type="checkbox" name="transcription_nwr_auto" <?= $t_nwr_auto?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
         Auto-transcribe NWR every 30 min (systemd timer)
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
-        <input type="checkbox" name="transcription_nwr_hybrid" <?= $t_nwr_hybrid?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        <input type="checkbox" name="transcription_nwr_hybrid" <?= $t_nwr_hybrid?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
         Hybrid mode — listen live + auto-transcribe simultaneously
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
-        <input type="checkbox" name="transcription_talk_post" <?= $t_talk_post?'checked':'' ?> <?= (!$t_enabled||!$whisper_ok)?'disabled':'' ?>>
+        <input type="checkbox" name="transcription_talk_post" <?= $t_talk_post?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
         Post summary to Talk after each transcription
       </label>
+
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;margin-top:4px">
+        <label style="color:#aaa;white-space:nowrap">Backend:</label>
+        <select name="transcription_backend" style="background:#0d0d1a;border:1px solid #2a2a4a;color:#ccc;border-radius:4px;padding:3px 8px;font-size:12px">
+          <option value="auto"           <?= $t_backend_pref==='auto'?'selected':'' ?>>Auto (best available)</option>
+          <option value="vosk"           <?= $t_backend_pref==='vosk'?'selected':'' ?>>vosk (always works, no AVX)</option>
+          <option value="faster-whisper" <?= $t_backend_pref==='faster-whisper'?'selected':'' ?> <?= !$cpu_avx?'disabled':'' ?>>faster-whisper (AVX required, more accurate)</option>
+        </select>
+        <span style="font-size:11px;color:#555">(override; Auto selects best installed backend)</span>
+      </div>
     </div>
 
-    <?php if ($whisper_ok && $t_enabled): ?>
+    <?php if ($any_backend_ok && $t_enabled): ?>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <button type="button" id="tx-now-btn" style="background:#1a2a3a;border:1px solid #2a5a7a;color:#7ad;border-radius:5px;padding:7px 16px;font-size:12px;cursor:pointer">🎙 Transcribe Now</button>
       <?php if ($last_tx): ?>
-      <span style="font-size:11px;color:#555">Last run: <?= date('M j H:i', $last_tx['ts'] ?? 0) ?></span>
+      <span style="font-size:11px;color:#555">Last run: <?= date('M j H:i', $last_tx['ts'] ?? 0) ?> via <?= esc($last_tx['backend'] ?? 'vosk') ?></span>
       <?php endif; ?>
     </div>
     <?php if ($last_tx): ?>
