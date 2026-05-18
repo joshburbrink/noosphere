@@ -64,6 +64,8 @@ if (get_setting('show_supplies','0')==='1' || get_setting('show_seeds','0')==='1
     $tiles[] = ['href'=>'/resources/', 'icon'=>'🗃️', 'label'=>'Resources', 'desc'=>'Supply inventory, seed library &amp; tool lending'];
 if (get_setting('show_triage','0')==='1')
     $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking — START triage priority, print patient tags'];
+if (get_setting('show_canvas','0')==='1')
+    $tiles[] = ['href'=>'/canvas/',  'icon'=>'🎨', 'label'=>'Canvas',     'desc'=>'Freehand drawing, diagrams &amp; annotated map sketches'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
