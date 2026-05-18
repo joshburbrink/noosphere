@@ -167,6 +167,70 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- Device status (AJAX — returns JSON for Devices panel) ---
+    if ($act === 'dev_status') {
+        header('Content-Type: application/json');
+        $lsusb = shell_exec('lsusb 2>/dev/null') ?? '';
+        // Known noosphere hardware USB IDs
+        $known = [
+            ['ids'=>['0bda:2832','0bda:2838','0413:6680','1209:2832','1554:5020','15f4:0131',
+                     '185b:0620','1b80:d3a4','1d19:1101','1d19:1102','1d19:1103',
+                     '1f4d:a803','1f4d:b803','1f4d:c803','1f4d:d286','1f4d:d803'],
+             'label'=>'RTL-SDR Dongle','icon'=>'📡','type'=>'sdr'],
+            ['ids'=>['0bda:0811','0bda:8812','0bda:a811','0bda:0812'],
+             'label'=>'USB WiFi (8812AU)','icon'=>'📶','type'=>'wifi'],
+            ['ids'=>['0b95:1790','0b95:178a'],
+             'label'=>'USB Ethernet (AX88179)','icon'=>'🔌','type'=>'eth'],
+            ['ids'=>['0403:6001','0403:6010','04d8:000a','067b:2303'],
+             'label'=>'Radio Programming Cable','icon'=>'🎙','type'=>'cable'],
+        ];
+        $detected = [];
+        foreach ($known as $dev) {
+            $present = false;
+            $matched_id = '';
+            foreach ($dev['ids'] as $id) {
+                if (stripos($lsusb, "ID $id") !== false) { $present = true; $matched_id = $id; break; }
+            }
+            $detected[] = ['label'=>$dev['label'],'icon'=>$dev['icon'],'type'=>$dev['type'],
+                           'present'=>$present,'id'=>$matched_id];
+        }
+        // RTL-SDR detailed status
+        $sdr_raw  = trim(shell_exec('/usr/local/bin/rtlsdr-detect.sh --verbose 2>&1') ?? '');
+        $sdr_ok   = (strpos($sdr_raw,'Status:    OK') !== false)
+                 || (strpos($sdr_raw,'IN USE') !== false && preg_match('/IN USE by PID \d+ \((?:rtl_fm|rtl_433|multimon)/',$sdr_raw));
+        $sdr_mode = get_setting('radio_mode','off');
+        // Service states
+        $svcs = ['noaa-weather','scanner-waterfall','hostapd','noosphere-rtl433','noosphere-aprs'];
+        $svc_states = [];
+        foreach ($svcs as $s) {
+            $svc_states[$s] = trim(shell_exec("systemctl is-active {$s}.service 2>/dev/null") ?? 'inactive');
+        }
+        // Alert count
+        $alert_count = 0; $latest_alert = '';
+        try {
+            $adb = new SQLite3('/var/lib/noosphere/weather/alerts.db', SQLITE3_OPEN_READONLY);
+            $alert_count = (int)($adb->querySingle('SELECT COUNT(*) FROM alerts') ?? 0);
+            $row = $adb->querySingle('SELECT event,received_at FROM alerts ORDER BY received_at DESC LIMIT 1', true);
+            if ($row) $latest_alert = ($row['event'] ?? '') . ' @ ' . date('M j H:i', $row['received_at'] ?? 0);
+            $adb->close();
+        } catch (Exception $e) {}
+        // Recent NWR log (last 15 lines via sdr-diag.sh which has sudo)
+        $log_raw   = shell_exec('sudo /usr/local/bin/sdr-diag.sh log noaa-weather 2>&1') ?? '';
+        $log_lines = array_slice(array_filter(explode("\n", $log_raw), fn($l)=>trim($l)!==''), -15);
+        echo json_encode([
+            'devices'     => $detected,
+            'sdr_raw'     => $sdr_raw,
+            'sdr_ok'      => $sdr_ok,
+            'sdr_mode'    => $sdr_mode,
+            'svc_states'  => $svc_states,
+            'alert_count' => $alert_count,
+            'latest_alert'=> $latest_alert,
+            'log'         => implode("\n", $log_lines),
+            'ts'          => time(),
+        ]);
+        exit;
+    }
+
     // --- Transcribe now (AJAX) ---
     if ($act === 'transcribe_now') {
         header('Content-Type: application/json');
@@ -1825,7 +1889,124 @@ if (!$usb_eths): ?>
     </div>
     <?php endif; ?>
   </div>
-</details></div><!-- #tab-network -->
+</details>
+
+<!-- Devices & Hardware -->
+<details class="cpanel" open>
+  <summary>📟 Devices &amp; Hardware
+    <span style="font-size:11px;color:#888;font-weight:normal">— USB hardware, service health, radio alerts</span>
+    <button type="button" id="dev-refresh-btn" onclick="devRefresh()" style="margin-left:12px;background:#0d0d1a;border:1px solid #2a2a4a;color:#7ad;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer">↺ Refresh</button>
+    <span id="dev-refresh-ts" style="font-size:10px;color:#444;margin-left:8px"></span>
+  </summary>
+  <div class="cpbody" id="dev-panel">
+    <div id="dev-loading" style="font-size:12px;color:#555;padding:8px 0">Loading…</div>
+  </div>
+</details>
+<script>
+(function(){
+  var csrf = '';
+  function getcsrf(){ return document.querySelector('[name=csrf_token]')?.value||''; }
+
+  function badge(ok, label){
+    var col = ok ? '#2ecc71' : '#e94560';
+    return '<span style="background:'+col+'22;border:1px solid '+col+'55;color:'+col+';border-radius:4px;padding:1px 7px;font-size:11px">'+label+'</span>';
+  }
+  function svcbadge(state){
+    if (state==='active') return badge(true,'active');
+    if (state==='activating') return '<span style="background:#f39c1222;border:1px solid #f39c1255;color:#f39c12;border-radius:4px;padding:1px 7px;font-size:11px">activating</span>';
+    return badge(false, state||'inactive');
+  }
+
+  window.devRefresh = function(){
+    document.getElementById('dev-loading') && (document.getElementById('dev-loading').style.display='block');
+    var fd = new FormData();
+    fd.append('act','dev_status');
+    fd.append('csrf_token', getcsrf());
+    fetch('', {method:'POST', body:fd})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ renderDevPanel(d); })
+      .catch(function(e){ var p=document.getElementById('dev-panel'); if(p) p.innerHTML='<div style="color:#e94560;font-size:12px">Error: '+e+'</div>'; });
+  };
+
+  function renderDevPanel(d){
+    var p = document.getElementById('dev-panel');
+    if (!p) return;
+    var h = '';
+
+    // USB device table
+    h += '<div style="margin-bottom:14px">';
+    h += '<div style="font-size:11px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">USB Hardware</div>';
+    h += '<table class="dtable"><thead><tr><th>Device</th><th>Status</th><th>USB ID</th></tr></thead><tbody>';
+    (d.devices||[]).forEach(function(dev){
+      var st='', extra='';
+      if (!dev.present) {
+        st = badge(false,'not connected');
+      } else if (dev.type==='sdr') {
+        if (d.sdr_ok) {
+          var mode_label = {off:'idle',nwr:'NWR',scanner:'scanner',rtl433:'rtl_433',aprs:'APRS'}[d.sdr_mode]||d.sdr_mode;
+          st = badge(true, 'OK — '+mode_label);
+        } else {
+          st = badge(false,'ERROR');
+        }
+        extra = ' <a href="javascript:void(0)" onclick="document.querySelector(\'.tab[onclick*=settings]\').click();document.getElementById(\'stab-modules-btn\').click();setTimeout(function(){document.querySelector(\'[data-act=sdr_diag_usb]\').scrollIntoView()},200)" style="font-size:10px;color:#4a9eff">→ SDR Radio</a>';
+      } else if (dev.type==='wifi') {
+        var ap_up = (d.svc_states||{})['hostapd']==='active';
+        st = badge(ap_up, ap_up?'AP active':'present');
+      } else if (dev.type==='eth') {
+        st = badge(true,'present');
+      } else {
+        st = badge(true,'present');
+      }
+      h += '<tr><td>'+dev.icon+' '+dev.label+'</td><td>'+st+extra+'</td><td style="color:#555;font-family:monospace;font-size:11px">'+dev.id+'</td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    // Service health
+    h += '<div style="margin-bottom:14px">';
+    h += '<div style="font-size:11px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Services</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">';
+    var svc_labels = {'noaa-weather':'NWR','scanner-waterfall':'Scanner','hostapd':'AP','noosphere-rtl433':'rtl_433','noosphere-aprs':'APRS'};
+    Object.entries(d.svc_states||{}).forEach(function(kv){
+      h += '<span style="font-family:monospace">'+svc_labels[kv[0]]||kv[0]+': '+svcbadge(kv[1])+'</span>';
+    });
+    h += '</div></div>';
+
+    // Alert summary
+    h += '<div style="margin-bottom:14px">';
+    h += '<div style="font-size:11px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">NWR Alerts (all-time)</div>';
+    h += '<span style="font-size:13px;color:#eee">'+d.alert_count+'</span>';
+    if (d.latest_alert) h += ' <span style="font-size:11px;color:#555">— latest: '+d.latest_alert+'</span>';
+    h += '</div>';
+
+    // SDR probe detail (collapsible)
+    if (d.sdr_raw) {
+      h += '<details style="margin-bottom:14px"><summary style="font-size:11px;color:#666;cursor:pointer">RTL-SDR probe detail</summary>';
+      h += '<pre style="font-size:11px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;margin-top:6px;white-space:pre-wrap;overflow-x:auto">'+d.sdr_raw+'</pre></details>';
+    }
+
+    // Log tail
+    h += '<div>';
+    h += '<div style="font-size:11px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">NWR Service Log <span style="color:#444">(last 15 lines)</span></div>';
+    h += '<pre style="font-size:10px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;max-height:180px;overflow-y:auto;white-space:pre-wrap">'+(d.log||'(no output)')+'</pre>';
+    h += '</div>';
+
+    // Timestamp
+    if (d.ts) {
+      var ts = new Date(d.ts*1000);
+      document.getElementById('dev-refresh-ts').textContent = 'Updated '+ts.toLocaleTimeString();
+    }
+    var loading = document.getElementById('dev-loading');
+    if (loading) loading.style.display='none';
+    p.innerHTML = h;
+  }
+
+  // Load on tab open + auto-refresh every 15s
+  devRefresh();
+  setInterval(devRefresh, 15000);
+})();
+</script>
+
+</div><!-- #tab-network -->
 
 <!-- CONTENT -->
 <div id="tab-content" class="tab-content">
