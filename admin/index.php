@@ -1,5 +1,6 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
+require_once '/var/www/noosphere/shared/audit.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
 
@@ -59,16 +60,20 @@ if ($stored_hash ? password_verify($pw, $stored_hash) : ($pw === ADMIN_PASS)) {
         $_SESSION['admin']      = true;
         $_SESSION['admin_name'] = '(bootstrap)';
         rate_reset('admin_login');
+        log_audit('login_ok', 'bootstrap password', 'info');
     } elseif ($name) {
         $row = verify_pin($name, $pw, true);
         if ($row) {
             $_SESSION['admin']      = true;
             $_SESSION['admin_name'] = $row['name'];
+            log_audit('login_ok', $row['name'], 'info');
         } else {
             $error = 'Incorrect credentials or insufficient privileges.';
+            log_audit('login_fail', 'name: ' . ($name ?: '(blank)'), 'warn');
         }
     } else {
         $error = 'Incorrect password.';
+        log_audit('login_fail', 'wrong password', 'warn');
     }
 }
 
@@ -176,6 +181,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Ban user ---
     if ($act === 'ban') {
+        log_audit('ban', 'id=' . (int)($_POST['id']??0) . ' name=' . trim($_POST['ban_name']??''), 'warn');
         $ban_name   = trim($_POST['ban_name'] ?? '');
         $ban_ip     = trim($_POST['ban_ip']   ?? '');
         $ban_reason = trim($_POST['ban_reason'] ?? '');
@@ -187,12 +193,14 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Remove ban ---
     if ($act === 'unban') {
+        log_audit('unban', 'id=' . (int)($_POST['id']??0), 'info');
         remove_ban((int)($_POST['ban_id'] ?? 0));
         $msg = 'Ban removed.';
     }
 
     // --- Delete registry entry ---
     if ($act === 'del_registry') {
+        log_audit('del_registry', 'id=' . (int)($_POST['id']??0), 'warn');
         $uid = (int)($_POST['uid'] ?? 0);
         $rdb = new SQLite3(REGISTRY_DB);
         $row = $rdb->querySingle("SELECT photo FROM registry WHERE id=$uid", true);
@@ -208,6 +216,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Delete forum thread ---
     if ($act === 'del_thread') {
+        log_audit('del_thread', 'id=' . (int)($_POST['id']??0), 'warn');
         $tid = (int)($_POST['tid'] ?? 0);
         $fdb = new PDO('sqlite:' . FORUM_DB);
         $fdb->prepare('DELETE FROM posts WHERE thread_id=?')->execute([$tid]);
@@ -217,6 +226,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Delete forum post ---
     if ($act === 'del_post') {
+        log_audit('del_post', 'id=' . (int)($_POST['id']??0), 'warn');
         $pid = (int)($_POST['pid'] ?? 0);
         $fdb = new PDO('sqlite:' . FORUM_DB);
         $fdb->prepare('DELETE FROM posts WHERE id=?')->execute([$pid]);
@@ -225,6 +235,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Delete file ---
     if ($act === 'del_file') {
+        log_audit('del_file', trim($_POST['fname']??''), 'warn');
         $fname = $_POST['fname'] ?? '';
         $path  = realpath(FILES_DIR . $fname);
         if ($path && strpos($path, realpath(FILES_DIR)) === 0 && file_exists($path)) {
@@ -263,6 +274,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Calendar: approve submission ---
     if ($act === 'approve_event') {
+        log_audit('approve_event', 'id=' . (int)($_POST['id']??0), 'info');
         $eid = (int)($_POST['eid'] ?? 0);
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->prepare("UPDATE events SET status='approved' WHERE id=?")->execute([$eid]);
@@ -271,6 +283,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Calendar: reject submission ---
     if ($act === 'reject_event') {
+        log_audit('reject_event', 'id=' . (int)($_POST['id']??0), 'info');
         $eid = (int)($_POST['eid'] ?? 0);
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->prepare('DELETE FROM events WHERE id=?')->execute([$eid]);
@@ -279,6 +292,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- External drive: mount ---
     if ($act === 'ext_mount') {
+        log_audit('ext_mount', trim($_POST['ext_device']??''), 'info');
         $dev = $_POST['ext_device'] ?? '';
         if (!preg_match('#^/dev/(sd[b-z][0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$#', $dev)) {
             $msg = 'Invalid device.';
@@ -297,6 +311,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- External drive: unmount ---
     if ($act === 'ext_umount') {
+        log_audit('ext_umount', '', 'info');
         // Unregister any loaded external ZIMs from Kiwix library first
         $ext_zims = json_decode(get_setting('ext_zims_loaded','[]'), true) ?: [];
         $xml = @simplexml_load_file('/var/lib/kiwix/library.xml');
@@ -392,6 +407,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Change admin password ---
     if ($act === 'change_password') {
+        log_audit('change_password', '', 'warn');
         $cur = $_POST['cur_pw'] ?? '';
         $new = $_POST['new_pw'] ?? '';
         $con = $_POST['con_pw'] ?? '';
@@ -411,6 +427,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Calendar: delete event ---
     if ($act === 'del_event') {
+        log_audit('del_event', 'id=' . (int)($_POST['id']??0), 'warn');
         $eid = (int)($_POST['eid'] ?? 0);
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->prepare('DELETE FROM events WHERE id=?')->execute([$eid]);
@@ -419,6 +436,8 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Kiwix: toggle ZIM module ---
     if ($act === 'kiwix_toggle') {
+        $zt = trim($_POST['zim']??''); $en = ($_POST['enable']??'0')==='1';
+        log_audit('kiwix_toggle', ($en?'enable':'disable').': '.$zt, 'info');
         $zim    = $_POST['zim'] ?? '';
         $enable = ($_POST['enable'] ?? '0') === '1';
         if (!preg_match('/^[a-zA-Z0-9._\-]+\.zim$/', $zim)) {
@@ -453,6 +472,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Settings: apply quick-start preset ---
     if ($act === 'apply_preset') {
+        log_audit('apply_preset', trim($_POST['preset']??''), 'info');
         $preset = $_POST['preset'] ?? '';
         $presets = get_presets();
         if (apply_preset($preset)) {
@@ -463,6 +483,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Settings: save all settings ---
     if ($act === 'save_settings') {
+        log_audit('save_settings', count($_POST) . ' fields submitted', 'info');
         $text_keys = ['instance_name','instance_tagline','homepage_alert',
                       'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
                       'tasks_categories','tasks_auto_close_hours',
@@ -570,6 +591,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Post announcement to forum ---
     if ($act === 'post_announcement') {
+        log_audit('post_announcement', trim($_POST['subject']??''), 'info');
         $ann_title = trim($_POST['ann_title'] ?? '');
         $ann_body  = trim($_POST['ann_body']  ?? '');
         if ($ann_title && $ann_body) {
@@ -590,6 +612,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Broadcast message to chat ---
     if ($act === 'broadcast_chat') {
+        log_audit('broadcast_chat', mb_substr(trim($_POST['body']??''),0,80), 'info');
         $bcast = trim($_POST['broadcast_body'] ?? '');
         if ($bcast && mb_strlen($bcast) <= 1000) {
             try {
@@ -605,6 +628,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Delete registry photo ---
     if ($act === 'del_photo') {
+        log_audit('del_photo', trim($_POST['fname']??''), 'warn');
         $fname = basename($_POST['fname'] ?? '');
         $path  = realpath(PHOTOS_DIR . $fname);
         if ($path && strpos($path, realpath(PHOTOS_DIR)) === 0 && file_exists($path)) {
@@ -648,6 +672,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'reset_instance') {
         $confirm = trim($_POST['reset_confirm'] ?? '');
         if ($confirm === 'RESET') {
+            log_audit('reset_instance', 'INSTANCE RESET — all user data wiped', 'critical');
             // Wipe all user data, preserve settings DB
             $dbs_to_clear = [
                 '/var/lib/noosphere/registry.db' => ['registry'],
@@ -1981,6 +2006,36 @@ if (!$usb_eths): ?>
       <button type="submit" class="btn-green" style="padding:8px 22px;font-size:13px">Download Backup (.zip)</button>
     </form>
     <div style="font-size:11px;color:#555;margin-top:8px">Backup does not include uploaded files or ZIM libraries — copy those manually.</div>
+  </div>
+</details>
+
+
+<details class="cpanel">
+  <summary>Audit Log</summary>
+  <div class="cpbody">
+    <div style="font-size:11px;color:#555;margin-bottom:10px">Last 200 admin actions. Read-only. Stored in <code>audit.db</code>.</div>
+    <?php $audit_rows = get_audit_log(200); ?>
+    <?php if (!$audit_rows): ?>
+      <div style="color:#333;font-size:13px">No audit entries yet.</div>
+    <?php else: ?>
+    <table class="dtable" style="font-size:12px">
+      <thead><tr><th>Time</th><th>Actor</th><th>IP</th><th>Action</th><th>Detail</th></tr></thead>
+      <tbody>
+      <?php foreach ($audit_rows as $a):
+        $sev_color = $a['severity'] === 'critical' ? '#e94560' : ($a['severity'] === 'warn' ? '#f39c12' : '#555');
+      ?>
+      <tr>
+        <td style="white-space:nowrap;color:#555"><?= date('m/d H:i:s', $a['ts']) ?></td>
+        <td style="color:#aaa"><?= esc($a['actor']) ?></td>
+        <td style="color:#444;font-size:11px"><?= esc($a['ip'] ?? '') ?></td>
+        <td style="color:<?= $sev_color ?>;font-family:monospace"><?= esc($a['action']) ?></td>
+        <td style="color:#666;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= esc($a['detail'] ?? '') ?></td>
+      </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <div style="font-size:11px;color:#333;margin-top:8px"><?= count($audit_rows) ?> entries shown</div>
+    <?php endif; ?>
   </div>
 </details>
 
