@@ -1,0 +1,165 @@
+/*
+ * Noosphere Theme System
+ * Variables used throughout the UI. Each theme overrides the root set.
+ * Apply by setting data-theme="<name>" on <html>.
+ */
+
+:root,
+[data-theme="dark"] {
+  --bg:           #1a1a2e;
+  --bg-card:      #16213e;
+  --bg-deep:      #0f0f1a;
+  --bg-input:     #0d0d1a;
+  --border:       #2a2a4a;
+  --border-hi:    #4a4a6a;
+  --accent:       #e94560;
+  --accent2:      #4a9eff;
+  --text:         #eee;
+  --text-muted:   #aaa;
+  --text-dim:     #555;
+  --success:      #2ecc71;
+  --warning:      #f39c12;
+  --danger:       #e74c3c;
+  --tile-bg:      #16213e;
+  --tile-border:  #e94560;
+  --tile-hover:   #e94560;
+  --admin-link:   #333;
+}
+
+[data-theme="darker"] {
+  --bg:           #000000;
+  --bg-card:      #0a0a0a;
+  --bg-deep:      #000000;
+  --bg-input:     #0d0d0d;
+  --border:       #1a1a1a;
+  --border-hi:    #333333;
+  --accent:       #e94560;
+  --accent2:      #4a9eff;
+  --text:         #ffffff;
+  --text-muted:   #bbb;
+  --text-dim:     #444;
+  --success:      #2ecc71;
+  --warning:      #f39c12;
+  --danger:       #e74c3c;
+  --tile-bg:      #0a0a0a;
+  --tile-border:  #e94560;
+  --tile-hover:   #e94560;
+  --admin-link:   #333;
+}
+
+[data-theme="light"] {
+  --bg:           #f0f2f5;
+  --bg-card:      #ffffff;
+  --bg-deep:      #e4e8ee;
+  --bg-input:     #ffffff;
+  --border:       #d0d5dd;
+  --border-hi:    #a0a8b8;
+  --accent:       #1a6fd4;
+  --accent2:      #0a4fa0;
+  --text:         #1a1a2e;
+  --text-muted:   #555;
+  --text-dim:     #999;
+  --success:      #27ae60;
+  --warning:      #e67e22;
+  --danger:       #c0392b;
+  --tile-bg:      #ffffff;
+  --tile-border:  #1a6fd4;
+  --tile-hover:   #1a6fd4;
+  --admin-link:   #aaa;
+}
+
+[data-theme="high-contrast"] {
+  --bg:           #000000;
+  --bg-card:      #000000;
+  --bg-deep:      #000000;
+  --bg-input:     #000000;
+  --border:       #ffffff;
+  --border-hi:    #ffff00;
+  --accent:       #ffff00;
+  --accent2:      #00ffff;
+  --text:         #ffffff;
+  --text-muted:   #dddddd;
+  --text-dim:     #aaaaaa;
+  --success:      #00ff00;
+  --warning:      #ffaa00;
+  --danger:       #ff4444;
+  --tile-bg:      #000000;
+  --tile-border:  #ffff00;
+  --tile-hover:   #ffff00;
+  --admin-link:   #888;
+}
+
+[data-theme="forest"] {
+  --bg:           #0d1a0d;
+  --bg-card:      #112211;
+  --bg-deep:      #080f08;
+  --bg-input:     #0a140a;
+  --border:       #1e3a1e;
+  --border-hi:    #2e5a2e;
+  --accent:       #4caf50;
+  --accent2:      #81c784;
+  --text:         #e8f5e9;
+  --text-muted:   #a5d6a7;
+  --text-dim:     #4a6a4a;
+  --success:      #66bb6a;
+  --warning:      #ffa726;
+  --danger:       #ef5350;
+  --tile-bg:      #112211;
+  --tile-border:  #4caf50;
+  --tile-hover:   #4caf50;
+  --admin-link:   #2e5a2e;
+}
+
+[data-theme="amber"] {
+  --bg:           #1a0e00;
+  --bg-card:      #211500;
+  --bg-deep:      #100900;
+  --bg-input:     #150c00;
+  --border:       #3a2200;
+  --border-hi:    #5a3a00;
+  --accent:       #ff8c00;
+  --accent2:      #ffb347;
+  --text:         #ffe8b0;
+  --text-muted:   #cc9900;
+  --text-dim:     #664400;
+  --success:      #c8a800;
+  --warning:      #ff6600;
+  --danger:       #cc2200;
+  --tile-bg:      #211500;
+  --tile-border:  #ff8c00;
+  --tile-hover:   #ff8c00;
+  --admin-link:   #3a2200;
+}
+
+/* Theme picker widget — injected on every page */
+#ns-theme-bar {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  background: var(--bg-card, #16213e);
+  border: 1px solid var(--border, #2a2a4a);
+  border-radius: 20px;
+  padding: 5px 10px;
+  z-index: 9999;
+  opacity: 0.5;
+  transition: opacity .2s;
+}
+#ns-theme-bar:hover { opacity: 1; }
+.ns-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform .15s, border-color .15s;
+}
+.ns-swatch:hover, .ns-swatch.active { transform: scale(1.3); border-color: var(--text, #eee); }
+.ns-swatch[data-t="dark"]          { background: #1a1a2e; }
+.ns-swatch[data-t="darker"]        { background: #000; }
+.ns-swatch[data-t="light"]         { background: #f0f2f5; }
+.ns-swatch[data-t="high-contrast"] { background: #ffff00; }
+.ns-swatch[data-t="forest"]        { background: #4caf50; }
+.ns-swatch[data-t="amber"]         { background: #ff8c00; }

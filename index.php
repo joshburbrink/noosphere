@@ -71,16 +71,17 @@ if (get_setting('show_triage','0')==='1')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($name) ?></title>
+    <?php require_once '/var/www/noosphere/shared/head.php'; ?>
     <style>
         * { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
-        .alert { background:#3a0a0a; border:2px solid #e94560; color:#e94560; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:2rem; text-align:center; max-width:700px; width:100%; }
+        body { font-family:sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
+        .alert { background:color-mix(in srgb, var(--accent) 15%, transparent); border:2px solid var(--accent); color:var(--accent); padding:12px 24px; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:2rem; text-align:center; max-width:700px; width:100%; }
         .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; width:100%; max-width:1100px; }
-        a.tile { display:block; background:#16213e; border:1px solid #e94560; border-radius:12px; padding:2rem; text-align:center; text-decoration:none; color:#eee; transition:0.2s; }
-        a.tile:hover { background:#e94560; transform:translateY(-3px); }
+        a.tile { display:block; background:var(--tile-bg); border:1px solid var(--tile-border); border-radius:12px; padding:2rem; text-align:center; text-decoration:none; color:var(--text); transition:0.2s; }
+        a.tile:hover { background:var(--tile-hover); transform:translateY(-3px); }
         .icon { font-size:2.5rem; margin-bottom:0.75rem; }
         .label { font-size:1.1rem; font-weight:bold; }
-        .desc { font-size:0.85rem; color:#aaa; margin-top:0.4rem; }
+        .desc { font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem; }
         a.tile:hover .desc { color:#fff; }
     </style>
 </head>
@@ -98,7 +99,7 @@ if (get_setting('show_triage','0')==='1')
         <?php endforeach; ?>
     </div>
     <div style="margin-top:2.5rem">
-        <a href="/admin/" style="font-size:12px;color:#333;text-decoration:none;padding:6px 14px;border:1px solid #333;border-radius:5px;transition:.15s" onmouseover="this.style.color='#e94560';this.style.borderColor='#e94560'" onmouseout="this.style.color='#333';this.style.borderColor='#333'">Admin</a>
+        <a href="/admin/" style="font-size:12px;color:var(--admin-link);text-decoration:none;padding:6px 14px;border:1px solid var(--admin-link);border-radius:5px;transition:.15s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'" onmouseout="this.style.color='';this.style.borderColor=''">Admin</a>
     </div>
 <script>
 (function(){

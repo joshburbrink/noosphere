@@ -563,11 +563,11 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                       'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
                       'tasks_categories','tasks_auto_close_hours',
                       'radio_freq','radio_gain','radio_ppm','radio_same_fips',
-                      'transcription_backend'];
+                      'transcription_backend','theme_default'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
-        $toggle_keys = ['transcription_enabled','transcription_nwr_auto','transcription_nwr_hybrid','transcription_talk_post','transcription_radio_log',
+        $toggle_keys = ['transcription_enabled','transcription_nwr_auto','transcription_nwr_hybrid','transcription_talk_post','transcription_radio_log','theme_allow_user_override',
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
@@ -843,6 +843,7 @@ $scripts = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin — Noosphere</title>
+<?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; }
@@ -2345,6 +2346,53 @@ if (!$usb_eths): ?>
 <div style="margin:16px 0">
   <button type="submit" class="btn">Save</button>
 </div>
+
+<!-- Theme -->
+<?php
+$_cur_theme   = get_setting('theme_default','dark');
+$_theme_override = get_setting('theme_allow_user_override','1') === '1';
+$_themes = [
+  'dark'          => ['label'=>'Dark (default)',          'swatch'=>'#1a1a2e'],
+  'darker'        => ['label'=>'Darker / OLED',           'swatch'=>'#000'],
+  'light'         => ['label'=>'Light',                   'swatch'=>'#f0f2f5'],
+  'high-contrast' => ['label'=>'High Contrast',           'swatch'=>'#ffff00'],
+  'forest'        => ['label'=>'Forest',                  'swatch'=>'#4caf50'],
+  'amber'         => ['label'=>'Amber / Night Vision',    'swatch'=>'#ff8c00'],
+];
+?>
+<div class="identity-section" style="margin-top:12px">
+  <h3>Theme</h3>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+    <label style="font-size:13px;color:#aaa;white-space:nowrap">Instance default:</label>
+    <select name="theme_default" id="theme-default-select" style="background:var(--bg-input,#0d0d1a);border:1px solid var(--border,#2a2a4a);color:var(--text,#eee);border-radius:4px;padding:5px 10px;font-size:13px">
+      <?php foreach ($_themes as $k => $th): ?>
+      <option value="<?= $k ?>" <?= $_cur_theme===$k?'selected':'' ?>><?= htmlspecialchars($th['label']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <div style="display:flex;gap:6px;align-items:center">
+      <?php foreach ($_themes as $k => $th): ?>
+      <span title="<?= htmlspecialchars($th['label']) ?>"
+            onclick="document.getElementById('theme-default-select').value='<?= $k ?>'; document.documentElement.setAttribute('data-theme','<?= $k ?>'); document.querySelectorAll('.ns-swatch').forEach(function(s){s.classList.toggle('active',s.dataset.t==='<?= $k ?>')})"
+            style="width:18px;height:18px;border-radius:50%;background:<?= $th['swatch'] ?>;cursor:pointer;border:2px solid <?= $_cur_theme===$k?'#eee':'transparent' ?>;display:inline-block;transition:.15s"
+            class="theme-preview-dot"></span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#ccc">
+    <input type="checkbox" name="theme_allow_user_override" <?= $_theme_override?'checked':'' ?>>
+    Allow users to override theme locally (via the theme picker bar on each page)
+  </label>
+  <div style="font-size:11px;color:#555;margin-top:6px">The theme picker appears as a small floating bar on every page. Disable to lock everyone to the instance default.</div>
+</div>
+<script>
+document.getElementById('theme-default-select').addEventListener('change', function(){
+  document.documentElement.setAttribute('data-theme', this.value);
+  document.querySelectorAll('.ns-swatch').forEach(function(s){
+    s.classList.toggle('active', s.dataset.t === document.documentElement.getAttribute('data-theme'));
+  });
+});
+</script>
+
 </div><!-- #stab-configure -->
 
 <!-- ── MODULES ───────────────────────────────────────────────────────────── -->
