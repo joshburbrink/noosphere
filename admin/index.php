@@ -567,7 +567,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
-        $toggle_keys = ['transcription_enabled','transcription_nwr_auto','transcription_nwr_hybrid','transcription_talk_post',
+        $toggle_keys = ['transcription_enabled','transcription_nwr_auto','transcription_nwr_hybrid','transcription_talk_post','transcription_radio_log',
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
@@ -2778,6 +2778,7 @@ $t_enabled     = get_setting('transcription_enabled','0') === '1';
 $t_nwr_auto    = get_setting('transcription_nwr_auto','0') === '1';
 $t_nwr_hybrid  = get_setting('transcription_nwr_hybrid','0') === '1';
 $t_talk_post   = get_setting('transcription_talk_post','0') === '1';
+$t_radio_log   = get_setting('transcription_radio_log','0') === '1';
 $t_backend_pref = get_setting('transcription_backend','auto');
 
 // CPU capability
@@ -2865,6 +2866,10 @@ if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), t
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
         <input type="checkbox" name="transcription_talk_post" <?= $t_talk_post?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
         Post summary to Talk after each transcription
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
+        <input type="checkbox" name="transcription_radio_log" <?= $t_radio_log?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
+        Auto-transcribe scanner radio captures <span style="font-size:11px;color:#555">(#59 — backend coming soon)</span>
       </label>
 
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;margin-top:4px">
