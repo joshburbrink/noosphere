@@ -8,6 +8,7 @@ $is_readonly = is_readonly();
 $aprs_active   = (get_setting('radio_mode','off') === 'aprs');
 $incidents_active = (get_setting('show_incidents','0') === '1');
 $incidents_command = (get_setting('show_incidents_command','0') === '1');
+$runners_active    = (get_setting('show_runners','1') === '1');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,6 +84,9 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <?php if ($incidents_active): ?>
   <button class="theme-btn" id="btn-incidents" onclick="toggleIncidents()" title="Toggle incident / map-report pins">Incidents</button>
 <?php endif; ?>
+<?php if ($runners_active): ?>
+  <button class="theme-btn" id="btn-runners" onclick="toggleRunners()" title="Toggle runner destination pins">Runners</button>
+<?php endif; ?>
 <?php if ($aprs_active): ?>
   <button class="theme-btn" id="btn-aprs" onclick="toggleAprs()" title="Toggle APRS station markers">APRS</button>
 <?php endif; ?>
@@ -131,6 +135,7 @@ var IS_READONLY = <?= $is_readonly ? 'true' : 'false' ?>;
 var APRS_ACTIVE   = <?= $aprs_active   ? 'true' : 'false' ?>;
 var INCIDENTS_ACTIVE  = <?= $incidents_active  ? 'true' : 'false' ?>;
 var INCIDENTS_COMMAND = <?= $incidents_command ? 'true' : 'false' ?>;
+var RUNNERS_ACTIVE    = <?= $runners_active ? 'true' : 'false' ?>;
 
 var THEMES = {
     dark: {
@@ -462,6 +467,82 @@ function toggleIncidents() {
 
 // Auto-show incidents layer if module is enabled — pins are the primary map content now.
 if (INCIDENTS_ACTIVE) { toggleIncidents(); }
+
+// ── Runner layer ─────────────────────────────────────────────────────────────
+var runnerMarkers = {};
+var runnersVisible = false;
+var runnersTimer   = null;
+
+function runnerPopup(r) {
+  var now  = Math.floor(Date.now() / 1000);
+  var dep  = Math.floor((now - r.departed_at) / 60);
+  var eta  = '';
+  if (r.expected_at) {
+    var diff = r.expected_at - now;
+    eta = diff < 0
+      ? '<div style="color:#e94560;font-weight:bold;margin-top:3px">&#9888; Overdue ' + Math.floor(-diff/60) + 'm</div>'
+      : '<div style="color:#aaa;font-size:12px;margin-top:2px">ETA in ' + Math.floor(diff/60) + 'm (' + new Date(r.expected_at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ')</div>';
+  }
+  return '<div style="min-width:150px">' +
+    '<b style="font-size:14px">&#127939; ' + esc(r.name) + '</b>' +
+    '<div style="color:#4a9eff;margin-top:3px">' + esc(r.destination) + '</div>' +
+    '<div style="color:#aaa;font-size:12px;margin-top:2px">Out ' + dep + 'm</div>' +
+    eta +
+    (r.notes ? '<div style="color:#888;font-size:12px;margin-top:3px">' + esc(r.notes) + '</div>' : '') +
+    '</div>';
+}
+
+function loadRunners() {
+  if (!runnersVisible) return;
+  fetch('/runners/api.php')
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      var seen = {};
+      rows.forEach(function(r) {
+        seen[r.id] = true;
+        if (runnerMarkers[r.id]) {
+          runnerMarkers[r.id]._popup.setHTML(runnerPopup(r));
+          return;
+        }
+        var el = document.createElement('div');
+        el.style.cssText = 'width:30px;height:30px;border-radius:50%;background:#f39c12;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.6)';
+        el.textContent = '\uD83C\uDFC3';
+        var popup = new maplibregl.Popup({ offset: 18 }).setHTML(runnerPopup(r));
+        el.addEventListener('click', function(e) {
+          e.stopPropagation();
+          popup.isOpen() ? popup.remove() : popup.setLngLat([r.lng, r.lat]).addTo(map);
+        });
+        var mk = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([r.lng, r.lat]).addTo(map);
+        mk._popup = popup;
+        runnerMarkers[r.id] = mk;
+      });
+      Object.keys(runnerMarkers).forEach(function(id) {
+        if (!seen[id]) { runnerMarkers[id]._popup.remove(); runnerMarkers[id].remove(); delete runnerMarkers[id]; }
+      });
+    })
+    .catch(function(e) { console.warn('runners poll failed:', e); });
+}
+
+function clearRunners() {
+  Object.values(runnerMarkers).forEach(function(mk) { mk._popup.remove(); mk.remove(); });
+  runnerMarkers = {};
+}
+
+function toggleRunners() {
+  runnersVisible = !runnersVisible;
+  var btn = document.getElementById('btn-runners');
+  if (btn) btn.classList.toggle('active', runnersVisible);
+  if (runnersVisible) {
+    loadRunners();
+    if (!runnersTimer) runnersTimer = setInterval(loadRunners, 30000);
+  } else {
+    clearRunners();
+    if (runnersTimer) { clearInterval(runnersTimer); runnersTimer = null; }
+  }
+}
+
+if (RUNNERS_ACTIVE) { toggleRunners(); }
 
 // ── APRS layer ─────────────────────────────────────────────────────────────────
 var aprsMarkers = {};

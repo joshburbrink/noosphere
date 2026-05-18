@@ -21,6 +21,8 @@ $db->exec("CREATE TABLE IF NOT EXISTS runners (
     logged_by    TEXT,
     created_at   INTEGER NOT NULL
 )");
+@$db->exec("ALTER TABLE runners ADD COLUMN dest_lat REAL");
+@$db->exec("ALTER TABLE runners ADD COLUMN dest_lng REAL");
 
 $msg = ''; $error = '';
 
@@ -33,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $destination = trim($_POST['destination'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
         $by          = trim($_POST['logged_by'] ?? '') ?: ($is_admin ? 'Operator' : 'Volunteer');
+        $dest_lat    = isset($_POST['dest_lat']) && $_POST['dest_lat'] !== '' ? (float)$_POST['dest_lat'] : null;
+        $dest_lng    = isset($_POST['dest_lng']) && $_POST['dest_lng'] !== '' ? (float)$_POST['dest_lng'] : null;
 
         // Parse expected return — offset in minutes from now, or blank
         $expected_min = (int)($_POST['expected_min'] ?? 0);
@@ -47,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         elseif (!$destination) { $error = 'Destination is required.'; }
         else {
             $now = time();
-            $s = $db->prepare("INSERT INTO runners (name,destination,departed_at,expected_at,notes,status,logged_by,created_at)
-                               VALUES (?,?,?,?,?,'out',?,?)");
+            $s = $db->prepare("INSERT INTO runners (name,destination,departed_at,expected_at,notes,status,logged_by,created_at,dest_lat,dest_lng)
+                               VALUES (?,?,?,?,?,'out',?,?,?,?)");
             $s->bindValue(1, $name, SQLITE3_TEXT);
             $s->bindValue(2, $destination, SQLITE3_TEXT);
             $s->bindValue(3, $departed_at, SQLITE3_INTEGER);
@@ -56,6 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             $s->bindValue(5, $notes ?: null, $notes ? SQLITE3_TEXT : SQLITE3_NULL);
             $s->bindValue(6, $by, SQLITE3_TEXT);
             $s->bindValue(7, $now, SQLITE3_INTEGER);
+            $s->bindValue(8, $dest_lat, $dest_lat !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
+            $s->bindValue(9, $dest_lng, $dest_lng !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
             $s->execute();
             $msg = htmlspecialchars($name) . ' logged out.';
         }
@@ -79,6 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $destination = trim($_POST['destination'] ?? '');
         $notes       = trim($_POST['notes'] ?? '');
         $expected_min = (int)($_POST['expected_min'] ?? 0);
+        $dest_lat    = isset($_POST['dest_lat']) && $_POST['dest_lat'] !== '' ? (float)$_POST['dest_lat'] : null;
+        $dest_lng    = isset($_POST['dest_lng']) && $_POST['dest_lng'] !== '' ? (float)$_POST['dest_lng'] : null;
 
         $row = $id ? $db->querySingle("SELECT departed_at FROM runners WHERE id=$id", true) : null;
         $expected_at = $expected_min > 0 && $row
@@ -86,12 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             : null;
 
         if ($id && $name && $destination) {
-            $s = $db->prepare("UPDATE runners SET name=?,destination=?,expected_at=?,notes=? WHERE id=?");
+            $s = $db->prepare("UPDATE runners SET name=?,destination=?,expected_at=?,notes=?,dest_lat=?,dest_lng=? WHERE id=?");
             $s->bindValue(1, $name, SQLITE3_TEXT);
             $s->bindValue(2, $destination, SQLITE3_TEXT);
             $s->bindValue(3, $expected_at, $expected_at ? SQLITE3_INTEGER : SQLITE3_NULL);
             $s->bindValue(4, $notes ?: null, $notes ? SQLITE3_TEXT : SQLITE3_NULL);
-            $s->bindValue(5, $id, SQLITE3_INTEGER);
+            $s->bindValue(5, $dest_lat, $dest_lat !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
+            $s->bindValue(6, $dest_lng, $dest_lng !== null ? SQLITE3_FLOAT : SQLITE3_NULL);
+            $s->bindValue(7, $id, SQLITE3_INTEGER);
             $s->execute();
             $msg = 'Entry updated.';
         }
@@ -152,6 +162,8 @@ function expected_label($row) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= htmlspecialchars($label) ?> — <?= htmlspecialchars($name_setting) ?></title>
 <?= csrf_js() ?>
+<link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
+<script src="/maps/lib/maplibre-gl.js"></script>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; display:flex; flex-direction:column; }
@@ -255,7 +267,7 @@ if ($overdue):
   ?>
     <tr class="<?= $is_overdue ? 'overdue' : '' ?>">
       <td class="name-cell"><?= htmlspecialchars($r['name']) ?></td>
-      <td class="dest-cell"><?= htmlspecialchars($r['destination']) ?></td>
+      <td class="dest-cell"><?= htmlspecialchars($r['destination']) ?><?php if (!empty($r['dest_lat']) && !empty($r['dest_lng'])): ?> <a href="/maps/" title="Destination pinned" style="text-decoration:none">📍</a><?php endif ?></td>
       <td class="time-cell"><?= date('H:i', $r['departed_at']) ?> <span style="color:#555">(<?= $dep_ago ?> ago)</span></td>
       <td class="time-cell"><?= expected_label($r) ?></td>
       <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
@@ -308,7 +320,7 @@ if ($overdue):
     <?php foreach ($returned as $r): ?>
       <tr>
         <td class="name-cell"><?= htmlspecialchars($r['name']) ?></td>
-        <td class="dest-cell"><?= htmlspecialchars($r['destination']) ?></td>
+        <td class="dest-cell"><?= htmlspecialchars($r['destination']) ?><?php if (!empty($r['dest_lat']) && !empty($r['dest_lng'])): ?> 📍<?php endif ?></td>
         <td class="time-cell"><?= date('H:i', $r['departed_at']) ?></td>
         <td class="time-cell" style="color:#2ecc71"><?= $r['returned_at'] ? date('H:i', $r['returned_at']) : '—' ?></td>
         <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
@@ -362,6 +374,18 @@ if ($overdue):
       <label>Logged by</label>
       <input type="text" name="logged_by" value="<?= htmlspecialchars($_SESSION['reg_name'] ?? '') ?>"
              placeholder="Your name" maxlength="60">
+      <input type="hidden" name="dest_lat" id="dest_lat_log">
+      <input type="hidden" name="dest_lng" id="dest_lng_log">
+      <div id="pin-toggle-log" onclick="initPickerMap('log')" style="margin-top:10px;cursor:pointer;background:#0f0f1a;border:1px dashed #2a2a4a;border-radius:5px;padding:5px 10px;font-size:12px;color:#666;text-align:center">
+        📍 Set destination pin on map (optional)
+      </div>
+      <div id="pin-wrap-log" style="display:none">
+        <div id="pin-map-log" style="height:180px;border-radius:5px;overflow:hidden;margin-top:6px;border:1px solid #2a2a4a"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
+          <span id="pin-coords-log" style="font-size:11px;color:#888">Tap map to place pin</span>
+          <button type="button" onclick="clearPin('log')" style="font-size:11px;color:#e94560;background:none;border:none;cursor:pointer">✕ Clear</button>
+        </div>
+      </div>
       <div class="modal-btns">
         <button type="submit" class="btn-red">Log Out</button>
         <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
@@ -399,6 +423,18 @@ if ($overdue):
       </select>
       <label>Notes</label>
       <textarea name="notes" id="edit-notes"></textarea>
+      <input type="hidden" name="dest_lat" id="dest_lat_edit">
+      <input type="hidden" name="dest_lng" id="dest_lng_edit">
+      <div id="pin-toggle-edit" onclick="initPickerMap('edit')" style="margin-top:10px;cursor:pointer;background:#0f0f1a;border:1px dashed #2a2a4a;border-radius:5px;padding:5px 10px;font-size:12px;color:#666;text-align:center">
+        📍 Set destination pin on map (optional)
+      </div>
+      <div id="pin-wrap-edit" style="display:none">
+        <div id="pin-map-edit" style="height:180px;border-radius:5px;overflow:hidden;margin-top:6px;border:1px solid #2a2a4a"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
+          <span id="pin-coords-edit" style="font-size:11px;color:#888">Tap map to place pin</span>
+          <button type="button" onclick="clearPin('edit')" style="font-size:11px;color:#e94560;background:none;border:none;cursor:pointer">✕ Clear</button>
+        </div>
+      </div>
       <div class="modal-btns">
         <button type="submit" class="btn-red">Save</button>
         <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
@@ -418,6 +454,20 @@ function openEdit(id, row) {
   document.getElementById('edit-name').value        = row.name;
   document.getElementById('edit-destination').value = row.destination;
   document.getElementById('edit-notes').value       = row.notes || '';
+  var elat = document.getElementById('dest_lat_edit');
+  var elng = document.getElementById('dest_lng_edit');
+  if (elat) elat.value = row.dest_lat || '';
+  if (elng) elng.value = row.dest_lng || '';
+  // Reset edit map state
+  if (typeof pickerMaps !== 'undefined' && pickerMaps['edit']) { pickerMaps['edit'].remove(); pickerMaps['edit'] = null; }
+  document.getElementById('pin-wrap-edit').style.display = 'none';
+  var tog = document.getElementById('pin-toggle-edit');
+  if (tog) {
+    tog.style.display = '';
+    tog.textContent = row.dest_lat && row.dest_lng
+      ? '📍 Pin set (' + parseFloat(row.dest_lat).toFixed(4) + ', ' + parseFloat(row.dest_lng).toFixed(4) + ') — click to view/change'
+      : '📍 Set destination pin on map (optional)';
+  }
   // Compute expected_min from departed_at and expected_at
   var sel = document.getElementById('edit-expected');
   if (row.expected_at && row.departed_at) {
@@ -432,6 +482,71 @@ function openEdit(id, row) {
     sel.selectedIndex = 0;
   }
   document.getElementById('veil-edit').classList.add('open');
+}
+
+// ── Destination pin picker ───────────────────────────────────────────────────
+var pickerMaps = {}, pickerMarkers = {};
+function pickerStyle() {
+  return {
+    version: 8,
+    glyphs: '/maps/fonts/{fontstack}/{range}.pbf',
+    sources: { counties: { type: 'vector', tiles: [location.origin + '/tiles/counties/tiles/{z}/{x}/{y}.pbf'], minzoom: 4, maxzoom: 14 } },
+    layers: [
+      { id: 'bg',    type: 'background', paint: { 'background-color': '#1a1f2e' } },
+      { id: 'water', type: 'fill',       source: 'counties', 'source-layer': 'water', paint: { 'fill-color': '#162236' } },
+      { id: 'road',  type: 'line',       source: 'counties', 'source-layer': 'transportation',
+        filter: ['in', ['get', 'class'], ['literal', ['minor','tertiary','secondary','primary','trunk','motorway']]],
+        paint: { 'line-color': '#3a3e62', 'line-width': 1 } },
+      { id: 'place', type: 'symbol',     source: 'counties', 'source-layer': 'place', minzoom: 8,
+        layout: { 'text-field': ['get', 'name:latin'], 'text-size': 11, 'text-font': ['Noto Sans Regular'] },
+        paint: { 'text-color': '#b0b0cc', 'text-halo-color': '#0a0a1a', 'text-halo-width': 1.5 } },
+    ],
+  };
+}
+function initPickerMap(which) {
+  var wrap = document.getElementById('pin-wrap-' + which);
+  var tog  = document.getElementById('pin-toggle-' + which);
+  wrap.style.display = 'block';
+  if (tog) tog.style.display = 'none';
+  if (pickerMaps[which]) { setTimeout(function(){ pickerMaps[which].resize(); }, 20); return; }
+  var pm = new maplibregl.Map({
+    container: 'pin-map-' + which,
+    style: pickerStyle(),
+    center: [-85.90, 39.20],
+    zoom: 10,
+    attributionControl: false,
+  });
+  pm.addControl(new maplibregl.NavigationControl(), 'top-left');
+  var existLat = parseFloat(document.getElementById('dest_lat_' + which).value);
+  var existLng = parseFloat(document.getElementById('dest_lng_' + which).value);
+  pm.on('load', function() {
+    if (existLat && existLng) {
+      pm.setCenter([existLng, existLat]);
+      pm.setZoom(12);
+      placePinOnMap(which, pm, existLat, existLng);
+    }
+  });
+  pm.on('click', function(e) { placePinOnMap(which, pm, e.lngLat.lat, e.lngLat.lng); });
+  pickerMaps[which] = pm;
+  setTimeout(function(){ pm.resize(); }, 50);
+}
+function placePinOnMap(which, pm, lat, lng) {
+  var latF = parseFloat(lat).toFixed(6), lngF = parseFloat(lng).toFixed(6);
+  document.getElementById('dest_lat_' + which).value = latF;
+  document.getElementById('dest_lng_' + which).value = lngF;
+  document.getElementById('pin-coords-' + which).textContent = latF + ', ' + lngF;
+  if (pickerMarkers[which]) pickerMarkers[which].remove();
+  var el = document.createElement('div');
+  el.style.cssText = 'width:26px;height:26px;border-radius:50%;background:#f39c12;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.6);cursor:pointer';
+  el.textContent = '🏃';
+  pickerMarkers[which] = new maplibregl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([parseFloat(lngF), parseFloat(latF)]).addTo(pm);
+}
+function clearPin(which) {
+  document.getElementById('dest_lat_' + which).value = '';
+  document.getElementById('dest_lng_' + which).value = '';
+  document.getElementById('pin-coords-' + which).textContent = 'Tap map to place pin';
+  if (pickerMarkers[which]) { pickerMarkers[which].remove(); pickerMarkers[which] = null; }
 }
 
 // Auto-refresh every 60s to update overdue status
