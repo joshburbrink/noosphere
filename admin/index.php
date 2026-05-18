@@ -873,7 +873,8 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
   <h1>Admin</h1>
   <div class="spacer"></div>
   <?php if ($authed): ?>
-    <a href="/admin/wiki.php" style="color:#888;text-decoration:none;font-size:13px" onmouseover="this.style.color='#e94560'" onmouseout="this.style.color='#888'">📖 Docs</a>
+    <a href="/admin/wiki.php" style="color:#888;text-decoration:none;font-size:13px" onmouseover="this.style.color=#e94560" onmouseout="this.style.color=#888">📖 Docs</a>
+    <a href="/kiosk/" target="_blank" style="color:#888;text-decoration:none;font-size:13px" onmouseover="this.style.color=#e94560" onmouseout="this.style.color=#888">📺 Kiosk</a>
     <span class="who">Logged in<?= $_SESSION['admin_name'] !== '(bootstrap)' ? ' as ' . esc($_SESSION['admin_name']) : '' ?></span>
     <form method="post" style="margin:0"><?= csrf_field() ?><button name="logout" class="btn-sm">Log out</button></form>
   <?php endif; ?>
