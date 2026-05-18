@@ -270,6 +270,38 @@ printf "Cancel a scheduled shutdown:\n"
 printf "  ${C}shutdown -c${X}\n\n"
 
 
+
+# ── 10. KIT MAINTENANCE & DEPLOYMENT ─────────────────────────────────────────
+printf "${W}━━  10. KIT MAINTENANCE & DEPLOYMENT  ━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
+
+printf "${W}Clone this drive to a backup USB:${X}\n"
+printf "  ${C}clone-usb.sh /dev/sdX /dev/sdY${X}       byte-for-byte copy (find device with lsblk)\n"
+printf "  ${C}clone-usb.sh /dev/sdX /dev/sdY --verify${X}  clone + SHA256 verify\n"
+printf "  ${C}clone-usb.sh /dev/sdX backup-$(date +%%Y%%m%%d).img${X}  clone to image file\n\n"
+
+printf "Best practices:\n"
+printf "  - Label backup drive: 'NOOSPHERE BACKUP <date>'\n"
+printf "  - Store separately from primary drive\n"
+printf "  - Refresh after major updates: git pull, then re-run clone-usb.sh\n"
+printf "  - Test boot: verify backup boots on the target hardware at least once\n\n"
+
+printf "${W}Pre-cache NIC drivers for unknown hardware:${X}\n"
+printf "  ${C}cache-drivers.sh [/output/dir]${X}\n"
+printf "  Downloads firmware-realtek, firmware-iwlwifi, firmware-atheros,\n"
+printf "  firmware-brcm80211, firmware-ralink + DKMS build tools to a local dir.\n"
+printf "  On new hardware: cd <cache-dir> && dpkg -i *.deb && update-initramfs -u\n\n"
+
+printf "${W}Configure any WiFi router as a captive portal:${X}\n"
+printf "  ${C}setup-router-generic.sh ap${X}              use built-in AP mode (no router)\n"
+printf "  ${C}setup-router-generic.sh openwrt${X}         SSH-configure an OpenWrt router\n"
+printf "  ${C}setup-router-generic.sh manual${X}          print instructions for any router\n"
+printf "  ${C}setup-router-generic.sh check${X}           verify captive portal is working\n\n"
+
+printf "Set env vars to target a specific router:\n"
+printf "  ${C}ROUTER_IP=192.168.1.1 setup-router-generic.sh openwrt${X}\n\n"
+
+printf "${W}Scripts location:${X}  /var/www/noosphere/scripts/\n\n"
+
 # ── FOOTER ───────────────────────────────────────────────────────────────────
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 printf "  Run ${C}noosphere-selftest${X} for an automated health check.\n"
