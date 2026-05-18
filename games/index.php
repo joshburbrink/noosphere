@@ -6,6 +6,11 @@ if (get_setting('show_games','0') !== '1') {
     die('<p style="font-family:sans-serif;padding:2rem;color:#eee;background:#1a1a2e;min-height:100vh;margin:0">Games module is not enabled.</p>');
 }
 
+$multiplayer = [
+    ['file'=>'battleship/', 'icon'=>'⚓', 'title'=>'Battleship',  'desc'=>'2 players — sink the fleet · share link to join'],
+    ['file'=>'codenames/',  'icon'=>'🕵️', 'title'=>'Codenames',   'desc'=>'2–8 players — one-word clues, two teams'],
+    ['file'=>'pictionary/', 'icon'=>'🎨', 'title'=>'Pictionary',  'desc'=>'2+ players — draw and guess · 90s per turn'],
+];
 $games = [
     ['file'=>'snake.html',      'icon'=>'🐍', 'title'=>'Snake',       'desc'=>'Classic snake — eat, grow, survive'],
     ['file'=>'tetris.html',     'icon'=>'🧱', 'title'=>'Tetris',      'desc'=>'Stack falling blocks — clear lines'],
@@ -41,6 +46,17 @@ a.tile:hover .desc{color:#fff}
 <body>
 <h1>🎮 Games</h1>
 <div class="sub">Browser-based games — no internet required · high scores saved per device</div>
+<div style="font-size:.82rem;color:#888;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.05em">Multiplayer</div>
+<div class="grid" style="margin-bottom:1.5rem">
+<?php foreach ($multiplayer as $g): ?>
+<a class="tile" href="/games/<?= $g['file'] ?>">
+  <div class="icon"><?= $g['icon'] ?></div>
+  <div class="label"><?= $g['title'] ?></div>
+  <div class="desc"><?= $g['desc'] ?></div>
+</a>
+<?php endforeach; ?>
+</div>
+<div style="font-size:.82rem;color:#888;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.05em">Single Player</div>
 <div class="grid">
 <?php foreach ($games as $g): ?>
 <a class="tile" href="/games/<?= $g['file'] ?>">
