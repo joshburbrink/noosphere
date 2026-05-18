@@ -11,7 +11,7 @@ if (get_setting('show_canvas','0') !== '1') { http_response_code(404); exit; }
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Canvas — <?= htmlspecialchars(get_setting('instance_name','Noosphere')) ?></title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
-<?php echo csrf_js_token(); ?>
+<?php echo csrf_js(); ?>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
