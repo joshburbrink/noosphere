@@ -29,18 +29,17 @@ $WORD_PACKS = [
     'pen','piano','pilot','pin','pipe','plane','plant','plate','play','plot',
     'point','pool','port','post','press','pump','queen','ring','rock','roll',
   ],
-  'indiana' => [
-    'columbus','nashville','bedford','martinsville','seymour','crothersville','brownstown','edinburgh',
-    'greenwood','franklin','shelbyville','greensburg','madison','north-vernon','scottsburg','salem',
-    'french-lick','paoli','mitchell','loogootee','washington','vincennes','terre-haute','linton',
-    'bloomington','spencer','ellettsville','martinsville','mooresville','danville','plainfield',
-    'crane','muscatatuck','atterbury','camp-atterbury','hoosier','covered-bridge','cardinal',
-    'covered-bridge','peony','limestone','quarry','coal','corn','soybean','tomato','popcorn',
-    '500','brickyard','speedway','colts','pacers','pacer','hoosier','purdue','notre-dame',
-    'wabash','ohio','white-river','blue-river','patoka','deer','turkey','coyote','hawk',
-    'brown-county','monroe-lake','hardy-lake','patoka-lake','brookville-lake','harmonie',
-    'lincoln','mad-anthony','tecumseh','miami','potawatomi','shawnee','delaware',
-    'covered-bridge','grist-mill','barn','silo','creek','bottom','flat','ridge','draw','ford',
+  'camping' => [
+    'tent','tarp','hammock','fire','kindling','flint','striker','lighter','matches','smoke',
+    'lantern','headlamp','candle','flashlight','fuel','stove','pot','grill','grate','spatula',
+    'cooler','ice','food','trail-mix','jerky','oats','coffee','water','filter','purifier',
+    'bottle','canteen','hydration','creek','spring','well','pump','tablet','boil','collect',
+    'sleeping-bag','pad','pillow','bivvy','ground-cloth','footprint','stakes','guy-lines','mallet','cord',
+    'backpack','daypack','hip-belt','compression','dry-bag','stuff-sack','bear-canister','hang','cache','bury',
+    'axe','hatchet','saw','knife','multitool','paracord','duct-tape','shovel','trowel','dig',
+    'map','compass','gps','bearing','waypoint','trail','blaze','cairn','switchback','summit',
+    'ridge','valley','meadow','forest','clearing','campsite','leave-no-trace','cat-hole','gray-water','pack-out',
+    'rain-fly','poncho','dry','wet','cold','warm','layers','base','mid','shell',
   ],
   'wilderness' => [
     'acorn','antler','ash','aspen','badger','bark','beaver','birch','blaze','bluff',
@@ -133,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pid  = preg_replace('/[^a-zA-Z0-9]/', '', $body['pid'] ?? '');
     $name = htmlspecialchars(substr($body['name'] ?? 'Player', 0, 20), ENT_QUOTES);
 
-    $valid_themes = ['emergency','classic','indiana','wilderness'];
+    $valid_themes = ['emergency','classic','camping','wilderness'];
     $req_theme = in_array($body['theme']??'', $valid_themes, true) ? $body['theme'] : 'emergency';
 
     if ($act === 'new_room') {
@@ -426,7 +425,7 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
     </ol>
     <p style="margin-top:.4rem"><strong>Special cards:</strong> ⬛ Assassin — if you guess it, your team <em>immediately loses</em>. Neutral cards just end your turn.</p>
     <p style="margin-top:.4rem"><strong>Win:</strong> Reveal all your agents first. Red has 9 cards, Blue has 8 — Red always goes first.</p>
-    <p style="margin-top:.4rem"><strong>Word themes:</strong> Change the word pack in the lobby — Emergency (disaster ops), Classic (everyday nouns), Indiana (local places), Wilderness (nature).</p>
+    <p style="margin-top:.4rem"><strong>Word themes:</strong> Change the word pack in the lobby — Emergency (disaster ops), Classic (everyday nouns), Camping (gear &amp; outdoors), Wilderness (nature).</p>
   </div>
 </details>
 <div class="back"><a href="/games/">← Games</a></div>
@@ -440,7 +439,7 @@ var state = null;
 var lastUpdated = 0;
 var pollTimer = null;
 var selectedTheme = localStorage.getItem('cn_theme') || 'emergency';
-var THEMES = {emergency:'🚨 Emergency',classic:'📖 Classic',indiana:'🌽 Indiana',wilderness:'🌲 Wilderness'};
+var THEMES = {emergency:'🚨 Emergency',classic:'📖 Classic',camping:'⛺ Camping',wilderness:'🌲 Wilderness'};
 
 document.getElementById('name-in').value = myName;
 
