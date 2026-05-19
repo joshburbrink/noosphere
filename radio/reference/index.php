@@ -110,9 +110,8 @@ td { padding:6px 8px; border-bottom:1px solid #161628; vertical-align:top; }
     <p style="font-size:13px;color:#777">Install a region pack from <a href="/admin/" style="color:#7ad">Admin -> Region</a> to load county frequencies.</p>
   </div>
 </div>
-<?php
-} else {
-?>
+<?php else: ?>
+<div class="card">
   <div class="note">⚠ Approximate data  -  verify frequencies at <strong>radioreference.com</strong> before programming radios. Last updated: <?= htmlspecialchars(array_values($counties)[0]['last_updated'] ?? ' - ') ?></div>
 
   <div class="filter-bar">
@@ -172,7 +171,7 @@ td { padding:6px 8px; border-bottom:1px solid #161628; vertical-align:top; }
   </div>
   <?php $i++; endforeach; ?>
 </div>
-<?php } ?>
+<?php endif; ?>
 
 <script>
 var activeCounty = '<?= htmlspecialchars(array_key_first($counties) ?? '') ?>';
