@@ -11,6 +11,25 @@ POLL=5
 
 sqlx() { sqlite3 -bail "$DB" "$@"; }
 
+# Bootstrap schema (mirrors shared/downloads.php so worker can start before
+# the PHP page is ever hit).
+sqlx "PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS downloads (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind         TEXT NOT NULL,
+    label        TEXT,
+    url          TEXT NOT NULL,
+    target_path  TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'queued',
+    bytes_total  INTEGER DEFAULT 0,
+    bytes_done   INTEGER DEFAULT 0,
+    pid          INTEGER,
+    error        TEXT,
+    queued_at    INTEGER NOT NULL,
+    started_at   INTEGER,
+    finished_at  INTEGER
+);"
+
 # Recover from crash: anything marked 'running' on startup goes back to 'queued'.
 sqlx "UPDATE downloads SET status='queued', pid=NULL WHERE status='running'"
 
