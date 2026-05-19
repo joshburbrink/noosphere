@@ -3,6 +3,7 @@ require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
 require_once '/var/www/noosphere/shared/libraries.php';
+require_once '/var/www/noosphere/shared/capabilities.php';
 sec_session_start();
 
 $modules = [];
@@ -23,8 +24,21 @@ foreach (list_libraries(false) as $L) {
     ];
 }
 
+$can_manage = can('libraries.manage');
+
+if ($can_manage) {
+    $modules[] = [
+        'href'  => '/admin/libraries.php?new=1',
+        'icon'  => '➕',
+        'label' => 'New library',
+        'desc'  => 'Create a custom inventory (operator only)',
+        'admin' => true,
+    ];
+}
+
 if (empty($modules)) { http_response_code(404); exit; }
-if (count($modules) === 1) { header('Location: '.$modules[0]['href']); exit; }
+// Skip auto-redirect if only thing visible is the admin tile.
+if (count($modules) === 1 && empty($modules[0]['admin'])) { header('Location: '.$modules[0]['href']); exit; }
 
 $name = get_setting('instance_name', 'Noosphere');
 ?>
@@ -46,6 +60,8 @@ a.tile:hover { background:#e94560; transform:translateY(-3px); }
 .label { font-size:1.1rem; font-weight:bold; }
 .desc { font-size:.85rem; color:#aaa; margin-top:.4rem; }
 a.tile:hover .desc { color:#fff; }
+a.tile.admin { border-style:dashed; border-color:#4a9eff; background:#0f1a2e; }
+a.tile.admin:hover { background:#1e3a5e; border-color:#4a9eff; }
 .back { margin-top:2rem; font-size:12px; color:#555; text-decoration:none; }
 .back:hover { color:#e94560; }
 </style>
@@ -55,7 +71,7 @@ a.tile:hover .desc { color:#fff; }
 <div class="sub">Community tools, supplies, and knowledge</div>
 <div class="grid">
 <?php foreach ($modules as $m): ?>
-<a class="tile" href="<?= $m['href'] ?>">
+<a class="tile<?= !empty($m['admin']) ? ' admin' : '' ?>" href="<?= $m['href'] ?>">
   <div class="icon"><?= $m['icon'] ?></div>
   <div class="label"><?= $m['label'] ?></div>
   <div class="desc"><?= $m['desc'] ?></div>
