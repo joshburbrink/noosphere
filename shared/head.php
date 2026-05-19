@@ -54,19 +54,23 @@ document.addEventListener("DOMContentLoaded", function(){
 </script>
 <?php if ($_ns_identity_strip): ?>
 <style>
+/* Inline thin bar at the very top of body — keeps it out of fixed-positioned
+ * headers in /admin/ and other modules. Takes layout space (~22px) so nothing
+ * ever overlaps it. */
 #ns-identity-strip {
-  position: fixed; top: 0; right: 0; z-index: 9998;
   font: 12px system-ui, sans-serif;
-  background: rgba(15,15,26,.85); color: #aaa;
-  padding: 4px 10px; border-bottom-left-radius: 6px;
-  border-left: 1px solid #333; border-bottom: 1px solid #333;
-  max-width: 90vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: #0a0a14; color: #aaa;
+  padding: 4px 12px; border-bottom: 1px solid #2a2a4a;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; justify-content: flex-end; align-items: center; gap: 8px;
 }
-#ns-identity-strip .ns-who { color: #4fc3f7; font-weight: 600; }
+#ns-identity-strip .ns-who   { color: #4fc3f7; font-weight: 600; }
 #ns-identity-strip .ns-roles { color: #f39c12; }
-#ns-identity-strip a { color: #4fc3f7; text-decoration: none; margin-left: 8px; }
-#ns-identity-strip a:hover { text-decoration: underline; }
-@media (max-width: 500px) { #ns-identity-strip { font-size: 11px; padding: 3px 6px; } }
+#ns-identity-strip a         { color: #4fc3f7; text-decoration: none; }
+#ns-identity-strip a:hover   { text-decoration: underline; }
+@media (max-width: 500px) {
+  #ns-identity-strip { font-size: 11px; padding: 3px 6px; justify-content: center; }
+}
 </style>
 <script>
 (function(){
@@ -84,7 +88,7 @@ document.addEventListener("DOMContentLoaded", function(){
     } else {
       bar.innerHTML = '👤 Anonymous · ' + esc(d.ip) + ' <a href="/registry/login.php?next=' + next + '">Sign in</a>';
     }
-    document.body.appendChild(bar);
+    document.body.insertBefore(bar, document.body.firstChild);
   }).catch(function(){});
 })();
 </script>
