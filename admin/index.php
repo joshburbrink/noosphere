@@ -869,7 +869,8 @@ $scripts = [
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; }
-header { background:#1a1a2e; border-bottom:2px solid #e94560; padding:12px 20px; display:flex; align-items:center; gap:16px; }
+/* Top padding clears the fixed identity strip in the top-right corner */
+header { background:#1a1a2e; border-bottom:2px solid #e94560; padding:34px 20px 12px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 header h1 { font-size:16px; color:#e94560; }
 header a { color:#888; text-decoration:none; font-size:13px; }
 header a:hover { color:#e94560; }
