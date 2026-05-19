@@ -254,6 +254,22 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = $flag ? 'User promoted to admin.' : 'Admin privileges removed.';
     }
 
+    // --- Set roles for a registry user (#68) ---
+    if ($act === 'set_roles') {
+        require_once __DIR__ . '/../shared/capabilities.php';
+        $uid   = (int)($_POST['uid'] ?? 0);
+        $valid = known_roles();
+        $picked = array_values(array_intersect($valid, $_POST['roles'] ?? []));
+        $csv = implode(',', $picked);
+        $rdb = new SQLite3(REGISTRY_DB);
+        $s   = $rdb->prepare('UPDATE registry SET roles=? WHERE id=?');
+        $s->bindValue(1, $csv);
+        $s->bindValue(2, $uid, SQLITE3_INTEGER);
+        $s->execute();
+        log_audit('set_roles', "id=$uid roles=" . ($csv ?: '(none)'));
+        $msg = 'Roles updated.';
+    }
+
     // --- Ban user ---
     if ($act === 'ban') {
         log_audit('ban', 'id=' . (int)($_POST['id']??0) . ' name=' . trim($_POST['ban_name']??''), 'warn');
@@ -1353,21 +1369,42 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
   <summary>Registry Users</summary>
   <div class="cpbody">
     <?php
+    require_once __DIR__ . '/../shared/capabilities.php';
     $rdb   = new SQLite3(REGISTRY_DB);
-    $users = $rdb->query("SELECT id,name,location,status,is_admin FROM registry WHERE entry_type='checkin' OR entry_type IS NULL OR entry_type='' ORDER BY name ASC");
+    $users = $rdb->query("SELECT id,name,location,status,is_admin,roles FROM registry WHERE entry_type='checkin' OR entry_type IS NULL OR entry_type='' ORDER BY name ASC");
     $user_rows = [];
     while ($u = $users->fetchArray(SQLITE3_ASSOC)) $user_rows[] = $u;
+    $all_roles = known_roles();
     ?>
     <?php if (!$user_rows): ?><div style="color:#555;font-size:13px">No registered users yet.</div>
     <?php else: ?>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">
+      Roles unlock specific module actions (see <code>shared/capabilities.php</code>). Admin = superuser.
+    </div>
     <table>
-      <tr><th>Name</th><th>Location</th><th>Status</th><th>Role</th><th>Actions</th></tr>
-      <?php foreach ($user_rows as $u): ?>
+      <tr><th>Name</th><th>Location</th><th>Status</th><th>Admin</th><th style="min-width:280px">Roles</th><th>Actions</th></tr>
+      <?php foreach ($user_rows as $u):
+        $user_roles = array_filter(array_map('trim', explode(',', $u['roles'] ?? '')));
+      ?>
       <tr>
         <td><?= esc($u['name']) ?></td>
         <td><?= esc($u['location']) ?></td>
         <td><?= esc($u['status']) ?></td>
         <td><span class="<?= $u['is_admin'] ? 'badge-admin' : 'badge-user' ?>"><?= $u['is_admin'] ? 'Admin' : 'User' ?></span></td>
+        <td>
+          <form method="post" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+            <?= csrf_field() ?>
+            <input type="hidden" name="act" value="set_roles">
+            <input type="hidden" name="uid" value="<?= $u['id'] ?>">
+            <?php foreach ($all_roles as $r): ?>
+              <label style="font-size:11px;color:#bbb;display:inline-flex;align-items:center;gap:2px;background:#222;padding:2px 6px;border-radius:3px">
+                <input type="checkbox" name="roles[]" value="<?= esc($r) ?>" <?= in_array($r, $user_roles, true) ? 'checked' : '' ?>>
+                <?= esc($r) ?>
+              </label>
+            <?php endforeach; ?>
+            <button type="submit" class="btn-sm" style="font-size:11px">Save</button>
+          </form>
+        </td>
         <td>
           <form method="post" style="display:inline">
             <?= csrf_field() ?>
