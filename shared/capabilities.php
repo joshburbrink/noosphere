@@ -66,6 +66,9 @@ function capability_map(): array {
 
         // Maps
         'maps.edit_layers'      => ['operator'],
+
+        // Command dashboard (#76)
+        'command.view'          => ['operator', 'command'],
     ];
 }
 
@@ -98,5 +101,5 @@ function require_capability(string $cap): void {
 }
 
 function known_roles(): array {
-    return ['operator', 'shelter_staff', 'sar', 'medical', 'comms', 'volunteer'];
+    return ['operator', 'command', 'shelter_staff', 'sar', 'medical', 'comms', 'volunteer'];
 }

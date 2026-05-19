@@ -1,5 +1,7 @@
 <?php
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
+sec_session_start();
 
 $name    = get_setting('instance_name',    'Noosphere');
 $tagline = get_setting('instance_tagline', 'Offline information hub — no internet required');
@@ -55,6 +57,10 @@ if (get_setting('show_incidents','0')==='1') {
                 'desc'=>$inc_cmd
                     ? 'Field reports with severity, status &amp; assignment — drop pins on the map'
                     : 'Drop pins on the map — report what you see out there'];
+    if ($inc_cmd && can('command.view')) {
+        $tiles[] = ['href'=>'/command/', 'icon'=>'🚨', 'label'=>'Command',
+                    'desc'=>'Operator dashboard — all active incidents, runners, supplies &amp; weather at a glance'];
+    }
 }
 if (get_setting('show_games','0')==='1')
     $tiles[] = ['href'=>'/games/',  'icon'=>'🎮', 'label'=>'Games',        'desc'=>'Browser-based games — Snake, Tetris, 2048 and more'];
