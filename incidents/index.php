@@ -3,7 +3,7 @@ require_once __DIR__ . '/_init.php';
 sec_session_start();
 if (get_setting('show_incidents','0') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 $is_command  = incidents_command_mode();
 $db          = incidents_db();
@@ -62,13 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             $msg = 'Incident reported.';
         }
     }
-    elseif ($act === 'status' && $is_admin) {
+    elseif ($act === 'status') {
+        require_capability('incidents.resolve');
         $id = (int)($_POST['id'] ?? 0);
         $s  = $_POST['status'] ?? '';
         if ($id && isset(INCIDENT_STATUSES[$s])) {
+            $actor = current_name() ?: 'operator';
             if ($s === 'resolved') {
                 $db->prepare("UPDATE incidents SET status=?, resolved_at=?, resolved_by=?, updated_at=? WHERE id=?")
-                   ->execute([$s, time(), $_SESSION['admin_name'] ?? 'admin', time(), $id]);
+                   ->execute([$s, time(), $actor, time(), $id]);
             } else {
                 $db->prepare("UPDATE incidents SET status=?, resolved_at=NULL, resolved_by=NULL, updated_at=? WHERE id=?")
                    ->execute([$s, time(), $id]);
@@ -76,7 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             $msg = 'Status updated.';
         }
     }
-    elseif ($act === 'assign' && $is_admin) {
+    elseif ($act === 'assign') {
+        require_capability('incidents.edit');
         $id = (int)($_POST['id'] ?? 0);
         $to = trim($_POST['assigned_to'] ?? '');
         if ($id) {
@@ -85,7 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             $msg = 'Assignment updated.';
         }
     }
-    elseif ($act === 'delete' && $is_admin) {
+    elseif ($act === 'delete') {
+        require_capability('incidents.delete');
         $id = (int)($_POST['id'] ?? 0);
         if ($id) {
             $row = $db->prepare("SELECT photo_path FROM incidents WHERE id=?");

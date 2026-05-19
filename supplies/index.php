@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_supplies','0') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $CATEGORIES = [
@@ -57,7 +58,7 @@ function days_label($qty, $cpd) {
 // ── POST handlers ──────────────────────────────────────────────────────────
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!$is_admin) { http_response_code(403); exit; }
+    if (!can('supplies.edit')) { http_response_code(403); exit; }
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) { http_response_code(403); exit; }
 
     $act = $_POST['act'] ?? '';

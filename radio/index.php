@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_radio','1') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $db = new SQLite3('/var/lib/noosphere/radio.db');
@@ -59,7 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
     }
 
-    if ($act === 'delete' && $is_admin) {
+    if ($act === 'delete') {
+        require_capability('radio.delete_log');
         $id = (int)($_POST['id'] ?? 0);
         if ($id) $db->exec("DELETE FROM radio_log WHERE id=$id");
         $msg = 'Entry deleted.';

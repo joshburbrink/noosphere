@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_weather','1') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $db = new SQLite3('/var/lib/noosphere/weather.db');
@@ -57,7 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $msg = 'Entry logged.';
     }
 
-    if ($act === 'set_nwr_freq' && $is_admin) {
+    if ($act === 'set_nwr_freq') {
+        require_capability('weather.set_freq');
         $freq = $_POST['freq'] ?? '';
         $allowed = ['162.400','162.425','162.450','162.475','162.500','162.525','162.550'];
         if (in_array($freq, $allowed, true)) {
@@ -73,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
     }
 
-    if ($act === 'scan_nwr' && $is_admin) {
+    if ($act === 'scan_nwr') {
+        require_capability('weather.scan');
         $out = []; $code = 0;
         exec('sudo -n /usr/local/bin/noosphere-scan-nwr.sh 2>&1', $out, $code);
         $channels = [];
@@ -96,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
     }
 
-    if ($act === 'delete' && $is_admin) {
+    if ($act === 'delete') {
+        require_capability('weather.delete_log');
         $id = (int)($_POST['id'] ?? 0);
         if ($id) $db->exec("DELETE FROM weather_log WHERE id=$id");
         $msg = 'Entry deleted.';

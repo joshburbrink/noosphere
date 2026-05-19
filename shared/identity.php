@@ -90,8 +90,15 @@ function sign_out_registry_user(): void {
 
 /*
  * Backwards-compat shim — modules that still test $is_admin should keep working.
- * After Phase D (gate migration) we can drop this.
+ * Returns true for password admin, registry-side admin flag, OR a signed-in
+ * registry user holding the 'operator' role (so the role actually grants the
+ * admin-equivalent powers that ungated $is_admin checks expect).
+ *
+ * After every cap site has been migrated to require_capability(), we can drop
+ * this shim and have callers test the specific cap they need.
  */
 function legacy_is_admin(): bool {
-    return !empty($_SESSION['admin']) || !empty($_SESSION['reg_admin']);
+    if (!empty($_SESSION['admin']))     return true;
+    if (!empty($_SESSION['reg_admin'])) return true;
+    return in_array('operator', current_roles(), true);
 }

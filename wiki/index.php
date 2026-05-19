@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_wiki','1') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $CATEGORIES = [
@@ -201,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
                 $existing->execute([$edit_id]);
                 $existing = $existing->fetch(PDO::FETCH_ASSOC);
                 if (!$existing) { $error = 'Article not found.'; }
-                elseif ($existing['locked'] && !$is_admin) { $error = 'This article is locked. Only admins can edit it.'; }
+                elseif ($existing['locked'] && !can('wiki.lock')) { $error = 'This article is locked. Only operators can edit it.'; }
                 else {
                     // Save revision of old body
                     $db->prepare("INSERT INTO revisions (article_id,body,author,edited_at) VALUES (?,?,?,?)")
@@ -225,7 +226,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
     }
 
-    if ($act === 'delete' && $is_admin) {
+    if ($act === 'delete') {
+        require_capability('wiki.delete');
         $id = (int)($_POST['del_id'] ?? 0);
         if ($id) {
             $db->prepare("DELETE FROM revisions WHERE article_id=?")->execute([$id]);
@@ -235,7 +237,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
     }
 
-    if ($act === 'lock' && $is_admin) {
+    if ($act === 'lock') {
+        require_capability('wiki.lock');
         $id  = (int)($_POST['lock_id'] ?? 0);
         $val = (int)($_POST['lock_val'] ?? 0);
         if ($id) {

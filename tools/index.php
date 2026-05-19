@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_tools','0') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $CATEGORIES = [
@@ -78,8 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = 'Item returned. Thank you!';
     }
 
-    // Admin only below
-    if ($is_admin) {
+    // Manager actions below
+    if (can('tools.manage')) {
         if ($act === 'add_tool') {
             $name = trim($_POST['name'] ?? '');
             if ($name === '') { $err = 'Name is required.'; }

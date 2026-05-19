@@ -18,10 +18,12 @@ function capability_map(): array {
         // Weather / NWR
         'weather.set_freq'      => ['operator', 'comms'],
         'weather.scan'          => ['operator', 'comms'],
+        'weather.delete_log'    => ['operator', 'comms'],
 
         // Radio / SDR
         'radio.control'         => ['operator', 'comms'],
         'radio.program'         => ['operator', 'comms'],
+        'radio.delete_log'      => ['operator', 'comms'],
 
         // Incidents
         'incidents.edit'        => ['operator', 'sar', 'medical'],
@@ -52,6 +54,8 @@ function capability_map(): array {
         // Tasks / Runners
         'tasks.manage'          => ['operator'],
         'runners.dispatch'      => ['operator'],
+        'runners.manage'        => ['operator'],
+        'tools.manage'          => ['operator', 'shelter_staff'],
 
         // Files
         'files.upload'          => ['operator', 'volunteer'],

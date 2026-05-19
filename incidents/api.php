@@ -6,7 +6,7 @@ if (get_setting('show_incidents','0') !== '1') { http_response_code(404); exit; 
 header('Content-Type: application/json');
 
 $db = incidents_db();
-$is_admin = !empty($_SESSION['admin']);
+$is_admin = legacy_is_admin();
 $is_command = incidents_command_mode();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
@@ -113,7 +113,12 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     readonly_die();
-    if (!$is_admin) { http_response_code(403); echo json_encode(['ok'=>false,'err'=>'admin required']); exit; }
+    // Status changes use incidents.resolve, other field edits use incidents.edit.
+    $needs_resolve = isset($_POST['status']);
+    $needs_edit    = isset($_POST['assigned_to']) || isset($_POST['severity']);
+    if (($needs_resolve && !can('incidents.resolve')) || ($needs_edit && !can('incidents.edit'))) {
+        http_response_code(403); echo json_encode(['ok'=>false,'err'=>'permission denied']); exit;
+    }
 
     $id = (int)($_POST['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['ok'=>false,'err'=>'id required']); exit; }
@@ -125,7 +130,7 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $sets[] = 'status = ?'; $params[] = $s;
         if ($s === 'resolved') {
             $sets[] = 'resolved_at = ?'; $params[] = time();
-            $sets[] = 'resolved_by = ?'; $params[] = $_SESSION['admin_name'] ?? 'admin';
+            $sets[] = 'resolved_by = ?'; $params[] = current_name() ?: 'operator';
         } else {
             $sets[] = 'resolved_at = NULL';
             $sets[] = 'resolved_by = NULL';
@@ -158,7 +163,7 @@ if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = trim($_POST['token'] ?? '');
     if (!$id) { http_response_code(400); echo json_encode(['ok'=>false,'err'=>'id required']); exit; }
 
-    $can = $is_admin;
+    $can = can('incidents.delete');
     if (!$can && $token !== '') {
         $row = $db->prepare('SELECT creator_token, photo_path FROM incidents WHERE id = ?');
         $row->execute([$id]);
@@ -171,7 +176,7 @@ if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $r = $row->fetch(PDO::FETCH_ASSOC);
         $photo = $r['photo_path'] ?? null;
     }
-    if (!$can) { http_response_code(403); echo json_encode(['ok'=>false,'err'=>'admin or creator token required']); exit; }
+    if (!$can) { http_response_code(403); echo json_encode(['ok'=>false,'err'=>'permission or creator token required']); exit; }
 
     if ($photo) @unlink(INCIDENT_PHOTO_DIR . '/' . basename($photo));
     $db->prepare('DELETE FROM incidents WHERE id = ?')->execute([$id]);

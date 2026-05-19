@@ -1,10 +1,11 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 if (get_setting('show_triage','0') !== '1') { http_response_code(404); exit; }
 
-$is_admin    = !empty($_SESSION['admin']);
+$is_admin    = legacy_is_admin();
 $is_readonly = is_readonly();
 
 $db = new SQLite3('/var/lib/noosphere/triage.db');
@@ -44,7 +45,7 @@ function next_tag_id($db) {
 
 $msg = ''; $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $is_admin && !$is_readonly) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && can('triage.edit') && !$is_readonly) {
     csrf_verify();
     $act = $_POST['act'] ?? '';
 
