@@ -19,6 +19,10 @@ $db->exec("CREATE TABLE IF NOT EXISTS radio_log (
     notes      TEXT,
     logged_by  TEXT
 )");
+@$db->exec("ALTER TABLE radio_log ADD COLUMN source TEXT");
+@$db->exec("ALTER TABLE radio_log ADD COLUMN transcript TEXT");
+@$db->exec("ALTER TABLE radio_log ADD COLUMN clip_path TEXT");
+@$db->exec("ALTER TABLE radio_log ADD COLUMN duration REAL");
 
 $SIGNAL_LABELS = [1=>'1 — Barely readable', 2=>'2 — Readable with effort',
                   3=>'3 — Readable', 4=>'4 — Good', 5=>'5 — Excellent'];
@@ -201,13 +205,28 @@ tr:hover td { background:#1a1f35; }
     <?php foreach ($rows as $r):
       $sig = (int)($r['signal'] ?? 0);
       $sig_html = $sig ? str_repeat('●',$sig).str_repeat('○',5-$sig) : '—';
+      $is_auto = ($r['source'] ?? '') === 'monitor-auto';
     ?>
       <tr>
-        <td style="white-space:nowrap;color:#aaa"><?= date('m/d H:i', $r['logged_at']) ?></td>
+        <td style="white-space:nowrap;color:#aaa">
+          <?= date('m/d H:i', $r['logged_at']) ?>
+          <?php if ($is_auto): ?>
+            <br><span style="font-size:10px;background:#1a2a1a;border:1px solid #2a5a2a;border-radius:3px;padding:1px 5px;color:#2ecc71">SDR Auto</span>
+          <?php endif ?>
+        </td>
         <td><span class="callsign"><?= htmlspecialchars($r['callsign']) ?></span></td>
         <td><span class="freq"><?= htmlspecialchars($r['frequency'] ?? '—') ?></span></td>
         <td><span class="sig-dots" title="<?= $sig ? htmlspecialchars($SIGNAL_LABELS[$sig]) : '' ?>"><?= $sig_html ?></span></td>
-        <td class="notes-cell"><?= htmlspecialchars($r['traffic'] ?? '') ?></td>
+        <td class="notes-cell">
+          <?php if ($is_auto && !empty($r['transcript'])): ?>
+            <details>
+              <summary style="cursor:pointer;color:#7ad">📝 Transcript<?= !empty($r['duration']) ? ' ('.round($r['duration']).'s)' : '' ?></summary>
+              <div style="margin-top:4px;color:#888;line-height:1.5;font-size:12px"><?= htmlspecialchars($r['transcript']) ?></div>
+            </details>
+          <?php else: ?>
+            <?= htmlspecialchars($r['traffic'] ?? '') ?>
+          <?php endif ?>
+        </td>
         <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
         <td style="white-space:nowrap;color:#aaa"><?= htmlspecialchars($r['logged_by'] ?? '') ?></td>
         <?php if ($is_admin): ?>

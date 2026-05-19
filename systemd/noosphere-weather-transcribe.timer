@@ -1,0 +1,11 @@
+[Unit]
+Description=Noosphere NWR auto-transcription timer
+Requires=noosphere-weather-transcribe.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Unit=noosphere-weather-transcribe.service
+
+[Install]
+WantedBy=timers.target

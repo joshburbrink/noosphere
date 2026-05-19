@@ -1,0 +1,9 @@
+[Unit]
+Description=Noosphere NWR auto-transcription (one-shot)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/noosphere-whisper/bin/python3 /usr/local/bin/noosphere-weather-transcribe.py auto
+StandardOutput=journal
+StandardError=journal

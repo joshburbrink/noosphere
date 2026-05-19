@@ -563,7 +563,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                       'registry_label','registry_description','registry_statuses','shelter_name','shelter_capacity',
                       'tasks_categories','tasks_auto_close_hours',
                       'radio_freq','radio_gain','radio_ppm','radio_same_fips',
-                      'transcription_backend','theme_default'];
+                      'transcription_backend','radio_monitor_freq','theme_default'];
         foreach ($text_keys as $k) {
             if (isset($_POST[$k])) set_setting($k, trim($_POST[$k]));
         }
@@ -580,6 +580,12 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         shell_exec($t_auto
             ? 'systemctl enable --now noosphere-weather-transcribe.timer 2>&1'
             : 'systemctl disable --now noosphere-weather-transcribe.timer 2>&1');
+
+        // --- Sync radio monitor service ---
+        $r_mon = get_setting('transcription_enabled','0') === '1' && get_setting('transcription_radio_log','0') === '1';
+        shell_exec($r_mon
+            ? 'systemctl enable --now noosphere-radio-monitor.service 2>&1'
+            : 'systemctl disable --now noosphere-radio-monitor.service 2>&1');
 
         // --- SDR radio mode (off|nwr|scanner) — invokes helper if changed ---
         if (isset($_POST['radio_mode'])) {
@@ -2917,7 +2923,7 @@ if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), t
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
         <input type="checkbox" name="transcription_radio_log" <?= $t_radio_log?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
-        Auto-transcribe scanner radio captures <span style="font-size:11px;color:#555">(#59 — backend coming soon)</span>
+        Auto-transcribe radio monitor captures (squelch-aware, logs to Radio Log)
       </label>
 
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;margin-top:4px">
@@ -2929,6 +2935,17 @@ if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), t
         </select>
         <span style="font-size:11px;color:#555">(override; Auto selects best installed backend)</span>
       </div>
+
+      <?php if ($t_radio_log && $t_enabled): ?>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;margin-top:4px">
+        <label style="color:#aaa;white-space:nowrap">Monitor frequency:</label>
+        <input type="text" name="radio_monitor_freq"
+               value="<?= esc(get_setting('radio_monitor_freq','146.520M')) ?>"
+               placeholder="e.g. 146.520M"
+               style="width:110px;background:#0d0d1a;border:1px solid #2a2a4a;color:#ccc;border-radius:4px;padding:3px 8px;font-size:12px">
+        <span style="font-size:11px;color:#555">RTL-SDR tunes here for squelch capture (conflicts with NWR/scanner modes)</span>
+      </div>
+      <?php endif; ?>
     </div>
 
     <?php if ($any_backend_ok && $t_enabled): ?>

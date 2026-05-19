@@ -230,7 +230,7 @@ def main():
             'VALUES (?,?,?,?,?,?,?,?,?)',
             (int(time.time()), parsed.get('temp_f'), parsed.get('conditions'),
              parsed.get('wind_dir'), parsed.get('wind_speed'), parsed.get('humidity'),
-             f'[NWR transcript/{backend}] {transcript}', 'NWR Auto', 'nwr-auto')
+             f'[NWR transcript] {transcript}', 'NWR Auto', 'nwr-auto')
         )
         conn.commit(); conn.close()
         print('Logged to weather_log.')
