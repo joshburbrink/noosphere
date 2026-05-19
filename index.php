@@ -1,4 +1,5 @@
 <?php
+require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
