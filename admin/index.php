@@ -2503,6 +2503,15 @@ if (!$usb_eths): ?>
   <div class="cpbody">
     <?php
       $wc_zims = get_zim_info();
+      // Sort largest first  -  easy disk wins on top.
+      uasort($wc_zims, fn($a,$b) => $b['size'] <=> $a['size']);
+      $wc_zim_total = 0; foreach ($wc_zims as $z) $wc_zim_total += $z['size'];
+      // Group prefixes for quick-select chips (wikipedia_, wiktionary_, etc).
+      $wc_groups = [];
+      foreach ($wc_zims as $f => $z) {
+          $pfx = preg_split('/[_-]/', $f)[0] ?? $f;
+          $wc_groups[$pfx] = ($wc_groups[$pfx] ?? 0) + 1;
+      }
       $wc_topo = glob('/var/www/noosphere/maps/topo/*.pdf') ?: [];
       $wc_topo_bytes = 0; foreach ($wc_topo as $f) $wc_topo_bytes += (int)@filesize($f);
       $wc_sat = 0;
@@ -2531,26 +2540,47 @@ if (!$usb_eths): ?>
 
       <!-- ZIMs -->
       <div style="margin-bottom:18px">
-        <div style="font-weight:600;color:#e0e0e0;margin-bottom:6px">ZIM libraries  -  <span style="color:#888;font-weight:400;font-size:12px">re-downloadable, slow</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div style="font-weight:600;color:#e0e0e0">
+            ZIM libraries
+            <span style="color:#888;font-weight:400;font-size:12px"> -  largest first, <?= round($wc_zim_total/1073741824, 1) ?> GB total</span>
+          </div>
+        </div>
         <?php if (!$wc_zims): ?>
           <div style="color:#555;font-size:12px;padding:4px 0">No ZIM files on disk.</div>
         <?php else: ?>
-          <div style="margin-bottom:4px">
-            <label style="font-size:11px;color:#888;cursor:pointer">
-              <input type="checkbox" onclick="document.querySelectorAll('.wc-zim').forEach(c=>c.checked=this.checked)"> select all
-            </label>
+          <!-- Quick-select chips and filter -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:11px">
+            <input type="text" id="wc-zim-filter" placeholder="filter by name…" style="flex:1;min-width:160px;padding:5px 8px;background:#0f0f1a;border:1px solid #2a2a4a;color:#e0e0e0;font-size:11px;border-radius:4px">
+            <button type="button" class="wc-chip" data-pfx="*">All (<?= count($wc_zims) ?>)</button>
+            <?php arsort($wc_groups); foreach ($wc_groups as $pfx => $n): if ($n < 1) continue; ?>
+              <button type="button" class="wc-chip" data-pfx="<?= esc($pfx) ?>"><?= esc($pfx) ?> (<?= $n ?>)</button>
+            <?php endforeach; ?>
+            <button type="button" class="wc-chip" data-pfx="" style="border-color:#3a2a2a;color:#e9a0a0">Clear</button>
           </div>
+          <style>
+            .wc-chip{background:#1a1a2e;border:1px solid #2a2a4a;color:#aaa;padding:3px 9px;border-radius:11px;font-size:11px;cursor:pointer}
+            .wc-chip:hover{background:#2a2a4a;color:#e0e0e0}
+            .wc-zim-row.hidden{display:none}
+            .wc-zim-row input:checked + .wc-meta{color:#e94560}
+          </style>
+          <div id="wc-zim-list" style="max-height:340px;overflow-y:auto;border:1px solid #1a1a2e;border-radius:4px;padding:4px 8px">
           <?php foreach ($wc_zims as $f => $z):
             $mb = round($z['size'] / 1048576);
             $disp = zim_display_name($f, $z['title']);
           ?>
-            <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
-              <input type="checkbox" class="wc-zim" name="zims[]" value="<?= esc($f) ?>">
-              <span style="flex:1;color:#e0e0e0"><?= esc($disp) ?></span>
-              <span style="color:#666;font-size:11px"><?= esc($f) ?></span>
-              <span style="color:#888;flex-shrink:0;min-width:60px;text-align:right"><?= $mb ?> MB</span>
+            <label class="wc-zim-row" data-name="<?= esc(strtolower($f . ' ' . $disp)) ?>" style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;cursor:pointer;border-bottom:1px solid #15152a">
+              <input type="checkbox" class="wc-zim" name="zims[]" value="<?= esc($f) ?>" data-bytes="<?= (int)$z['size'] ?>">
+              <span class="wc-meta" style="flex:1;color:#e0e0e0"><?= esc($disp) ?>
+                <span style="color:#555;font-size:10px;display:block;font-family:monospace"><?= esc($f) ?></span>
+              </span>
+              <span style="color:#888;flex-shrink:0;min-width:70px;text-align:right;font-weight:600"><?= $mb ?> MB</span>
             </label>
           <?php endforeach; ?>
+          </div>
+          <div id="wc-zim-summary" style="margin-top:8px;padding:8px 10px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:4px;font-size:12px;color:#888">
+            Select items above to see reclaim total.
+          </div>
         <?php endif; ?>
       </div>
 
@@ -2596,6 +2626,47 @@ if (!$usb_eths): ?>
         <button type="submit" class="btn-red" style="padding:8px 22px;font-size:13px">Wipe selected</button>
       </div>
     </form>
+    <script>
+    (function(){
+      var rows    = document.querySelectorAll('.wc-zim-row');
+      var boxes   = document.querySelectorAll('.wc-zim');
+      var summary = document.getElementById('wc-zim-summary');
+      var filter  = document.getElementById('wc-zim-filter');
+      function recalc(){
+        if (!summary) return;
+        var n = 0, bytes = 0;
+        boxes.forEach(function(b){ if (b.checked){ n++; bytes += (+b.dataset.bytes || 0); } });
+        if (!n){ summary.textContent = 'Select items above to see reclaim total.'; summary.style.color='#888'; return; }
+        var gb = (bytes/1073741824).toFixed(2);
+        summary.innerHTML = '<strong style="color:#e94560">'+n+'</strong> selected  -  reclaim <strong style="color:#e94560">'+gb+' GB</strong> ('+(bytes/1048576).toFixed(0)+' MB)';
+        summary.style.color='#e0e0e0';
+      }
+      boxes.forEach(function(b){ b.addEventListener('change', recalc); });
+      // Quick-select chips
+      document.querySelectorAll('.wc-chip').forEach(function(c){
+        c.addEventListener('click', function(){
+          var pfx = c.dataset.pfx;
+          rows.forEach(function(r){
+            if (r.classList.contains('hidden')) return;  // respect filter
+            var name = r.dataset.name;
+            var box  = r.querySelector('.wc-zim');
+            if (pfx === '')      box.checked = false;
+            else if (pfx === '*')box.checked = true;
+            else                 box.checked = name.indexOf(pfx) === 0 || box.checked && false || name.indexOf(pfx) === 0;
+          });
+          recalc();
+        });
+      });
+      // Filter
+      if (filter) filter.addEventListener('input', function(){
+        var q = filter.value.toLowerCase().trim();
+        rows.forEach(function(r){
+          var hit = !q || r.dataset.name.indexOf(q) !== -1;
+          r.classList.toggle('hidden', !hit);
+        });
+      });
+    })();
+    </script>
   </div>
 </details>
 
