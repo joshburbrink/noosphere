@@ -989,6 +989,65 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 .reset-zone p { font-size:12px; color:#888; margin-bottom:12px; }
 .reset-row { display:flex; gap:8px; align-items:center; }
 .reset-row input { flex:1; max-width:200px; }
+
+/* ── Admin overhaul (#36) — toast, toggle, mobile, search, sticky save ── */
+
+/* Toast notifications */
+#ns-toast-host { position:fixed; top:14px; right:14px; z-index:10000; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.ns-toast { background:#1a2a1a; border:1px solid #2ecc71; color:#fff; padding:10px 16px; border-radius:6px;
+  font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.5); animation:ns-toast-in .25s ease-out;
+  max-width:340px; pointer-events:auto; }
+.ns-toast.err { background:#2a1a1a; border-color:#e94560; }
+@keyframes ns-toast-in { from { transform:translateX(40px); opacity:0; } to { transform:none; opacity:1; } }
+.ns-toast.fade { opacity:0; transition:opacity .4s; }
+
+/* Toggle switch — applied to .mod-toggle and any input[type=checkbox].toggle */
+.mod-toggle, input[type=checkbox].toggle {
+  appearance:none; -webkit-appearance:none;
+  width:36px; height:20px; border-radius:11px;
+  background:#16213e; border:1px solid #2a2a4a;
+  position:relative; cursor:pointer; transition:background .15s, border-color .15s;
+  flex-shrink:0; vertical-align:middle;
+}
+.mod-toggle::before, input[type=checkbox].toggle::before {
+  content:''; position:absolute; top:1px; left:1px; width:16px; height:16px;
+  background:#888; border-radius:50%; transition:transform .15s, background .15s;
+}
+.mod-toggle:checked, input[type=checkbox].toggle:checked { background:#5a1f30; border-color:#e94560; }
+.mod-toggle:checked::before, input[type=checkbox].toggle:checked::before { transform:translateX(16px); background:#e94560; }
+.mod-toggle:focus-visible, input[type=checkbox].toggle:focus-visible { outline:2px solid #e94560; outline-offset:1px; }
+
+/* Mobile tab bar — collapses to a dropdown under 700px */
+@media (max-width: 700px) {
+  .tab-bar { display:none; }
+  .tab-bar.open { display:flex; flex-direction:column; gap:4px; }
+  .tab-bar.open .tab { border-radius:6px; }
+  #ns-tab-menu-btn { display:flex; }
+}
+#ns-tab-menu-btn {
+  display:none; width:100%; align-items:center; justify-content:space-between;
+  background:#1a1a2e; border:1px solid #2a2a4a; color:#e0e0e0;
+  padding:10px 14px; border-radius:6px; font-size:14px; margin-bottom:8px; cursor:pointer;
+}
+
+/* Settings quick-search */
+.ns-search-bar { margin-bottom:14px; position:relative; }
+.ns-search-bar input { width:100%; padding:9px 14px 9px 36px; }
+.ns-search-bar::before {
+  content:'🔍'; position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  font-size:13px; opacity:.5; pointer-events:none;
+}
+details.cpanel.ns-hidden { display:none; }
+
+/* Sticky Save bar inside Settings tab */
+.ns-sticky-save {
+  position:sticky; bottom:0;
+  background:linear-gradient(to top, #0f0f1a 70%, rgba(15,15,26,0));
+  padding:14px 0 6px; margin-top:8px; z-index:50;
+  display:flex; gap:10px; align-items:center;
+}
+.ns-sticky-save .btn { padding:10px 24px; }
+.ns-sticky-save .hint { font-size:11px; color:#666; }
 </style>
 </head>
 <body>
@@ -1022,13 +1081,17 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 
 <?php if ($msg): ?><div class="msg-ok"><?= esc($msg) ?></div><?php endif; ?>
 
+<button id="ns-tab-menu-btn" type="button" onclick="document.querySelector('.tab-bar').classList.toggle('open')">
+  <span id="ns-tab-menu-label">Menu</span>
+  <span>☰</span>
+</button>
 <div class="tab-bar">
-  <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
-  <div class="tab" onclick="showTab('network')">Network</div>
-  <div class="tab" onclick="showTab('community')">Community</div>
-  <div class="tab" onclick="showTab('content')">Content</div>
-  <div class="tab" onclick="showTab('system')">System</div>
-  <div class="tab" onclick="showTab('settings')">Settings</div>
+  <div class="tab active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</div>
+  <div class="tab" data-tab="network"  onclick="showTab('network')">Network</div>
+  <div class="tab" data-tab="community" onclick="showTab('community')">Community</div>
+  <div class="tab" data-tab="content"   onclick="showTab('content')">Content</div>
+  <div class="tab" data-tab="system"    onclick="showTab('system')">System</div>
+  <div class="tab" data-tab="settings"  onclick="showTab('settings')">Settings</div>
 </div>
 
 <!-- DASHBOARD -->
@@ -2335,6 +2398,11 @@ if (!$usb_eths): ?>
 <!-- SETTINGS -->
 <div id="tab-settings" class="tab-content">
 
+<div class="ns-search-bar">
+  <input type="search" placeholder="Filter settings… (type a module name, label, or keyword)"
+         oninput="nsSettingsSearch(this.value)" autocomplete="off">
+</div>
+
 <div class="sub-tab-bar">
   <div class="sub-tab active" onclick="showSubTab('stab-configure',this)">Configure</div>
   <div class="sub-tab" onclick="showSubTab('stab-modules',this)">Modules</div>
@@ -3058,11 +3126,12 @@ foreach ($simple_mods as [$key, $id, $label]):
 </div>
 <?php endforeach; ?>
 
-<div style="margin:16px 0">
-  <button type="submit" class="btn">Save</button>
-</div>
 </div><!-- #stab-modules -->
 
+<div class="ns-sticky-save">
+  <button type="submit" class="btn">Save settings</button>
+  <span class="hint">Applies to Configure + Modules tabs</span>
+</div>
 </form>
 
 <!-- ── SECURITY ──────────────────────────────────────────────────────────── -->
@@ -3223,7 +3292,59 @@ function setDisplayMode(mode, btn) {
   document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
   document.querySelectorAll('.tab').forEach(function(el){ el.classList.remove('active'); });
   document.getElementById('tab-' + name).classList.add('active');
-  event.target.classList.add('active');
+  var btn = document.querySelector('.tab[data-tab="' + name + '"]');
+  if (btn) btn.classList.add('active');
+  else if (typeof event !== 'undefined' && event && event.target) event.target.classList.add('active');
+  try { localStorage.setItem('ns_admin_tab', name); } catch(e){}
+  var lbl = document.getElementById('ns-tab-menu-label');
+  if (lbl && btn) lbl.textContent = btn.textContent;
+  // Close mobile menu after selection
+  document.querySelector('.tab-bar').classList.remove('open');
+}
+
+// ── Admin overhaul (#36) wiring ────────────────────────────────────────────
+(function(){
+  // Restore last-active tab
+  try {
+    var saved = localStorage.getItem('ns_admin_tab');
+    if (saved && document.getElementById('tab-' + saved)) showTab(saved);
+  } catch(e){}
+
+  // Convert existing top-banner $msg into a toast
+  var banner = document.querySelector('.msg-ok, .error');
+  if (banner) {
+    var msg = banner.textContent.trim();
+    var isErr = banner.classList.contains('error');
+    if (msg) nsToast(msg, isErr ? 'err' : 'ok');
+    banner.style.display = 'none';
+  }
+})();
+
+function nsToast(text, kind) {
+  var host = document.getElementById('ns-toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'ns-toast-host';
+    document.body.appendChild(host);
+  }
+  var t = document.createElement('div');
+  t.className = 'ns-toast' + (kind === 'err' ? ' err' : '');
+  t.textContent = text;
+  host.appendChild(t);
+  setTimeout(function(){ t.classList.add('fade'); }, 3200);
+  setTimeout(function(){ t.remove(); }, 3700);
+}
+
+// Settings search filter — hides .cpanel summary/body that doesn't match
+function nsSettingsSearch(q) {
+  q = (q || '').trim().toLowerCase();
+  var panels = document.querySelectorAll('#tab-settings details.cpanel, #tab-settings .mod-section, #tab-settings .identity-section');
+  panels.forEach(function(p){
+    if (!q) { p.classList.remove('ns-hidden'); return; }
+    var txt = (p.textContent || '').toLowerCase();
+    if (txt.indexOf(q) === -1) p.classList.add('ns-hidden');
+    else                       p.classList.remove('ns-hidden');
+  });
 }
 function showSubTab(id, el) {
   document.querySelectorAll('.sub-tab-content').forEach(function(e){ e.classList.remove('active'); });
