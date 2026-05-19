@@ -2313,6 +2313,17 @@ if (!$usb_eths): ?>
   </div>
 </details>
 
+<details class="cpanel" open>
+  <summary>Optional Downloads (#82)</summary>
+  <div class="cpbody">
+    <p style="font-size:13px;color:#aaa;margin-bottom:10px">
+      Browse the Kiwix catalog (offline-cached) and queue ZIM downloads. Background worker handles transfers; downloads are resumable and survive reboots.
+    </p>
+    <a class="btn-sm" href="/admin/downloads.php">Open downloads manager -></a>
+    <span style="font-size:11px;color:#555;margin-left:10px">Wipe / reclaim disk: see System tab.</span>
+  </div>
+</details>
+
 <details class="cpanel">
   <summary>Library  -  ZIM Modules</summary>
   <div class="cpbody">

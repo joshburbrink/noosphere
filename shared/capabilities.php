@@ -73,6 +73,9 @@ function capability_map(): array {
 
         // Command dashboard (#76)
         'command.view'          => ['operator', 'command'],
+
+        // Content downloads + wipes (#82)
+        'content.manage'        => ['operator'],
     ];
 }
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Noosphere background download queue worker (#82)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/noosphere-download-worker.sh
+Restart=on-failure
+RestartSec=10
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
