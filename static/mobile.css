@@ -1,0 +1,67 @@
+/* mobile.css — universal mobile-friendly defaults (#37).
+ * Loaded by shared/head.php after theme.css. Scoped to small-viewport media
+ * queries so module-specific layouts are untouched on desktop. */
+
+/* Prevent iOS Safari from auto-zooming when focusing inputs: any text input
+ * with font-size < 16px triggers zoom. Applies at all sizes. */
+input[type="text"], input[type="search"], input[type="email"], input[type="tel"],
+input[type="url"], input[type="password"], input[type="number"], input[type="date"],
+input[type="time"], input[type="datetime-local"], select, textarea {
+  font-size: max(16px, 1em);
+}
+
+@media (max-width: 600px) {
+  /* Universal tap target floor for primary controls. 44px is the iOS HIG /
+   * Material baseline. */
+  button, .btn, .btn-sm, .btn-green, .btn-red,
+  a.btn, a.btn-sm, a.btn-green, a.btn-red,
+  input[type="submit"], input[type="button"] {
+    min-height: 44px;
+    padding-top: 10px; padding-bottom: 10px;
+  }
+
+  /* Tables: wrap horizontally instead of overflowing the viewport. Module
+   * pages with their own scroll containers will override this. */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  /* Stop tables breaking row layout when made display:block */
+  table > thead, table > tbody, table > tfoot { display: table-row-group; }
+  table > * > tr { display: table-row; }
+  table th, table td { white-space: nowrap; }
+
+  /* Forms: single-column on mobile. Many modules use .form-row with flex; this
+   * stacks them. */
+  .form-row, .row-flex {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .form-row > *, .row-flex > * { width: 100% !important; min-width: 0 !important; }
+
+  /* Increase line-height on dense paragraph content */
+  body { line-height: 1.4; }
+
+  /* Container padding: keep content off the edge */
+  .container, .wrap, main { padding-left: 12px !important; padding-right: 12px !important; }
+
+  /* Identity strip — already responsive but make it a touch larger to hit */
+  #ns-identity-strip { padding: 6px 8px; }
+  #ns-identity-strip a { padding: 4px 6px; }
+}
+
+/* Small phones (iPhone SE et al.) — tighter still */
+@media (max-width: 380px) {
+  body { font-size: 14px; }
+  .tab, .sub-tab { padding: 8px 10px !important; font-size: 12px !important; }
+}
+
+/* Common pattern: horizontal "action" rows of small buttons that overflow.
+ * Allow wrap with consistent gap. */
+@media (max-width: 600px) {
+  .actions, .btn-row, .button-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+}

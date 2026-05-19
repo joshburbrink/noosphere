@@ -19,6 +19,7 @@ $_ns_identity_strip       = get_setting('identity_strip', '1') === '1' && !is_re
 })();
 </script>
 <link rel="stylesheet" href="/static/theme.css">
+<link rel="stylesheet" href="/static/mobile.css">
 <script>
 document.addEventListener("DOMContentLoaded", function(){
   var allow = <?= $_ns_theme_allow_override ? 'true' : 'false' ?>;
