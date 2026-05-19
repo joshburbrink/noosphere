@@ -1,9 +1,9 @@
 #!/bin/bash
-# install-to-disk.sh — Install Noosphere directly to an internal drive.
+# install-to-disk.sh  -  Install Noosphere directly to an internal drive.
 #
 # What it does:
 #   1. Shows target drive info and requires explicit confirmation before touching anything
-#   2. Partitions the drive (GPT + EFI, or MBR + BIOS boot — auto-detected)
+#   2. Partitions the drive (GPT + EFI, or MBR + BIOS boot  -  auto-detected)
 #   3. Formats partitions and installs a minimal Debian 13 (trixie) base via debootstrap
 #   4. Installs and configures GRUB bootloader
 #   5. Drops noosphere-provision.sh into the new system as a first-boot service
@@ -103,7 +103,7 @@ fi
 ##############################################################################
 echo
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║          NOOSPHERE — INSTALL TO DISK                        ║"
+echo "║          NOOSPHERE  -  INSTALL TO DISK                        ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
 info "Target device: $DEVICE"
@@ -281,7 +281,7 @@ ok "Kernel and core packages installed."
 # Root password
 info "Setting temporary root password..."
 chroot "$MOUNT" bash -c "echo 'root:noosphere' | chpasswd"
-warn "Root password set to 'noosphere' — change it after first login with: passwd"
+warn "Root password set to 'noosphere'  -  change it after first login with: passwd"
 
 # SSH: allow root login temporarily
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' "$MOUNT/etc/ssh/sshd_config"
@@ -327,7 +327,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/$PROVISION_SCRIPT" ]]; then
     cp "$SCRIPT_DIR/$PROVISION_SCRIPT" "$MOUNT/root/$PROVISION_SCRIPT"
 else
-    warn "$PROVISION_SCRIPT not found alongside this script — you will need to run it manually."
+    warn "$PROVISION_SCRIPT not found alongside this script  -  you will need to run it manually."
     warn "Get it from: $REPO_URL"
 fi
 

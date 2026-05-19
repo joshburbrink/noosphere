@@ -1,15 +1,15 @@
 #!/bin/bash
-# noosphere-provision.sh — Full stack provisioning for a fresh Debian 13 (trixie) install.
+# noosphere-provision.sh  -  Full stack provisioning for a fresh Debian 13 (trixie) install.
 #
 # Called automatically on first boot by the noosphere-firstboot.service
 # (which is registered by install-to-disk.sh).  Can also be run manually.
 #
 # What it installs:
 #   - nginx + PHP 8.4-FPM + MariaDB
-#   - Noosphere repo → /var/www/noosphere/
+#   - Noosphere repo -> /var/www/noosphere/
 #   - Kiwix 3.7.0 (offline library server)
 #   - mbtileserver (offline tile server)
-#   - Nextcloud 33 (optional — skipped if --no-nextcloud passed)
+#   - Nextcloud 33 (optional  -  skipped if --no-nextcloud passed)
 #   - dnsmasq (captive portal DNS)
 #   - iptables (captive portal redirect)
 #   - All systemd services
@@ -38,7 +38,7 @@ NEXTCLOUD_URL="https://download.nextcloud.com/server/releases/nextcloud-${NEXTCL
 
 HOSTNAME_VAL="noosphere"
 PORTAL_DOMAIN="noosphere.net"
-SERVER_IP="192.168.2.166"   # Default — can be overridden
+SERVER_IP="192.168.2.166"   # Default  -  can be overridden
 
 UNATTENDED=0
 SKIP_NEXTCLOUD=0
@@ -72,13 +72,13 @@ done
 ##############################################################################
 echo
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║          NOOSPHERE — SYSTEM PROVISIONING                     ║"
+echo "║          NOOSPHERE  -  SYSTEM PROVISIONING                     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
-[[ "$UNATTENDED" -eq 1 ]] && info "Running in unattended mode — all prompts skipped."
+[[ "$UNATTENDED" -eq 1 ]] && info "Running in unattended mode  -  all prompts skipped."
 
 ##############################################################################
-# Apt sources — ensure trixie + non-free are present
+# Apt sources  -  ensure trixie + non-free are present
 ##############################################################################
 info "Configuring apt sources..."
 cat > /etc/apt/sources.list <<EOF
@@ -169,7 +169,7 @@ chown -R www-data:www-data "$DATA_DIR" /var/lib/kiwix /var/log/noosphere
 ok "Data directories created."
 
 ##############################################################################
-# SQLite settings DB — touch it so www-data can write
+# SQLite settings DB  -  touch it so www-data can write
 ##############################################################################
 info "Initializing settings database..."
 touch "$DATA_DIR/settings.db"
@@ -212,7 +212,7 @@ systemctl restart php8.4-fpm
 ok "PHP-FPM enabled."
 
 ##############################################################################
-# MariaDB — secure install + Nextcloud database
+# MariaDB  -  secure install + Nextcloud database
 ##############################################################################
 info "Configuring MariaDB..."
 systemctl enable mariadb
@@ -256,7 +256,7 @@ chown www-data:www-data /var/lib/kiwix/library.xml
 # Systemd service
 cp "$NOOSPHERE_DIR/systemd/kiwix.service" /etc/systemd/system/kiwix.service
 systemctl enable kiwix
-systemctl start kiwix || warn "kiwix started (no ZIM files yet — normal)"
+systemctl start kiwix || warn "kiwix started (no ZIM files yet  -  normal)"
 ok "Kiwix service installed."
 
 ##############################################################################
@@ -288,7 +288,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 systemctl enable mbtileserver
-systemctl start mbtileserver || warn "mbtileserver started (no MBTiles yet — normal)"
+systemctl start mbtileserver || warn "mbtileserver started (no MBTiles yet  -  normal)"
 ok "mbtileserver service installed."
 
 ##############################################################################
@@ -410,7 +410,7 @@ systemctl daemon-reload
 ok "Weather and scanner services installed (enable manually when hardware attached)."
 
 ##############################################################################
-# dnsmasq — captive portal DNS
+# dnsmasq  -  captive portal DNS
 ##############################################################################
 info "Configuring dnsmasq..."
 cat > /etc/dnsmasq.conf <<EOF
@@ -427,11 +427,11 @@ dhcp-option=option:dns-server,${SERVER_IP}
 log-dhcp
 EOF
 systemctl enable dnsmasq
-systemctl restart dnsmasq || warn "dnsmasq restart failed — check config"
+systemctl restart dnsmasq || warn "dnsmasq restart failed  -  check config"
 ok "dnsmasq configured."
 
 ##############################################################################
-# iptables — captive portal redirect
+# iptables  -  captive portal redirect
 ##############################################################################
 info "Configuring iptables..."
 cat > /etc/iptables/rules.v4 <<EOF
@@ -440,7 +440,7 @@ cat > /etc/iptables/rules.v4 <<EOF
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
-# Redirect all port-80 traffic not destined for us → our nginx
+# Redirect all port-80 traffic not destined for us -> our nginx
 -A PREROUTING -i wlan0 -p tcp --dport 80  ! -d ${SERVER_IP} -j DNAT --to-destination ${SERVER_IP}:80
 # Redirect all port-443 traffic (we handle it with nginx fake-ssl)
 -A PREROUTING -i wlan0 -p tcp --dport 443 ! -d ${SERVER_IP} -j DNAT --to-destination ${SERVER_IP}:443
@@ -464,7 +464,7 @@ COMMIT
 -A INPUT -p udp --dport 67  -j ACCEPT
 COMMIT
 EOF
-iptables-restore < /etc/iptables/rules.v4 || warn "iptables-restore failed — apply manually"
+iptables-restore < /etc/iptables/rules.v4 || warn "iptables-restore failed  -  apply manually"
 ok "iptables rules installed."
 
 ##############################################################################
@@ -489,7 +489,7 @@ done
 ok "Helper commands installed to /usr/local/bin/"
 
 ##############################################################################
-# sudo rules — allow www-data to call specific admin scripts as root
+# sudo rules  -  allow www-data to call specific admin scripts as root
 ##############################################################################
 info "Installing sudo rules..."
 cat > /etc/sudoers.d/noosphere-admin <<'EOF'
@@ -562,7 +562,7 @@ NCEOF
             --admin-user=admin \
             --admin-pass="${NC_ADMIN_PASS}" \
             --data-dir=/var/lib/noosphere/nextcloud-data \
-            2>&1 || warn "Nextcloud occ install failed — complete setup at /nextcloud in browser"
+            2>&1 || warn "Nextcloud occ install failed  -  complete setup at /nextcloud in browser"
 
         echo "NC_ADMIN_PASS=${NC_ADMIN_PASS}" >> /etc/noosphere/db.conf
 
@@ -576,7 +576,7 @@ NCEOF
 fi
 
 ##############################################################################
-# /etc/hosts — ensure portal domain resolves locally
+# /etc/hosts  -  ensure portal domain resolves locally
 ##############################################################################
 if ! grep -q "$PORTAL_DOMAIN" /etc/hosts; then
     echo "${SERVER_IP}  ${PORTAL_DOMAIN}" >> /etc/hosts
@@ -614,7 +614,7 @@ fi
 echo
 echo "  Web portal:  http://${SERVER_IP}/"
 echo "  Admin panel: http://${SERVER_IP}/admin/  (keyboard shortcut: aaa)"
-echo "  SSH:         ssh root@${SERVER_IP}  (password: noosphere — CHANGE IT)"
+echo "  SSH:         ssh root@${SERVER_IP}  (password: noosphere  -  CHANGE IT)"
 echo
 if [[ -f /etc/noosphere/db.conf ]]; then
     echo "  Saved credentials: /etc/noosphere/db.conf (chmod 600)"

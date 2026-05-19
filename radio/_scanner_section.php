@@ -1,5 +1,5 @@
 <?php
-// Scanner section — always included from /radio/index.php.
+// Scanner section  -  always included from /radio/index.php.
 // Waterfall only rendered when radio_mode=scanner; otherwise shows a quiet status note.
 
 $scanner_waterfall_mode = (get_setting('radio_mode','off') === 'scanner');
@@ -40,7 +40,7 @@ function _fmt_hz($hz) {
     <?php if (file_exists($scanner_png)): ?>
       <img id="waterfall-img" src="/radio/scanner/waterfall.png?<?= time() ?>" alt="Spectrum waterfall" style="display:block;width:100%;height:auto;image-rendering:pixelated;min-width:200px">
     <?php else: ?>
-      <div style="color:#666;text-align:center;padding:40px;font-size:13px">Scanner starting — first sweep in a few seconds.</div>
+      <div style="color:#666;text-align:center;padding:40px;font-size:13px">Scanner starting  -  first sweep in a few seconds.</div>
     <?php endif; ?>
   </div>
 
@@ -50,7 +50,7 @@ function _fmt_hz($hz) {
     <span style="color:#544"><?= $scanner_meta['db_min'] ?> dB</span>
     <span style="flex:1;height:8px;background:linear-gradient(to right,#440154,#3a528b,#21918c,#5ec962,#fde725);border-radius:2px;min-width:60px;max-width:300px"></span>
     <span style="color:#fde725"><?= $scanner_meta['db_max'] ?> dB</span>
-    <span style="color:#555;font-size:10px;width:100%">Time flows top→bottom · low freq ←→ high freq</span>
+    <span style="color:#555;font-size:10px;width:100%">Time flows top->bottom · low freq ←-> high freq</span>
   </div>
   <?php endif; ?>
 
@@ -59,7 +59,7 @@ function _fmt_hz($hz) {
     <div style="flex:1;height:6px;background:#111;border-radius:3px;overflow:hidden">
       <div id="scn-signal-fill" style="height:100%;width:0%;background:#555;border-radius:3px;transition:width 0.4s,background 0.4s"></div>
     </div>
-    <span id="scn-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
+    <span id="scn-signal-db" style="font-family:monospace;min-width:52px;text-align:right"> -  dB</span>
   </div>
 
   <div style="margin-top:10px;font-size:11px;color:#666">
@@ -88,7 +88,7 @@ function _fmt_hz($hz) {
       if (!fill) return;
       if (!d.ok || d.peak_db === null) {
         fill.style.width = '0%'; fill.style.background = '#555';
-        lbl.textContent = '— dB'; return;
+        lbl.textContent = ' -  dB'; return;
       }
       var pct   = Math.max(0, Math.min(100, (d.peak_db + 60) / 60 * 100));
       var color = d.peak_db > -30 ? '#2ecc71' : d.peak_db > -50 ? '#f39c12' : '#e94560';
@@ -105,6 +105,6 @@ function _fmt_hz($hz) {
 </script>
 <?php else: ?>
 <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#555">
-  📡 Spectrum waterfall unavailable in this mode — enable Scanner in Admin → SDR Radio to view live RF.
+  📡 Spectrum waterfall unavailable in this mode  -  enable Scanner in Admin -> SDR Radio to view live RF.
 </div>
 <?php endif; ?>

@@ -95,7 +95,7 @@ $csrf_token = csrf_token();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Files — Noosphere</title>
+<title>Files  -  Noosphere</title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; }

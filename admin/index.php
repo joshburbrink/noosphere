@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/audit.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 
 define('ADMIN_PASS', 'admin'); // fallback bootstrap password
@@ -92,7 +93,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $run_name   = $script;
     }
 
-    // --- AP mode toggle (AJAX — returns JSON) ---
+    // --- AP mode toggle (AJAX  -  returns JSON) ---
     if ($act === 'ap_enable' || $act === 'ap_disable') {
         header('Content-Type: application/json');
         $subcmd = $act === 'ap_enable' ? 'enable' : 'disable';
@@ -101,7 +102,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // --- Display mode switch (AJAX — returns JSON) ---
+    // --- Display mode switch (AJAX  -  returns JSON) ---
     if ($act === 'display_mode') {
         header('Content-Type: application/json');
         $mode = trim($_POST['mode'] ?? '');
@@ -133,7 +134,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // --- NWR channel scan (AJAX — returns JSON of freq→dB) ---
+    // --- NWR channel scan (AJAX  -  returns JSON of freq->dB) ---
     if ($act === 'sdr_nwr_scan') {
         header('Content-Type: application/json');
         $raw = shell_exec('sudo -n /usr/local/bin/noosphere-scan-nwr.sh 2>&1') ?? '';
@@ -147,7 +148,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // --- SDR diagnostics (AJAX — returns JSON) ---
+    // --- SDR diagnostics (AJAX  -  returns JSON) ---
     if (in_array($act, ['sdr_diag_usb','sdr_diag_rtltest','sdr_diag_log','sdr_diag_restart','sdr_diag_blacklist'])) {
         header('Content-Type: application/json');
         $arg = '';
@@ -167,7 +168,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // --- Device status (AJAX — returns JSON for Devices panel) ---
+    // --- Device status (AJAX  -  returns JSON for Devices panel) ---
     if ($act === 'dev_status') {
         header('Content-Type: application/json');
         $lsusb = shell_exec('lsusb 2>/dev/null') ?? '';
@@ -335,7 +336,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // --- Calendar: add event (admin — auto-approved) ---
+    // --- Calendar: add event (admin  -  auto-approved) ---
     if ($act === 'add_event') {
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->exec("CREATE TABLE IF NOT EXISTS events (
@@ -369,7 +370,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $eid = (int)($_POST['eid'] ?? 0);
         $cdb = new PDO('sqlite:/var/lib/noosphere/calendar.db');
         $cdb->prepare("UPDATE events SET status='approved' WHERE id=?")->execute([$eid]);
-        $msg = 'Event approved — now visible on the calendar.';
+        $msg = 'Event approved  -  now visible on the calendar.';
     }
 
     // --- Calendar: reject submission ---
@@ -561,6 +562,33 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- Region: switch active region pack ---
+    if ($act === 'set_active_region') {
+        $slug = trim($_POST['slug'] ?? '');
+        if (set_active_region($slug)) {
+            log_audit('set_active_region', $slug, 'info');
+            $msg = 'Active region set to: ' . esc($slug);
+        } else {
+            $msg = 'Region pack not found: ' . esc($slug);
+        }
+    }
+
+    // --- Region: upload + install a region pack tarball ---
+    if ($act === 'upload_region_pack' && !empty($_FILES['pack']['tmp_name'])) {
+        $f = $_FILES['pack'];
+        if ($f['error'] !== UPLOAD_ERR_OK) {
+            $msg = 'Upload failed (error code ' . (int)$f['error'] . ').';
+        } else {
+            $tmp = '/tmp/region-pack-' . bin2hex(random_bytes(6)) . '.tar.gz';
+            move_uploaded_file($f['tmp_name'], $tmp);
+            $out = []; $rc = 0;
+            exec('sudo -n /usr/local/bin/noosphere-install-region-pack.sh ' . escapeshellarg($tmp) . ' 2>&1', $out, $rc);
+            @unlink($tmp);
+            log_audit('upload_region_pack', $f['name'] . ' rc=' . $rc, $rc === 0 ? 'info' : 'warn');
+            $msg = ($rc === 0 ? 'Region pack installed. ' : 'Install failed (rc=' . $rc . '). ') . esc(implode("\n", $out));
+        }
+    }
+
     // --- Settings: apply quick-start preset ---
     if ($act === 'apply_preset') {
         log_audit('apply_preset', trim($_POST['preset']??''), 'info');
@@ -603,7 +631,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             ? 'systemctl enable --now noosphere-radio-monitor.service 2>&1'
             : 'systemctl disable --now noosphere-radio-monitor.service 2>&1');
 
-        // --- SDR radio mode (off|nwr|scanner) — invokes helper if changed ---
+        // --- SDR radio mode (off|nwr|scanner)  -  invokes helper if changed ---
         if (isset($_POST['radio_mode'])) {
             $valid_modes = ['off','nwr','scanner','rtl433','aprs'];
             $new_mode = in_array($_POST['radio_mode'], $valid_modes, true) ? $_POST['radio_mode'] : 'off';
@@ -770,7 +798,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'reset_instance') {
         $confirm = trim($_POST['reset_confirm'] ?? '');
         if ($confirm === 'RESET') {
-            log_audit('reset_instance', 'INSTANCE RESET — all user data wiped', 'critical');
+            log_audit('reset_instance', 'INSTANCE RESET  -  all user data wiped', 'critical');
             // Wipe all user data, preserve settings DB
             $dbs_to_clear = [
                 '/var/lib/noosphere/registry.db' => ['registry'],
@@ -790,7 +818,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach (glob(PHOTOS_DIR . '*') ?: [] as $f) @unlink($f);
             $msg = 'Instance reset. All user data cleared.';
         } else {
-            $msg = 'Reset cancelled — you must type RESET exactly.';
+            $msg = 'Reset cancelled  -  you must type RESET exactly.';
         }
     }
 }
@@ -864,7 +892,7 @@ $scripts = [
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — Noosphere</title>
+<title>Admin  -  Noosphere</title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -953,7 +981,7 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 .event-title { font-size:14px; font-weight:bold; }
 .event-meta { font-size:11px; color:#888; margin-top:2px; }
 /* Settings tab */
-/* Settings tab — module sections */
+/* Settings tab  -  module sections */
 .mod-section { background:#1a1a2e; border:1px solid #2a2a4a; border-radius:8px; margin-bottom:8px; overflow:hidden; }
 .mod-header { padding:12px 16px; display:flex; align-items:center; gap:12px; }
 .mod-header label { font-size:14px; font-weight:bold; color:#e0e0e0; flex:1; cursor:pointer; margin:0; }
@@ -991,7 +1019,7 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 .reset-row { display:flex; gap:8px; align-items:center; }
 .reset-row input { flex:1; max-width:200px; }
 
-/* ── Admin overhaul (#36) — toast, toggle, mobile, search, sticky save ── */
+/* ── Admin overhaul (#36)  -  toast, toggle, mobile, search, sticky save ── */
 
 /* Toast notifications */
 #ns-toast-host { position:fixed; top:14px; right:14px; z-index:10000; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
@@ -1002,7 +1030,7 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 @keyframes ns-toast-in { from { transform:translateX(40px); opacity:0; } to { transform:none; opacity:1; } }
 .ns-toast.fade { opacity:0; transition:opacity .4s; }
 
-/* Toggle switch — applied to .mod-toggle and any input[type=checkbox].toggle */
+/* Toggle switch  -  applied to .mod-toggle and any input[type=checkbox].toggle */
 .mod-toggle, input[type=checkbox].toggle {
   appearance:none; -webkit-appearance:none;
   width:36px; height:20px; border-radius:11px;
@@ -1018,7 +1046,7 @@ details.cpanel > .cpbody { padding:4px 16px 16px; border-top:1px solid #1e1e38; 
 .mod-toggle:checked::before, input[type=checkbox].toggle:checked::before { transform:translateX(16px); background:#e94560; }
 .mod-toggle:focus-visible, input[type=checkbox].toggle:focus-visible { outline:2px solid #e94560; outline-offset:1px; }
 
-/* Mobile tab bar — collapses to a dropdown under 700px */
+/* Mobile tab bar  -  collapses to a dropdown under 700px */
 @media (max-width: 700px) {
   .tab-bar { display:none; }
   .tab-bar.open { display:flex; flex-direction:column; gap:4px; }
@@ -1092,6 +1120,7 @@ details.cpanel.ns-hidden { display:none; }
   <div class="tab" data-tab="community" onclick="showTab('community')">Community</div>
   <div class="tab" data-tab="content"   onclick="showTab('content')">Content</div>
   <div class="tab" data-tab="system"    onclick="showTab('system')">System</div>
+  <div class="tab" data-tab="region"    onclick="showTab('region')">Region</div>
   <div class="tab" data-tab="settings"  onclick="showTab('settings')">Settings</div>
 </div>
 
@@ -1119,9 +1148,9 @@ details.cpanel.ns-hidden { display:none; }
     <?php
     // Load average
     $loadavg = file_exists('/proc/loadavg') ? explode(' ', trim(file_get_contents('/proc/loadavg'))) : [];
-    $load1  = $loadavg[0] ?? '—';
-    $load5  = $loadavg[1] ?? '—';
-    $load15 = $loadavg[2] ?? '—';
+    $load1  = $loadavg[0] ?? ' - ';
+    $load5  = $loadavg[1] ?? ' - ';
+    $load15 = $loadavg[2] ?? ' - ';
 
     // Memory from /proc/meminfo
     $mem_total = $mem_avail = 0;
@@ -1253,7 +1282,7 @@ details.cpanel.ns-hidden { display:none; }
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select name="ext_device" style="flex:1;min-width:220px">
               <?php foreach ($avail_drives as $d): ?>
-              <option value="<?= esc($d['device']) ?>"><?= esc($d['device']) ?> — <?= esc($d['size']) ?> (<?= esc($d['fstype']) ?><?= $d['label'] ? ', '.esc($d['label']) : '' ?>)</option>
+              <option value="<?= esc($d['device']) ?>"><?= esc($d['device']) ?>  -  <?= esc($d['size']) ?> (<?= esc($d['fstype']) ?><?= $d['label'] ? ', '.esc($d['label']) : '' ?>)</option>
               <?php endforeach; ?>
             </select>
             <button type="submit" class="btn-green" style="padding:8px 18px;font-size:13px;white-space:nowrap">Mount (read-only)</button>
@@ -1278,7 +1307,7 @@ try {
   <summary>Pending Event Submissions <span class="badge" style="background:#f39c12;color:#000"><?= $dash_pending_events ?></span></summary>
   <div class="cpbody">
     <p style="font-size:13px;color:#c8a040;margin-bottom:10px"><?= $dash_pending_events ?> event suggestion<?= $dash_pending_events !== 1 ? 's' : '' ?> waiting for review.</p>
-    <a href="#" onclick="showTab('community');document.querySelector('[onclick*=community]').click();return false" class="btn" style="font-size:12px;padding:7px 16px;text-decoration:none">Review in Community tab →</a>
+    <a href="#" onclick="showTab('community');document.querySelector('[onclick*=community]').click();return false" class="btn" style="font-size:12px;padding:7px 16px;text-decoration:none">Review in Community tab -></a>
   </div>
 </details>
 <?php endif; ?>
@@ -1296,7 +1325,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
                'files'=>'Files','maps'=>'Maps','library'=>'Library','calendar'=>'Calendar'];
 ?>
 <?php if (!$st): ?>
-  <details class="cpanel" open><summary>Analytics</summary><div class="cpbody"><p style="color:#666;font-size:13px;padding:4px 0">No analytics data yet — visitors will be tracked automatically as they use the hub.</p></div></details>
+  <details class="cpanel" open><summary>Analytics</summary><div class="cpbody"><p style="color:#666;font-size:13px;padding:4px 0">No analytics data yet  -  visitors will be tracked automatically as they use the hub.</p></div></details>
 <?php else:
   $unreg = $st['total'] - $st['registered'];
   $reg_rate = $st['total'] ? round($st['registered'] / $st['total'] * 100) : 0;
@@ -1311,7 +1340,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       ['Browsed, didn\'t register', $unreg,         '#f39c12'],
       ['Active today',           $st['today'],      '#4a9eff'],
       ['Registration rate',      $reg_rate . '%',   $reg_rate >= 50 ? '#2ecc71' : '#f39c12'],
-      ['Avg time on site',       $st['avg_duration'] ? fmt_dur($st['avg_duration']) : '—', '#e0e0e0'],
+      ['Avg time on site',       $st['avg_duration'] ? fmt_dur($st['avg_duration']) : ' - ', '#e0e0e0'],
       ['Total page hits',        $st['total_hits'],  '#e0e0e0'],
     ] as [$label, $val, $col]): ?>
     <div class="svc-card">
@@ -1365,7 +1394,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
 </details>
 
 <details class="cpanel">
-  <summary>Visitors — Last 7 Days</summary>
+  <summary>Visitors  -  Last 7 Days</summary>
   <div class="cpbody">
   <div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:6px">
   <?php foreach ($st['days'] as $date => $cnt):
@@ -1515,8 +1544,8 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <tr><th>Name</th><th>IP</th><th>Reason</th><th>Banned by</th><th></th></tr>
       <?php foreach ($bans as $b): ?>
       <tr>
-        <td><?= esc($b['name'] ?? '—') ?></td>
-        <td style="font-family:monospace;font-size:12px"><?= esc($b['ip'] ?? '—') ?></td>
+        <td><?= esc($b['name'] ?? ' - ') ?></td>
+        <td style="font-family:monospace;font-size:12px"><?= esc($b['ip'] ?? ' - ') ?></td>
         <td><?= esc($b['reason']) ?></td>
         <td style="color:#555"><?= esc($b['banned_by']) ?></td>
         <td>
@@ -1585,7 +1614,7 @@ $mod_labels = ['home'=>'Home','registry'=>'Registry','forum'=>'Forum','chat'=>'C
       <tr>
         <td><?= esc($f['name']) ?></td>
         <td><?= esc($f['location']) ?></td>
-        <td style="color:#555;font-size:11px"><?= $f['updated_at'] ? date('M j H:i', $f['updated_at']) : '—' ?></td>
+        <td style="color:#555;font-size:11px"><?= $f['updated_at'] ? date('M j H:i', $f['updated_at']) : ' - ' ?></td>
         <td>
           <form method="post" style="margin:0" onsubmit="return confirm('Delete this entry?')">
             <?= csrf_field() ?>
@@ -1727,7 +1756,7 @@ $_disp_exists = file_exists('/usr/local/bin/noosphere-display');
   <div class="cpbody">
     <div style="font-size:12px;color:#888;margin-bottom:12px">
       Two options: <strong>Hostapd</strong> (this laptop broadcasts WiFi directly) or <strong>External Router</strong> (GL.iNet or any router connected via ethernet).
-      Both work — hostapd is useful when no router is available.
+      Both work  -  hostapd is useful when no router is available.
     </div>
 
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -1756,8 +1785,8 @@ $_disp_exists = file_exists('/usr/local/bin/noosphere-display');
         </div>
         <div style="font-size:13px;font-weight:bold;margin-bottom:4px">External Router</div>
         <div style="font-size:12px;color:#aaa">GL.iNet or any router</div>
-        <div style="font-size:12px;color:#777">eno1 ethernet → router LAN port</div>
-        <div style="font-size:12px;color:#777">Captive portal → 192.168.8.2</div>
+        <div style="font-size:12px;color:#777">eno1 ethernet -> router LAN port</div>
+        <div style="font-size:12px;color:#777">Captive portal -> 192.168.8.2</div>
       </div>
     </div>
 
@@ -1795,7 +1824,7 @@ $_disp_exists = file_exists('/usr/local/bin/noosphere-display');
       <tr>
         <td style="font-family:monospace;font-size:12px"><?= esc($dev['ip']) ?></td>
         <td style="font-family:monospace;font-size:11px;color:#888"><?= esc($dev['mac']) ?></td>
-        <td><?= esc($dev['hostname']) ?: '<span style="color:#555">—</span>' ?></td>
+        <td><?= esc($dev['hostname']) ?: '<span style="color:#555"> - </span>' ?></td>
         <td style="color:#555;font-size:11px"><?= esc($dev['iface']) ?></td>
         <td>
           <form method="post" style="margin:0;display:inline">
@@ -1829,7 +1858,7 @@ $_disp_exists = file_exists('/usr/local/bin/noosphere-display');
       ?>
       <tr>
         <td><strong style="font-size:13px"><?= esc($iface) ?></strong></td>
-        <td style="font-family:monospace;font-size:12px;color:#aaa"><?= $ip_addr ? esc($ip_addr) : '<span style="color:#555">—</span>' ?></td>
+        <td style="font-family:monospace;font-size:12px;color:#aaa"><?= $ip_addr ? esc($ip_addr) : '<span style="color:#555"> - </span>' ?></td>
         <td style="font-family:monospace"><?= fmt_bytes($s['rx']) ?></td>
         <td style="font-family:monospace"><?= fmt_bytes($s['tx']) ?></td>
         <td style="color:<?= $link==='up'?'#2ecc71':'#555' ?>"><?= esc($link) ?></td>
@@ -1958,13 +1987,13 @@ if (!$usb_eths): ?>
     <p style="color:#aaa;font-size:13px;margin-bottom:14px">
       Attach an HDMI monitor or Raspberry Pi touchscreen to show the kiosk or command view locally.
       <?php if (!$_disp_exists): ?>
-        <span style="color:#e94560">noosphere-display not installed — run <code>setup-local-display.sh server</code> first.</span>
+        <span style="color:#e94560">noosphere-display not installed  -  run <code>setup-local-display.sh server</code> first.</span>
       <?php endif; ?>
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       <?php
       $modes = [
-        'kiosk'   => ['label'=>'Kiosk',   'desc'=>'Public view — full-screen kiosk display', 'color'=>'2ecc71', 'bg'=>'0a2a0a', 'border'=>'2a6a2a'],
+        'kiosk'   => ['label'=>'Kiosk',   'desc'=>'Public view  -  full-screen kiosk display', 'color'=>'2ecc71', 'bg'=>'0a2a0a', 'border'=>'2a6a2a'],
         'command' => ['label'=>'Command', 'desc'=>'Operator command dashboard',                'color'=>'4a9eff', 'bg'=>'0a1a2a', 'border'=>'2a4a6a'],
         'off'     => ['label'=>'Off',     'desc'=>'Turn off local display service',           'color'=>'888',    'bg'=>'161616', 'border'=>'2a2a2a'],
       ];
@@ -2002,7 +2031,7 @@ if (!$usb_eths): ?>
 <!-- Devices & Hardware -->
 <details class="cpanel" open>
   <summary>📟 Devices &amp; Hardware
-    <span style="font-size:11px;color:#888;font-weight:normal">— USB hardware, service health, radio alerts</span>
+    <span style="font-size:11px;color:#888;font-weight:normal"> -  USB hardware, service health, radio alerts</span>
     <button type="button" id="dev-refresh-btn" onclick="devRefresh()" style="margin-left:12px;background:#0d0d1a;border:1px solid #2a2a4a;color:#7ad;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer">↺ Refresh</button>
     <span id="dev-refresh-ts" style="font-size:10px;color:#444;margin-left:8px"></span>
   </summary>
@@ -2052,11 +2081,11 @@ if (!$usb_eths): ?>
       } else if (dev.type==='sdr') {
         if (d.sdr_ok) {
           var mode_label = {off:'idle',nwr:'NWR',scanner:'scanner',rtl433:'rtl_433',aprs:'APRS'}[d.sdr_mode]||d.sdr_mode;
-          st = badge(true, 'OK — '+mode_label);
+          st = badge(true, 'OK  -  '+mode_label);
         } else {
           st = badge(false,'ERROR');
         }
-        extra = ' <a href="javascript:void(0)" onclick="document.querySelector(\'.tab[onclick*=settings]\').click();document.getElementById(\'stab-modules-btn\').click();setTimeout(function(){document.querySelector(\'[data-act=sdr_diag_usb]\').scrollIntoView()},200)" style="font-size:10px;color:#4a9eff">→ SDR Radio</a>';
+        extra = ' <a href="javascript:void(0)" onclick="document.querySelector(\'.tab[onclick*=settings]\').click();document.getElementById(\'stab-modules-btn\').click();setTimeout(function(){document.querySelector(\'[data-act=sdr_diag_usb]\').scrollIntoView()},200)" style="font-size:10px;color:#4a9eff">-> SDR Radio</a>';
       } else if (dev.type==='wifi') {
         var ap_up = (d.svc_states||{})['hostapd']==='active';
         st = badge(ap_up, ap_up?'AP active':'present');
@@ -2083,7 +2112,7 @@ if (!$usb_eths): ?>
     h += '<div style="margin-bottom:14px">';
     h += '<div style="font-size:11px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">NWR Alerts (all-time)</div>';
     h += '<span style="font-size:13px;color:#eee">'+d.alert_count+'</span>';
-    if (d.latest_alert) h += ' <span style="font-size:11px;color:#555">— latest: '+d.latest_alert+'</span>';
+    if (d.latest_alert) h += ' <span style="font-size:11px;color:#555"> -  latest: '+d.latest_alert+'</span>';
     h += '</div>';
 
     // SDR probe detail (collapsible)
@@ -2195,10 +2224,10 @@ if (!$usb_eths): ?>
       <tr><th>Title</th><th>Type</th><th>Notes</th><th>Author</th><th></th></tr>
       <?php foreach ($ct_markers as $mk): ?>
       <tr>
-        <td><?= esc($mk['title'] ?? '—') ?></td>
-        <td style="color:#888"><?= esc($mk['type'] ?? '—') ?></td>
+        <td><?= esc($mk['title'] ?? ' - ') ?></td>
+        <td style="color:#888"><?= esc($mk['type'] ?? ' - ') ?></td>
         <td style="color:#555;font-size:11px"><?= esc(mb_substr($mk['notes'] ?? '', 0, 50)) ?><?= mb_strlen($mk['notes'] ?? '') > 50 ? '…' : '' ?></td>
-        <td style="color:#555"><?= esc($mk['author'] ?? '—') ?></td>
+        <td style="color:#555"><?= esc($mk['author'] ?? ' - ') ?></td>
         <td>
           <form method="post" style="margin:0" onsubmit="return confirm('Delete this marker?')">
             <?= csrf_field() ?>
@@ -2216,7 +2245,7 @@ if (!$usb_eths): ?>
 </details>
 
 <details class="cpanel">
-  <summary>Library — ZIM Modules</summary>
+  <summary>Library  -  ZIM Modules</summary>
   <div class="cpbody">
     <div style="font-size:11px;color:#555;margin-bottom:10px">Enable or disable offline library modules. Changes take effect immediately (restarts Kiwix).</div>
     <?php $ct_zims = get_zim_info(); ?>
@@ -2249,6 +2278,84 @@ if (!$usb_eths): ?>
 
 </div><!-- #tab-content -->
 
+<!-- REGION -->
+<div id="tab-region" class="tab-content">
+<details class="cpanel" open>
+  <summary>Active Region</summary>
+  <div class="cpbody">
+    <?php
+    $active_slug = active_region_slug();
+    $installed   = list_installed_regions();
+    $active_meta = null;
+    foreach ($installed as $r) if ($r['slug'] === $active_slug) { $active_meta = $r; break; }
+    ?>
+    <p style="font-size:13px;color:#aaa;margin-bottom:14px">
+      The active region pack supplies map center / zoom, topo PDFs, county frequency data, and the seed-library planting calendar.
+      Modules that need none of these will work regardless.
+    </p>
+    <table style="width:100%;font-size:13px">
+      <tr><td style="color:#888;width:140px">Active slug</td><td><code><?= esc($active_slug) ?></code></td></tr>
+      <tr><td style="color:#888">Label</td><td><?= esc($active_meta['label'] ?? '(no region.json)') ?></td></tr>
+      <tr><td style="color:#888">Country / State</td><td><?= esc(trim(($active_meta['country'] ?? '') . ' ' . ($active_meta['state'] ?? ''))) ?></td></tr>
+      <tr><td style="color:#888">Climate zone</td><td><?= esc($active_meta['zone'] ?? '') ?></td></tr>
+    </table>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>Installed Region Packs (<?= count($installed) ?>)</summary>
+  <div class="cpbody">
+  <?php if (!$installed): ?>
+    <p style="color:#888">No region packs installed. Run <code>scripts/seed-builtin-regions.sh</code> on the server to seed the bundled ones.</p>
+  <?php else: ?>
+    <form method="post" style="display:inline">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="set_active_region">
+      <table style="width:100%;font-size:13px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px">Slug</th>
+          <th style="text-align:left;padding:6px 8px">Label</th>
+          <th style="text-align:left;padding:6px 8px">Zone</th>
+          <th style="padding:6px 8px"></th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($installed as $r): $is_active = $r['slug'] === $active_slug; ?>
+          <tr style="<?= $is_active ? 'background:#0d2d0d' : '' ?>">
+            <td style="padding:6px 8px"><code><?= esc($r['slug']) ?></code></td>
+            <td style="padding:6px 8px"><?= esc($r['label']) ?></td>
+            <td style="padding:6px 8px;color:#888"><?= esc($r['zone']) ?></td>
+            <td style="padding:6px 8px;text-align:right">
+              <?php if ($is_active): ?>
+                <span style="color:#2ecc71;font-size:11px">ACTIVE</span>
+              <?php else: ?>
+                <button type="submit" name="slug" value="<?= esc($r['slug']) ?>" class="btn-sm">Activate</button>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </form>
+  <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Install Region Pack from Tarball</summary>
+  <div class="cpbody">
+    <form method="post" enctype="multipart/form-data">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="upload_region_pack">
+      <p style="font-size:13px;color:#aaa;margin-bottom:10px">
+        Upload a <code>.tar.gz</code> whose top level is a single directory matching <code>[a-z0-9_-]</code> and containing <code>region.json</code>. Existing packs with the same slug are backed up to <code>&lt;slug&gt;.bak-YYYYMMDD-HHMMSS</code>.
+      </p>
+      <input type="file" name="pack" accept=".tar.gz,.tgz" required>
+      <button type="submit" class="btn-sm" style="margin-left:10px">Upload &amp; install</button>
+    </form>
+  </div>
+</details>
+</div><!-- #tab-region -->
+
 <!-- SYSTEM -->
 <div id="tab-system" class="tab-content">
 
@@ -2269,7 +2376,7 @@ if (!$usb_eths): ?>
     <div class="svc-grid" style="grid-template-columns:repeat(auto-fill,minmax(155px,1fr))">
       <div class="svc-card">
         <div class="svc-name">CPU Temperature</div>
-        <div class="svc-state" style="color:<?= $temp_col ?>"><?= $temp_c ? $temp_c . ' °C' : '—' ?></div>
+        <div class="svc-state" style="color:<?= $temp_col ?>"><?= $temp_c ? $temp_c . ' °C' : ' - ' ?></div>
       </div>
       <div class="svc-card">
         <div class="svc-name">Total processes</div>
@@ -2360,7 +2467,7 @@ if (!$usb_eths): ?>
       <input type="hidden" name="act" value="backup_db">
       <button type="submit" class="btn-green" style="padding:8px 22px;font-size:13px">Download Backup (.zip)</button>
     </form>
-    <div style="font-size:11px;color:#555;margin-top:8px">Backup does not include uploaded files or ZIM libraries — copy those manually.</div>
+    <div style="font-size:11px;color:#555;margin-top:8px">Backup does not include uploaded files or ZIM libraries  -  copy those manually.</div>
   </div>
 </details>
 
@@ -2425,8 +2532,8 @@ if (!$usb_eths): ?>
     <div><label>Site Name</label><input type="text" name="instance_name" value="<?= esc(get_setting('instance_name','Noosphere')) ?>" placeholder="Noosphere"></div>
     <div><label>Tagline</label><input type="text" name="instance_tagline" value="<?= esc(get_setting('instance_tagline','')) ?>" placeholder="Offline information hub"></div>
   </div>
-  <div><label>Alert Banner <span style="color:#555;font-weight:normal">(shown on homepage — leave blank to hide)</span></label>
-  <input type="text" name="homepage_alert" value="<?= esc(get_setting('homepage_alert','')) ?>" placeholder="e.g. Shelter at capacity — see staff"></div>
+  <div><label>Alert Banner <span style="color:#555;font-weight:normal">(shown on homepage  -  leave blank to hide)</span></label>
+  <input type="text" name="homepage_alert" value="<?= esc(get_setting('homepage_alert','')) ?>" placeholder="e.g. Shelter at capacity  -  see staff"></div>
 </div>
 
 <div class="mod-section">
@@ -2523,8 +2630,8 @@ document.getElementById('theme-default-select').addEventListener('change', funct
       <input type="text" name="registry_label" value="<?= esc(get_setting('registry_label','Registry')) ?>" placeholder="Registry" style="width:180px">
     </div>
     <div style="margin-top:8px">
-      <label class="field-label">Tile description <span style="color:#555;font-weight:normal">— leave blank to auto-generate from enabled options</span></label>
-      <input type="text" name="registry_description" value="<?= esc(get_setting('registry_description','')) ?>" placeholder="Auto: Sign in and share your status — list skills">
+      <label class="field-label">Tile description <span style="color:#555;font-weight:normal"> -  leave blank to auto-generate from enabled options</span></label>
+      <input type="text" name="registry_description" value="<?= esc(get_setting('registry_description','')) ?>" placeholder="Auto: Sign in and share your status  -  list skills">
     </div>
 
     <div class="sub-row" style="margin-top:10px">
@@ -2537,14 +2644,14 @@ document.getElementById('theme-default-select').addEventListener('change', funct
     </div>
     <div class="sub-row">
       <input type="checkbox" class="sub-toggle" id="t_loc_req" name="registry_location_required" <?= get_setting('registry_location_required','1')==='1'?'checked':'' ?>>
-      <label for="t_loc_req">Location field is required <span style="color:#555;font-weight:normal">— uncheck for events where location doesn't apply</span></label>
+      <label for="t_loc_req">Location field is required <span style="color:#555;font-weight:normal"> -  uncheck for events where location doesn't apply</span></label>
     </div>
 
-    <div class="field-label" style="margin-top:14px">Status options <span style="color:#555;font-weight:normal">— comma-separated, shown in the status dropdown</span></div>
+    <div class="field-label" style="margin-top:14px">Status options <span style="color:#555;font-weight:normal"> -  comma-separated, shown in the status dropdown</span></div>
     <input type="text" name="registry_statuses" value="<?= esc(get_setting('registry_statuses','OK, Need Help, Checking In')) ?>" placeholder="OK, Need Help, Checking In" style="margin-bottom:4px">
     <div style="font-size:11px;color:#555">Examples: "OK, Need Help, Checking In" &nbsp;·&nbsp; "Checked In, Discharged, Transferred" &nbsp;·&nbsp; "Attending, Left Early"</div>
 
-    <div class="field-label" style="margin-top:14px">Custom fields <span style="color:#555;font-weight:normal">— shown in the check-in form · check to enable</span></div>
+    <div class="field-label" style="margin-top:14px">Custom fields <span style="color:#555;font-weight:normal"> -  shown in the check-in form · check to enable</span></div>
     <div id="rf-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
     <?php foreach (get_registry_fields() as $rf): ?>
       <div class="rf-row sub-row" style="gap:6px;align-items:center">
@@ -2572,7 +2679,7 @@ document.getElementById('theme-default-select').addEventListener('change', funct
 
     <div class="sub-row" style="margin-top:14px">
       <input type="checkbox" id="t_shelter" name="registry_shelter" <?= get_setting('registry_shelter','0')==='1'?'checked':'' ?> onchange="shelterToggle(this.checked)">
-      <label for="t_shelter">Shelter mode — shows capacity badge on homepage</label>
+      <label for="t_shelter">Shelter mode  -  shows capacity badge on homepage</label>
     </div>
     <div class="sub-body<?= get_setting('registry_shelter','0')!=='1'?' off':'' ?>" id="body_shelter">
       <div class="form-row" style="margin-top:6px">
@@ -2591,7 +2698,7 @@ document.getElementById('theme-default-select').addEventListener('change', funct
     <label for="t_forum">Community Board</label>
   </div>
   <div class="mod-body<?= get_setting('show_forum','1')!=='1'?' off':'' ?>" id="body_forum">
-    <div class="field-label" style="margin-top:12px">Categories <span style="color:#555;font-weight:normal">— Announcements always on · drag to reorder</span></div>
+    <div class="field-label" style="margin-top:12px">Categories <span style="color:#555;font-weight:normal"> -  Announcements always on · drag to reorder</span></div>
     <div class="sub-row" style="opacity:.5;pointer-events:none">
       <span style="font-size:18px;width:24px;text-align:center">📢</span>
       <span style="flex:1;font-size:13px;color:#ccc">Announcements</span>
@@ -2656,7 +2763,7 @@ document.getElementById('theme-default-select').addEventListener('change', funct
   </div>
   <div class="mod-body">
     <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <a href="/tasks/?manage=1" target="_blank" style="background:#16213e;border:1px solid #2a2a4a;color:#7ad;border-radius:6px;padding:6px 14px;font-size:12px;text-decoration:none">⚙ Manage Boards →</a>
+      <a href="/tasks/?manage=1" target="_blank" style="background:#16213e;border:1px solid #2a2a4a;color:#7ad;border-radius:6px;padding:6px 14px;font-size:12px;text-decoration:none">⚙ Manage Boards -></a>
       <span style="font-size:11px;color:#555">Each board has its own name, description, and categories.</span>
     </div>
     <div class="field-label" style="margin-top:10px">Default categories for new boards <span style="color:#555;font-weight:normal">&mdash; comma-separated</span></div>
@@ -2707,13 +2814,13 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
 ?>
 <div class="mod-section" style="border-color:<?= $card_border ?>">
   <div class="mod-header">
-    <span style="font-size:15px">📡 SDR Radio <span style="font-size:11px;color:#888;font-weight:normal">— NOAA Weather Radio, spectrum scanner, rtl_433 sensors, APRS</span></span>
+    <span style="font-size:15px">📡 SDR Radio <span style="font-size:11px;color:#888;font-weight:normal"> -  NOAA Weather Radio, spectrum scanner, rtl_433 sensors, APRS</span></span>
   </div>
   <div class="mod-body">
 
     <div style="background:<?= $status_box_bg ?>;border:1px solid <?= $status_box_br ?>;padding:8px 12px;border-radius:6px;margin:8px 0 12px;font-size:12px;font-family:monospace;white-space:pre-wrap;color:<?= $status_box_fg ?>"><?= htmlspecialchars($sdr_status ?: "(probe failed)") ?></div>
 
-    <div class="field-label" style="margin-top:4px">Mode <span style="color:#555;font-weight:normal">— only one can hold the dongle at a time</span></div>
+    <div class="field-label" style="margin-top:4px">Mode <span style="color:#555;font-weight:normal"> -  only one can hold the dongle at a time</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       <?php foreach ([
         ["off",     "Off",                  "Dongle idle. No SDR sections active."],
@@ -2756,7 +2863,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
       </div>
     </div>
 
-    <div class="field-label" style="margin-top:14px">Local FIPS codes <span style="color:#555;font-weight:normal">— alerts matching these are flagged as local</span></div>
+    <div class="field-label" style="margin-top:14px">Local FIPS codes <span style="color:#555;font-weight:normal"> -  alerts matching these are flagged as local</span></div>
     <input type="text" name="radio_same_fips" value="<?= htmlspecialchars($sdr_fips) ?>" placeholder="018005,018013" style="margin-bottom:4px">
     <div style="font-size:11px;color:#555">Bartholomew IN = 018005 · Brown IN = 018013 · Lookup at weather.gov/nwr/counties</div>
 
@@ -2766,7 +2873,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
       <span style="margin-left:auto;font-size:11px;color:#555">Save Settings to apply mode + tuning changes</span>
     </div>
 
-    <div class="field-label" style="margin-top:18px">rtl_433 Sensor Filter <span style="color:#555;font-weight:normal">— leave blank to accept all sensors nearby</span></div>
+    <div class="field-label" style="margin-top:18px">rtl_433 Sensor Filter <span style="color:#555;font-weight:normal"> -  leave blank to accept all sensors nearby</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
       <div>
         <div style="font-size:11px;color:#888;margin-bottom:3px">Sensor ID</div>
@@ -2818,7 +2925,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_usb" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">🔍 Scan USB</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_rtltest" style="background:#111126;border:1px solid #2a2a4a;color:#7ad;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📡 rtl_test (~8s)</button>
-          <button type="button" id="sdr-nwr-scan-btn" style="background:#111126;border:1px solid #2a2a4a;color:#2ecc71;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" title="Sweep all 7 NOAA NWR channels and rank by signal — useful for antenna placement. Briefly stops noaa-weather.">🔍 NWR Channel Scan (~6s)</button>
+          <button type="button" id="sdr-nwr-scan-btn" style="background:#111126;border:1px solid #2a2a4a;color:#2ecc71;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer" title="Sweep all 7 NOAA NWR channels and rank by signal  -  useful for antenna placement. Briefly stops noaa-weather.">🔍 NWR Channel Scan (~6s)</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noaa-weather" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 NWR Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="scanner-waterfall" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 Scanner Log</button>
           <button type="button" class="sdr-diag-btn" data-act="sdr_diag_log" data-service="noosphere-rtl433" style="background:#111126;border:1px solid #2a2a4a;color:#aaa;border-radius:5px;padding:6px 12px;font-size:12px;cursor:pointer">📋 rtl_433 Log</button>
@@ -2839,11 +2946,11 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
         <details style="margin-top:14px">
           <summary style="font-size:12px;color:#555;cursor:pointer">Common issues</summary>
           <div style="margin-top:8px;font-size:12px;color:#888;line-height:1.7">
-            <strong style="color:#aaa">No device found</strong> — dongle not plugged in, or DVB kernel modules claimed it first. Run <em>Re-apply Blacklist</em> then unplug/replug dongle.<br>
-            <strong style="color:#aaa">Device busy / cannot open</strong> — another process is using the dongle. Stop all SDR services (set Mode → Off, save), then retry.<br>
-            <strong style="color:#aaa">Weak / no SAME alerts</strong> — stock antenna has poor gain at 162 MHz. Use a quarter-wave dipole (~46cm) near a window. See Admin → Wiki → Optional Hardware.<br>
-            <strong style="color:#aaa">Wrong frequency</strong> — WXL58 (Indianapolis) transmits on 162.550 MHz. Confirm with <code style="color:#888">rtl_fm -f 162550000 -s 22050 | play -r 22050 -t raw -e s -b 16 -c 1 - 2>/dev/null</code> on the server.<br>
-            <strong style="color:#aaa">High PPM drift</strong> — cheap dongles drift ±60 PPM. Run <em>rtl_test</em> and watch the PPM correction value; enter it in the PPM field above.
+            <strong style="color:#aaa">No device found</strong>  -  dongle not plugged in, or DVB kernel modules claimed it first. Run <em>Re-apply Blacklist</em> then unplug/replug dongle.<br>
+            <strong style="color:#aaa">Device busy / cannot open</strong>  -  another process is using the dongle. Stop all SDR services (set Mode -> Off, save), then retry.<br>
+            <strong style="color:#aaa">Weak / no SAME alerts</strong>  -  stock antenna has poor gain at 162 MHz. Use a quarter-wave dipole (~46cm) near a window. See Admin -> Wiki -> Optional Hardware.<br>
+            <strong style="color:#aaa">Wrong frequency</strong>  -  WXL58 (Indianapolis) transmits on 162.550 MHz. Confirm with <code style="color:#888">rtl_fm -f 162550000 -s 22050 | play -r 22050 -t raw -e s -b 16 -c 1 - 2>/dev/null</code> on the server.<br>
+            <strong style="color:#aaa">High PPM drift</strong>  -  cheap dongles drift ±60 PPM. Run <em>rtl_test</em> and watch the PPM correction value; enter it in the PPM field above.
           </div>
         </details>
       </div>
@@ -2903,7 +3010,7 @@ $card_border    = $sdr_ok ? "#4a4a6a" : "#5a3a3a";
             var best = entries[0][0];
             var spread = (max - min).toFixed(1);
             var html = '<div style="font-size:12px;color:#888;margin-bottom:8px">Strongest: <strong style="color:#2ecc71;font-family:monospace">'+best+' MHz</strong> · spread '+spread+' dB '+
-                       (spread < 3 ? '<span style="color:#f39c12">(low — likely just noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal detected)</span>')+'</div>';
+                       (spread < 3 ? '<span style="color:#f39c12">(low  -  likely just noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal detected)</span>')+'</div>';
             entries.forEach(function(e){
               var ch = e[0], db = e[1];
               var pct = (db - min) / range * 100;
@@ -2966,7 +3073,7 @@ $tx_file = '/var/lib/noosphere/weather/last-transcription.json';
 if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), true) ?? [];
 ?>
 <details class="cpanel" <?= $t_enabled ? 'open' : '' ?>>
-  <summary>🎙 Transcription <span style="font-size:11px;color:#888;font-weight:normal">— Auto-log NWR audio offline (vosk / faster-whisper)</span></summary>
+  <summary>🎙 Transcription <span style="font-size:11px;color:#888;font-weight:normal"> -  Auto-log NWR audio offline (vosk / faster-whisper)</span></summary>
   <div class="cpbody">
 
     <!-- CPU + backend status -->
@@ -2995,7 +3102,7 @@ if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), t
 
     <?php if ($cpu_avx && !$fw_ok): ?>
     <div style="background:#1a1200;border:1px solid #554400;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#ca8">
-      <strong style="color:#fc9">This CPU supports AVX — faster-whisper is available for higher accuracy.</strong><br>
+      <strong style="color:#fc9">This CPU supports AVX  -  faster-whisper is available for higher accuracy.</strong><br>
       Install: <code style="font-size:11px;color:#888">/opt/noosphere-whisper/bin/pip install faster-whisper</code><br>
       The first run will download the <code style="color:#888">tiny.en</code> model (~39 MB) to
       <code style="color:#888">/var/lib/noosphere/whisper-models/</code>.
@@ -3021,7 +3128,7 @@ if (file_exists($tx_file)) $last_tx = json_decode(file_get_contents($tx_file), t
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
         <input type="checkbox" name="transcription_nwr_hybrid" <?= $t_nwr_hybrid?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
-        Hybrid mode — listen live + auto-transcribe simultaneously
+        Hybrid mode  -  listen live + auto-transcribe simultaneously
       </label>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding-left:20px;color:<?= $t_enabled?'#ccc':'#555'?>">
         <input type="checkbox" name="transcription_talk_post" <?= $t_talk_post?'checked':'' ?> <?= (!$t_enabled||!$any_backend_ok)?'disabled':'' ?>>
@@ -3142,7 +3249,7 @@ foreach ($simple_mods as [$key, $id, $label]):
 <details class="cpanel" open>
   <summary>Linux System Credentials</summary>
   <div class="cpbody">
-  <div style="font-size:12px;color:#555;margin-bottom:14px">Current Linux user: <strong style="color:#aaa"><?= esc($linux_user) ?></strong> — passwords for SSH/console login. Persist when cloning the drive.</div>
+  <div style="font-size:12px;color:#555;margin-bottom:14px">Current Linux user: <strong style="color:#aaa"><?= esc($linux_user) ?></strong>  -  passwords for SSH/console login. Persist when cloning the drive.</div>
   <div style="display:flex;gap:12px;flex-wrap:wrap">
     <?php foreach ([['user', "User ($linux_user)"], ['root', 'Root']] as [$target, $lbl]): ?>
     <form method="post" style="flex:1;min-width:200px;background:#111126;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
@@ -3187,14 +3294,14 @@ foreach ($simple_mods as [$key, $id, $label]):
 <details class="cpanel" open>
   <summary>Quick Start Presets</summary>
   <div class="cpbody">
-  <div style="font-size:12px;color:#555;margin-bottom:12px">Applies a full configuration preset — overwrites all settings in Configure and Modules.</div>
+  <div style="font-size:12px;color:#555;margin-bottom:12px">Applies a full configuration preset  -  overwrites all settings in Configure and Modules.</div>
   <?php
   $preset_info = [
       'emergency' => ['Full / Emergency',         'All modules on, emergency status set'],
       'event'     => ['Event',                    'Check-in, no skills or missing persons, event status'],
       'sar'       => ['Search & Rescue',          'Missing persons + found, maps, chat only'],
       'shelter'   => ['Shelter',                  'Shelter check-in, bunk/dietary fields, capacity tracking'],
-      'kiosk'     => ['Kiosk / Read-Only',        'Library, maps, forum view — all writes locked'],
+      'kiosk'     => ['Kiosk / Read-Only',        'Library, maps, forum view  -  all writes locked'],
       'resource'  => ['Resource Coordination',    'Skills, supplies, full forum, all modules'],
   ];
   ?>
@@ -3336,7 +3443,7 @@ function nsToast(text, kind) {
   setTimeout(function(){ t.remove(); }, 3700);
 }
 
-// Settings search filter — hides .cpanel summary/body that doesn't match
+// Settings search filter  -  hides .cpanel summary/body that doesn't match
 function nsSettingsSearch(q) {
   q = (q || '').trim().toLowerCase();
   var panels = document.querySelectorAll('#tab-settings details.cpanel, #tab-settings .mod-section, #tab-settings .identity-section');

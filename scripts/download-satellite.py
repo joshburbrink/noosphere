@@ -25,7 +25,7 @@ def main():
     db.execute('CREATE TABLE IF NOT EXISTS tiles (zoom_level INT, tile_column INT, tile_row INT, tile_data BLOB, PRIMARY KEY (zoom_level, tile_column, tile_row))')
     db.execute('CREATE UNIQUE INDEX IF NOT EXISTS tile_index ON tiles (zoom_level, tile_column, tile_row)')
     for k, v in [
-        ('name',        'USGS NAIP — Bartholomew & Brown County IN'),
+        ('name',        'USGS NAIP  -  Bartholomew & Brown County IN'),
         ('type',        'overlay'),
         ('version',     '1'),
         ('description', 'USGS NAIP aerial imagery'),

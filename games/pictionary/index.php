@@ -188,7 +188,7 @@ function filter_state($st, $pid) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Pictionary — Noosphere</title>
+<title>Pictionary  -  Noosphere</title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -225,7 +225,7 @@ canvas{background:#fff;border-radius:8px;border:2px solid var(--border,#2a2a4a);
 </head>
 <body>
 <h1>🎨 Pictionary</h1>
-<div class="sub">Draw and guess — 90 seconds per turn</div>
+<div class="sub">Draw and guess  -  90 seconds per turn</div>
 <div class="status" id="status">Connecting…</div>
 
 <div class="main">
@@ -279,7 +279,7 @@ canvas{background:#fff;border-radius:8px;border:2px solid var(--border,#2a2a4a);
       <li>Draw using your mouse or finger. Pick a color and brush size from the toolbar.</li>
       <li>No writing the word, no spelling it out, no speaking it aloud.</li>
     </ul>
-    <p style="margin-top:.4rem"><strong>Guessing:</strong> Type your guess in the chat box and press Enter. Correct guesses are highlighted — drawer gets +2 pts, guesser gets +1 pt.</p>
+    <p style="margin-top:.4rem"><strong>Guessing:</strong> Type your guess in the chat box and press Enter. Correct guesses are highlighted  -  drawer gets +2 pts, guesser gets +1 pt.</p>
     <p style="margin-top:.4rem"><strong>Turn ends</strong> when the timer hits zero or everyone has guessed correctly. The next player becomes the drawer.</p>
     <p style="margin-top:.4rem"><strong>Controls:</strong> Mouse drag or touch drag to draw. Toolbar has 8 colors, 3 brush sizes, and an eraser. Clear button wipes the canvas.</p>
   </div>
@@ -390,7 +390,7 @@ function applyState(st) {
   var drawerName = (st.players && st.drawer && st.players[st.drawer]) ? st.players[st.drawer].name : 'someone';
 
   if (phase==='lobby') {
-    setStatus('Lobby — share link and wait for players: ' + location.href + (location.search?'':'?r='+room));
+    setStatus('Lobby  -  share link and wait for players: ' + location.href + (location.search?'':'?r='+room));
   } else if (phase==='drawing') {
     if (amDrawer) {
       setStatus('Your turn to draw! Word: ' + st.word + ' (' + (st.time_left||90) + 's)', '#4a9eff');

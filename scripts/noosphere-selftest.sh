@@ -19,7 +19,7 @@ check_service() {
         local restarts
         restarts=$(systemctl show "$name" --property=NRestarts --value 2>/dev/null)
         if [[ -n "$restarts" && "$restarts" -gt 5 ]]; then
-            _warn "$name (active but restarted $restarts times — check logs)"
+            _warn "$name (active but restarted $restarts times  -  check logs)"
         else
             _ok "$name"
         fi
@@ -48,7 +48,7 @@ check_port() {
     fi
 }
 
-[[ $QUIET -eq 0 ]] && echo "" && echo "  Noosphere Self-Test — $(date)" && echo "  ─────────────────────────────────────"
+[[ $QUIET -eq 0 ]] && echo "" && echo "  Noosphere Self-Test  -  $(date)" && echo "  ─────────────────────────────────────"
 
 # Services
 [[ $QUIET -eq 0 ]] && echo "  Services"
@@ -56,7 +56,7 @@ for svc in nginx php8.4-fpm mariadb kiwix mbtileserver dnsmasq wifi-reconnect; d
     check_service "$svc"
 done
 
-# Optional SDR services — only warn if enabled but not running
+# Optional SDR services  -  only warn if enabled but not running
 SDR_MODE=""
 if command -v sqlite3 &>/dev/null; then
     SDR_MODE=$(sqlite3 /var/lib/noosphere/settings.db "SELECT value FROM settings WHERE key='radio_mode' LIMIT 1" 2>/dev/null || echo "")
@@ -74,7 +74,7 @@ if [[ -n "$SDR_MODE" && "$SDR_MODE" != "off" ]]; then
         if /usr/local/bin/rtlsdr-detect.sh 2>/dev/null | grep -q "Status:    OK"; then
             _ok "RTL-SDR dongle detected"
         else
-            _warn "RTL-SDR dongle not detected — SDR mode=$SDR_MODE but dongle missing?"
+            _warn "RTL-SDR dongle not detected  -  SDR mode=$SDR_MODE but dongle missing?"
         fi
     fi
 fi
@@ -106,7 +106,7 @@ fi
 # Disk usage
 usage_pct=$(df / | awk 'NR==2{gsub(/%/,"",$5); print $5}')
 if [[ "$usage_pct" -ge 90 ]]; then
-    _fail "disk usage (${usage_pct}% — critically full)"
+    _fail "disk usage (${usage_pct}%  -  critically full)"
 elif [[ "$usage_pct" -ge 80 ]]; then
     _warn "disk usage (${usage_pct}%)"
 else
@@ -118,7 +118,7 @@ if [[ -n "$WIFI" ]] && ip link show "$WIFI" | grep -q "state UP"; then
     ip=$(ip -4 addr show "$WIFI" | grep -oP '(?<=inet )\S+')
     _ok "WiFi ($WIFI up, $ip)"
 else
-    _warn "WiFi (interface not UP — ethernet-only mode?)"
+    _warn "WiFi (interface not UP  -  ethernet-only mode?)"
 fi
 
 # Summary

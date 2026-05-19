@@ -15,6 +15,28 @@ function _sdb() {
 function _init_settings($db) {
     $count = $db->query('SELECT COUNT(*) FROM settings')->fetchColumn();
     if ($count == 0) _apply_preset('emergency', $db);
+    _seed_region_defaults($db);
+}
+
+// Idempotent: only seeds region_* keys that don't already exist. Lets
+// existing instances pick up region defaults without clobbering anything.
+function _seed_region_defaults($db) {
+    $defaults = [
+        'active_region'       => 'world',
+        'region_label'        => 'Generic / no region',
+        'region_country'      => '',
+        'region_state'        => '',
+        'region_counties'     => '',
+        'region_climate_zone' => '',
+        'region_lat'          => '0',
+        'region_lng'          => '0',
+    ];
+    $check = $db->prepare('SELECT 1 FROM settings WHERE key=?');
+    $ins   = $db->prepare('INSERT INTO settings (key,value) VALUES (?,?)');
+    foreach ($defaults as $k => $v) {
+        $check->execute([$k]);
+        if (!$check->fetchColumn()) $ins->execute([$k, $v]);
+    }
 }
 
 $_settings_cache = [];
@@ -77,7 +99,7 @@ function _default_registry_fields() {
     ];
 }
 
-// Returns array of ['key','label','icon','desc'] — excludes announcements (always hardcoded)
+// Returns array of ['key','label','icon','desc']  -  excludes announcements (always hardcoded)
 function get_forum_categories() {
     $raw = get_setting('forum_categories', '');
     if ($raw) {
@@ -89,13 +111,13 @@ function get_forum_categories() {
 
 function _default_forum_cats() {
     return [
-        ['key'=>'missing',   'label'=>'Missing Persons', 'icon'=>'🔍', 'desc'=>'Searching for someone — also check the Registry'],
-        ['key'=>'lostfound', 'label'=>'Lost & Found',    'icon'=>'📦', 'desc'=>'Lost or found items — post here to reunite them'],
+        ['key'=>'missing',   'label'=>'Missing Persons', 'icon'=>'🔍', 'desc'=>'Searching for someone  -  also check the Registry'],
+        ['key'=>'lostfound', 'label'=>'Lost & Found',    'icon'=>'📦', 'desc'=>'Lost or found items  -  post here to reunite them'],
         ['key'=>'general',   'label'=>'General',          'icon'=>'💬', 'desc'=>'Coordination, questions, everything else'],
     ];
 }
 
-// Returns the registry tile description — custom override if set, otherwise auto-generated
+// Returns the registry tile description  -  custom override if set, otherwise auto-generated
 function get_registry_description() {
     $custom = get_setting('registry_description', '');
     if ($custom !== '') return $custom;
@@ -123,7 +145,7 @@ function get_registry_description() {
     $extras = [];
     if ($has_skills) $extras[] = 'skills';
     if ($has_supply) $extras[] = 'resources';
-    if ($extras) $desc .= ' — list ' . implode(' and ', $extras);
+    if ($extras) $desc .= '  -  list ' . implode(' and ', $extras);
     if ($found)  $desc .= ' · report found persons';
     return $desc;
 }
@@ -137,12 +159,12 @@ function _rf($enabled_keys) {
 function _presets() {
     $full_cats  = json_encode(_default_forum_cats());
     $event_cats = json_encode([['key'=>'general','label'=>'General','icon'=>'💬','desc'=>'Questions, coordination, everything else']]);
-    $sar_cats   = json_encode([['key'=>'missing','label'=>'Missing Persons','icon'=>'🔍','desc'=>'Searching for someone — also check the Registry']]);
+    $sar_cats   = json_encode([['key'=>'missing','label'=>'Missing Persons','icon'=>'🔍','desc'=>'Searching for someone  -  also check the Registry']]);
     $res_cats   = json_encode(_default_forum_cats());
 
     return [
         'emergency' => [
-            'instance_tagline'          => 'Offline information hub — no internet required',
+            'instance_tagline'          => 'Offline information hub  -  no internet required',
             'readonly'                  => '0',
             'homepage_alert'            => '',
             'show_registry'             => '1',

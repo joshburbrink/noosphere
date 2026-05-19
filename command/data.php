@@ -1,6 +1,6 @@
 <?php
 /*
- * /command/data.php — JSON snapshot for the Incident Command dashboard (#76).
+ * /command/data.php  -  JSON snapshot for the Incident Command dashboard (#76).
  * Polled every ~30s by /command/index.php. All queries are read-only.
  */
 require_once '/var/www/noosphere/shared/security.php';
@@ -108,7 +108,7 @@ if ($show_registry) {
     $out['registry'] = ['enabled' => false];
 }
 
-// ── Supplies — only red/yellow ─────────────────────────────────────────────
+// ── Supplies  -  only red/yellow ─────────────────────────────────────────────
 if ($show_supplies) {
     $items = _q('/var/lib/noosphere/inventory.db',
         "SELECT name, category, quantity, unit, low_threshold, consumption_per_day FROM items");

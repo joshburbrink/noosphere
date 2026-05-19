@@ -29,7 +29,7 @@ require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 sec_session_start();
 
-// Module disabled → 404 (NOT redirect — keeps URLs deterministic)
+// Module disabled -> 404 (NOT redirect  -  keeps URLs deterministic)
 if (get_setting('show_<module>','1') !== '1') { http_response_code(404); exit; }
 
 $is_admin    = !empty($_SESSION['admin']);
@@ -44,7 +44,7 @@ $is_readonly = is_readonly();
 
 ### 3a. Toggle in all six presets
 
-Every module MUST have a `show_<module>` key set in all six presets in `shared/settings.php` → `_presets()`. Decide on/off per preset using this rubric:
+Every module MUST have a `show_<module>` key set in all six presets in `shared/settings.php` -> `_presets()`. Decide on/off per preset using this rubric:
 
 | Preset    | Default purpose                          |
 |-----------|------------------------------------------|
@@ -58,9 +58,9 @@ Every module MUST have a `show_<module>` key set in all six presets in `shared/s
 ### 3b. Sub-settings
 
 Module-specific options (labels, categories, feature flags) MUST also appear in every preset. Use:
-- `<module>_label` — string shown on the homepage tile
-- `<module>_<feature>` — `'1'` / `'0'` boolean toggles
-- `<module>_categories` — comma-separated or JSON list
+- `<module>_label`  -  string shown on the homepage tile
+- `<module>_<feature>`  -  `'1'` / `'0'` boolean toggles
+- `<module>_categories`  -  comma-separated or JSON list
 
 ### 3c. Admin panel wiring
 
@@ -85,7 +85,7 @@ if (get_setting('show_<module>','1')==='1') {
 
 - One SQLite database per module at `/var/lib/noosphere/<module>.db`.
 - Prefer the `SQLite3` class for new modules. PDO is allowed for legacy parity but must still respect WAL and prepared statements.
-- ALWAYS set `PRAGMA journal_mode=WAL` immediately after opening — multiple PHP-FPM workers will deadlock otherwise.
+- ALWAYS set `PRAGMA journal_mode=WAL` immediately after opening  -  multiple PHP-FPM workers will deadlock otherwise.
 - `CREATE TABLE IF NOT EXISTS …` at the top of the file is the schema source of truth.
 - Schema migrations for existing installs: wrap `ALTER TABLE … ADD COLUMN` in `@` (or try/catch for PDO) so re-runs don't error.
 
@@ -106,10 +106,10 @@ foreach (['new_col TEXT','another_col INTEGER DEFAULT 0'] as $col) {
 |----------------------|-------------------------------------------------------------------|
 | CSRF                 | `csrf_verify()` on EVERY POST; `csrf_field()` in every form       |
 | Read-only mode       | `readonly_die()` OR `if (!$is_readonly)` wrap on every write path |
-| Admin actions        | Inside `if ($is_admin) { … }` — never trust client                |
+| Admin actions        | Inside `if ($is_admin) { … }`  -  never trust client                |
 | Output               | `htmlspecialchars($x, ENT_QUOTES)` on ALL user data               |
-| DB input             | Prepared statements only — no string concatenation                |
-| ID inputs            | `(int)$_POST['id']` — always cast                                 |
+| DB input             | Prepared statements only  -  no string concatenation                |
+| ID inputs            | `(int)$_POST['id']`  -  always cast                                 |
 | File upload MIME     | `check_mime_safe()` / `allowed_image_mime()` from security.php    |
 | Rate-limited actions | `rate_limit('action_key', max, window_seconds)`                   |
 | Banned users         | `ban_check_or_die()` before accepting submissions                 |
@@ -119,7 +119,7 @@ foreach (['new_col TEXT','another_col INTEGER DEFAULT 0'] as $col) {
 ## 7. Optionality & user identity
 
 - **Kiosk / readonly:** writes blocked; reads always work.
-- **Registered users:** if a user is logged into the registry, `$_SESSION['reg_name']` is set — auto-fill the author field and skip the name prompt.
+- **Registered users:** if a user is logged into the registry, `$_SESSION['reg_name']` is set  -  auto-fill the author field and skip the name prompt.
 - **`require_registration` setting:** if `'1'`, block anonymous posts; require name+PIN via `verify_pin()`.
 
 ---
@@ -150,7 +150,7 @@ Don't `require_once shared/analytics.php` and call `track_visit()` yourself. The
 
 ## 9. Nginx
 
-If your module has its own routes (clean URLs, sub-paths, static assets), add a location block in `/etc/nginx/sites-available/noosphere`. Simple PHP modules need nothing — the default `location ~ \.php$` handler picks them up.
+If your module has its own routes (clean URLs, sub-paths, static assets), add a location block in `/etc/nginx/sites-available/noosphere`. Simple PHP modules need nothing  -  the default `location ~ \.php$` handler picks them up.
 
 ---
 

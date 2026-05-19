@@ -1,7 +1,7 @@
 #!/bin/bash
 # setup-router-generic.sh -- Configure any WiFi router as a Noosphere captive portal.
 # Works with OpenWrt, DD-WRT, GL.iNet, or as a fallback using the built-in AP mode.
-# (#10 — router-agnostic captive portal setup)
+# (#10  -  router-agnostic captive portal setup)
 
 set -e
 
@@ -27,7 +27,7 @@ Options (for openwrt mode):
   NOOSPHERE_SSID=<name>   WiFi network name (default: $NOOSPHERE_SSID)
 
 Examples:
-  $0 ap                               # Use built-in 8812AU AP — no router needed
+  $0 ap                               # Use built-in 8812AU AP  -  no router needed
   ROUTER_IP=192.168.1.1 $0 openwrt   # Configure OpenWrt router
   $0 manual                           # Print instructions for stock routers
   $0 check                            # Test captive portal detection endpoints
@@ -108,41 +108,41 @@ if [ "$mode" = "manual" ]; then
 === Manual Captive Portal Setup ===
 Works with any router that supports custom DNS settings.
 
-STEP 1 — Connect the router
+STEP 1  -  Connect the router
   Plug an ethernet cable from the Noosphere server (eno1) into the router's WAN or LAN port.
   Server IP on that interface: $NOOSPHERE_IP
 
-STEP 2 — Set DNS in router DHCP settings
+STEP 2  -  Set DNS in router DHCP settings
   Log into your router admin page (usually 192.168.1.1 or 192.168.0.1).
-  Find: DHCP → DNS Server (or Primary DNS)
+  Find: DHCP -> DNS Server (or Primary DNS)
   Set: $NOOSPHERE_IP
 
   This makes all devices ask Noosphere for DNS lookups. Noosphere's dnsmasq
   returns its own IP for every domain, triggering the captive portal.
 
-STEP 3 — Set WiFi to open (no password)
+STEP 3  -  Set WiFi to open (no password)
   SSID: $NOOSPHERE_SSID (or any name)
   Security: None / Open
 
-STEP 4 — (Optional) Redirect HTTP at the router
+STEP 4  -  (Optional) Redirect HTTP at the router
   If your router supports firewall/NAT rules, add:
-    Redirect: TCP port 80 from LAN → $NOOSPHERE_IP:80
+    Redirect: TCP port 80 from LAN -> $NOOSPHERE_IP:80
   This forces all HTTP traffic to Noosphere even if the client ignores DNS.
 
-STEP 5 — Test
+STEP 5  -  Test
   Connect a phone to the WiFi. It should automatically show a captive portal
   notification, or navigate to any http:// URL and land on the Noosphere homepage.
 
-FALLBACK — No router available
+FALLBACK  -  No router available
   Use the built-in AP mode instead: run  setup-router-generic.sh ap
   This uses the RTL8812AU USB adapter (SSID: NET) with no external router.
 
 Tested router families:
-  GL.iNet  — use setup-router.sh (GL-SFT1200 specific) or this script's openwrt mode
-  OpenWrt  — use this script's openwrt mode
-  DD-WRT   — manual: Services → DNSMasq → Additional Options: address=/#/$NOOSPHERE_IP
-  pfSense  — DNS Resolver → Host Overrides: *.* → $NOOSPHERE_IP
-  Stock    — set DHCP DNS field to $NOOSPHERE_IP (varies by brand)
+  GL.iNet   -  use setup-router.sh (GL-SFT1200 specific) or this script's openwrt mode
+  OpenWrt   -  use this script's openwrt mode
+  DD-WRT    -  manual: Services -> DNSMasq -> Additional Options: address=/#/$NOOSPHERE_IP
+  pfSense   -  DNS Resolver -> Host Overrides: *.* -> $NOOSPHERE_IP
+  Stock     -  set DHCP DNS field to $NOOSPHERE_IP (varies by brand)
 EOF
     exit 0
 fi
@@ -153,15 +153,15 @@ if [ "$mode" = "check" ]; then
     echo "Testing detection endpoints on $NOOSPHERE_IP..."
     for path in /generate_204 /hotspot-detect.html /ncsi.txt /connecttest.txt; do
         code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "http://$NOOSPHERE_IP$path" 2>/dev/null || echo "ERR")
-        echo "  $path → HTTP $code"
+        echo "  $path -> HTTP $code"
     done
     echo
     echo "Testing DNS wildcard (should resolve to $NOOSPHERE_IP)..."
     resolved=$(getent hosts example.com 2>/dev/null | awk '{print $1}')
     if [ "$resolved" = "$NOOSPHERE_IP" ]; then
-        echo "  example.com → $resolved ✓ (captive portal DNS active)"
+        echo "  example.com -> $resolved ✓ (captive portal DNS active)"
     else
-        echo "  example.com → ${resolved:-no response} (DNS not redirecting — check dnsmasq)"
+        echo "  example.com -> ${resolved:-no response} (DNS not redirecting  -  check dnsmasq)"
     fi
     exit 0
 fi

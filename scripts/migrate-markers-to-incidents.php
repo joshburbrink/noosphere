@@ -6,13 +6,13 @@
 // creator_token preserved so anon users keep delete rights.
 //
 // Type mapping:
-//   pin      → general
-//   search   → missing
-//   camp     → resource  (title prefixed "Camp: ")
-//   hazard   → hazard
-//   medical  → medical
-//   resource → resource
-//   blocked  → hazard    (title prefixed "Road blocked: ")
+//   pin      -> general
+//   search   -> missing
+//   camp     -> resource  (title prefixed "Camp: ")
+//   hazard   -> hazard
+//   medical  -> medical
+//   resource -> resource
+//   blocked  -> hazard    (title prefixed "Road blocked: ")
 //
 // Usage: php /var/www/noosphere/scripts/migrate-markers-to-incidents.php
 
@@ -22,7 +22,7 @@ $MARKERS_DB     = '/var/lib/noosphere/map_markers.db';
 $MARKERS_PHOTOS = '/var/lib/noosphere/marker_photos';
 
 if (!file_exists($MARKERS_DB)) {
-    fwrite(STDERR, "No map_markers.db at $MARKERS_DB — nothing to migrate.\n");
+    fwrite(STDERR, "No map_markers.db at $MARKERS_DB  -  nothing to migrate.\n");
     exit(0);
 }
 

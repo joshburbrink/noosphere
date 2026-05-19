@@ -18,7 +18,7 @@ $CATEGORIES = [
     'other'   => 'Other',
 ];
 
-$CONDITIONS = ['good'=>'Good','fair'=>'Fair','poor'=>'Poor — use with caution'];
+$CONDITIONS = ['good'=>'Good','fair'=>'Fair','poor'=>'Poor  -  use with caution'];
 
 $db = new PDO('sqlite:/var/lib/noosphere/tools.db');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -152,7 +152,7 @@ $csrf = csrf_token();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tool Lending — <?= esc($name) ?></title>
+<title>Tool Lending  -  <?= esc($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -375,7 +375,7 @@ document.getElementById('editModal').addEventListener('click',function(e){ if(e.
     <td><?= esc($co['tool_name']) ?></td>
     <td><?= esc($co['borrower_name']) ?></td>
     <td><?= date('M j, g:ia', $co['checked_out_at']) ?></td>
-    <td class="<?= $overdue ? 'overdue' : '' ?>"><?= $co['expected_return'] ? esc($co['expected_return']) : '<span style="color:#555">—</span>' ?></td>
+    <td class="<?= $overdue ? 'overdue' : '' ?>"><?= $co['expected_return'] ? esc($co['expected_return']) : '<span style="color:#555"> - </span>' ?></td>
     <td>
       <?php if ($is_admin): ?>
       <form method="post" style="display:inline">

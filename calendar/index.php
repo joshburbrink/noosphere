@@ -75,7 +75,7 @@ function esc($s) { return htmlspecialchars($s ?? '', ENT_QUOTES); }
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Calendar — <?= esc(get_setting('instance_name','Noosphere')) ?></title>
+<title>Calendar  -  <?= esc(get_setting('instance_name','Noosphere')) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; }
@@ -141,7 +141,7 @@ textarea { resize:vertical; }
         <?php if ($ev['event_time']): ?><div class="time"><?= esc($ev['event_time']) ?></div><?php endif; ?>
       </div>
       <div class="event-body">
-        <div class="event-title"><?= esc($ev['title']) ?><?= $isToday ? ' <span style="color:#e94560;font-size:12px">— TODAY</span>' : '' ?></div>
+        <div class="event-title"><?= esc($ev['title']) ?><?= $isToday ? ' <span style="color:#e94560;font-size:12px"> -  TODAY</span>' : '' ?></div>
         <?php if ($ev['location']): ?><div class="event-loc">📍 <?= esc($ev['location']) ?></div><?php endif; ?>
         <?php if ($ev['notes']): ?><div class="event-notes"><?= esc($ev['notes']) ?></div><?php endif; ?>
       </div>

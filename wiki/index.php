@@ -82,7 +82,7 @@ function wiki_inline($text) {
 }
 
 function render_markdown($raw) {
-    // Escape all HTML first — no raw HTML from users
+    // Escape all HTML first  -  no raw HTML from users
     $text = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
 
     // Extract fenced code blocks before line processing
@@ -123,7 +123,7 @@ function render_markdown($raw) {
             $i++; continue;
         }
 
-        // Blockquote — after htmlspecialchars, > became &gt;
+        // Blockquote  -  after htmlspecialchars, > became &gt;
         if (preg_match('/^&gt;\s?(.*)/', $line, $m)) {
             $bq = wiki_inline($m[1]);
             $i++;
@@ -157,7 +157,7 @@ function render_markdown($raw) {
             continue;
         }
 
-        // Paragraph — collect until blank line or block element
+        // Paragraph  -  collect until blank line or block element
         $para_lines = [];
         while ($i < $total) {
             $l = $lines[$i];
@@ -335,7 +335,7 @@ function time_ago($ts) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Local Knowledge Wiki — <?= esc($name) ?></title>
+<title>Local Knowledge Wiki  -  <?= esc($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; }
@@ -656,14 +656,14 @@ elseif ($action === 'history' && $article):
 ?>
 
 <div style="margin-bottom:1rem">
-  <h2 style="font-size:1.2rem;color:#e94560"><?= esc($article['title']) ?> — Edit History</h2>
+  <h2 style="font-size:1.2rem;color:#e94560"><?= esc($article['title']) ?>  -  Edit History</h2>
   <div style="font-size:12px;color:#555;margin-top:4px">
     <a href="/wiki/?slug=<?= esc($article['slug']) ?>">← Back to article</a>
   </div>
 </div>
 
 <?php if (!$revisions): ?>
-<div style="color:#555;font-size:13px">No edit history — this article has never been revised.</div>
+<div style="color:#555;font-size:13px">No edit history  -  this article has never been revised.</div>
 <?php else: ?>
 <ul class="rev-list">
   <?php foreach ($revisions as $rev): ?>

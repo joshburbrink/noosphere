@@ -1,5 +1,5 @@
 #!/bin/bash
-# Noosphere — out-of-tree WiFi driver installer
+# Noosphere  -  out-of-tree WiFi driver installer
 # Run while online, before going offline.
 # Installs DKMS drivers for USB WiFi adapters not covered by mainline kernel.
 #
@@ -32,7 +32,7 @@ echo ""
 info "Installing build prerequisites..."
 apt-get install -y dkms "linux-headers-${KERNEL}" linux-headers-amd64 2>/dev/null || \
 apt-get install -y dkms linux-headers-generic 2>/dev/null || \
-err "Could not install linux-headers — may need manual install: apt-get install linux-headers-\$(uname -r)"
+err "Could not install linux-headers  -  may need manual install: apt-get install linux-headers-\$(uname -r)"
 
 HEADERS_PATH="/lib/modules/${KERNEL}/build"
 [ -d "$HEADERS_PATH" ] || err "Kernel headers not found at $HEADERS_PATH after install"
@@ -43,7 +43,7 @@ echo ""
 echo "--- RTL8812AU/8821AU (aircrack-ng/rtl8812au v${DRIVER_VERSION}) ---"
 
 if dkms status "${DRIVER_NAME}/${DRIVER_VERSION}" 2>/dev/null | grep -q "installed"; then
-    info "Driver already installed for kernel $KERNEL — skipping build"
+    info "Driver already installed for kernel $KERNEL  -  skipping build"
 else
     if [ ! -d "$SRC_INSTALL_DIR" ]; then
         info "Downloading driver source..."
@@ -62,7 +62,7 @@ else
 
     info "Building (may take 1-2 minutes)..."
     dkms build "${DRIVER_NAME}/${DRIVER_VERSION}" \
-        || err "Build failed — check: dkms status && journalctl -n 30"
+        || err "Build failed  -  check: dkms status && journalctl -n 30"
 
     info "Installing module..."
     dkms install "${DRIVER_NAME}/${DRIVER_VERSION}"
@@ -80,10 +80,10 @@ if [ -n "$REALTEK_USB" ]; then
     if [ -n "$NEW_IFACE" ]; then
         info "Interface ready: $NEW_IFACE"
     else
-        info "Interface not yet visible — try: modprobe 88XXau && ip link show"
+        info "Interface not yet visible  -  try: modprobe 88XXau && ip link show"
     fi
 else
-    info "No RTL8812AU detected via USB (adapter not plugged in — module will load automatically when connected)"
+    info "No RTL8812AU detected via USB (adapter not plugged in  -  module will load automatically when connected)"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

@@ -4,10 +4,10 @@
 set -e
 
 PACKAGES=(
-    # Session management — keeps work alive if SSH drops
+    # Session management  -  keeps work alive if SSH drops
     tmux
 
-    # Version control — pull updates from GitHub when internet is available
+    # Version control  -  pull updates from GitHub when internet is available
     git
 
     # Editor

@@ -18,7 +18,7 @@ echo "==> Writing default config files"
 mkdir -p /etc/noosphere
 
 [ -f /etc/noosphere/rtl433.conf ] || cat > /etc/noosphere/rtl433.conf <<'EOF'
-# rtl_433 sensor filter — leave blank to accept all sensors on the air
+# rtl_433 sensor filter  -  leave blank to accept all sensors on the air
 # Find your sensor's id/model by running: rtl_433 -F json
 sensor_id=
 sensor_model=
@@ -52,6 +52,6 @@ mkdir -p /var/lib/noosphere
 
 echo ""
 echo "setup-rtlsdr.sh complete."
-echo "  - Plug in your RTL-SDR dongle, then enable a mode in Admin → SDR Radio."
+echo "  - Plug in your RTL-SDR dongle, then enable a mode in Admin -> SDR Radio."
 echo "  - rtl_433: verify sensor with: rtl_433 -F json (run as root or plugdev member)"
 echo "  - APRS:    verify dongle with: rtl_fm -f 144390000 -s 24k | aplay -r 24000 -f S16_LE -t raw"

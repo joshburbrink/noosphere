@@ -1,0 +1,34 @@
+{
+  "slug": "bartholomew-brown-in",
+  "label": "Bartholomew & Brown County, Indiana",
+  "country": "US",
+  "state": "IN",
+  "counties": ["Bartholomew", "Brown"],
+  "climate_zone": "6a",
+  "center": { "lat": 39.20, "lng": -85.90 },
+  "zoom": 11,
+  "min_zoom": 7,
+  "max_zoom": 19,
+  "tiles": {
+    "vector": "/tiles/counties/tiles/{z}/{x}/{y}.pbf",
+    "satellite": "/tiles/satellite/tiles/{z}/{x}/{y}.jpg",
+    "vector_minzoom": 4,
+    "vector_maxzoom": 14,
+    "satellite_minzoom": 10,
+    "satellite_maxzoom": 16
+  },
+  "radio": {
+    "counties": [
+      { "slug": "bartholomew", "label": "Bartholomew County" },
+      { "slug": "brown",       "label": "Brown County" }
+    ]
+  },
+  "seeds": {
+    "zone_label": "Zone 6a  -  Southern Indiana",
+    "last_frost": "April 15",
+    "first_frost": "October 15"
+  },
+  "weather": {
+    "nwr_channels": ["162.400", "162.475", "162.525"]
+  }
+}

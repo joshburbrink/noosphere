@@ -1,0 +1,82 @@
+{
+  "county": "Bartholomew",
+  "state": "Indiana",
+  "fips": "018005",
+  "county_seat": "Columbus",
+  "last_updated": "2026-05-16",
+  "source_note": "Approximate data  -  verify at radioreference.com/db/browse/ctid/1127 before programming radios",
+  "agencies": [
+    {
+      "name": "Bartholomew County Sheriff's Office",
+      "short": "BCSO",
+      "type": "Law Enforcement",
+      "frequencies": [
+        {"freq": "155.3700", "tone": "100.0", "mode": "FM", "tag": "Dispatch", "notes": "Primary dispatch"},
+        {"freq": "155.6850", "tone": null,    "mode": "FM", "tag": "Car-to-Car", "notes": "Vehicle-to-vehicle tactical"}
+      ]
+    },
+    {
+      "name": "Columbus Police Department",
+      "short": "CPD",
+      "type": "Law Enforcement",
+      "frequencies": [
+        {"freq": "155.0100", "tone": null, "mode": "FM", "tag": "Operations", "notes": "City operations channel"}
+      ]
+    },
+    {
+      "name": "Columbus Fire Department",
+      "short": "CFD",
+      "type": "Fire",
+      "frequencies": [
+        {"freq": "154.3400", "tone": "77.0",  "mode": "FM", "tag": "Dispatch", "notes": "Primary fire dispatch"},
+        {"freq": "154.1300", "tone": null,     "mode": "FM", "tag": "Fire Mutual Aid", "notes": "Statewide fire mutual aid"},
+        {"freq": "154.2800", "tone": null,     "mode": "FM", "tag": "Fire Mutual Aid 2", "notes": "Secondary mutual aid"}
+      ]
+    },
+    {
+      "name": "Bartholomew County EMS",
+      "short": "BC EMS",
+      "type": "EMS",
+      "frequencies": [
+        {"freq": "155.3400", "tone": null, "mode": "FM", "tag": "MERCI Med", "notes": "Indiana MERCI medical coordination channel"},
+        {"freq": "155.2800", "tone": null, "mode": "FM", "tag": "EMS Ops",   "notes": "Local EMS operations"}
+      ]
+    },
+    {
+      "name": "Indiana State Police (Versailles Post)",
+      "short": "ISP",
+      "type": "Law Enforcement",
+      "frequencies": [
+        {"freq": "154.9200", "tone": null, "mode": "FM", "tag": "ISP Primary",   "notes": "ISP District 36 primary"},
+        {"freq": "155.4750", "tone": null, "mode": "FM", "tag": "ISP Secondary", "notes": "ISP secondary / interop"}
+      ]
+    },
+    {
+      "name": "Bartholomew County Highway",
+      "short": "BCHWY",
+      "type": "Public Works",
+      "frequencies": [
+        {"freq": "159.2100", "tone": null, "mode": "FM", "tag": "Highway", "notes": "County highway department"}
+      ]
+    },
+    {
+      "name": "NOAA Weather Radio",
+      "short": "NWR",
+      "type": "Weather",
+      "frequencies": [
+        {"freq": "162.5500", "tone": null, "mode": "FM", "tag": "WXL58", "notes": "Indianapolis NWR station  -  serves Bartholomew & Brown Counties"}
+      ]
+    },
+    {
+      "name": "Amateur Radio Emergency Service (ARES)",
+      "short": "ARES",
+      "type": "Amateur / Emergency",
+      "frequencies": [
+        {"freq": "146.5200", "tone": null,  "mode": "FM",  "tag": "VHF Calling",  "notes": "National VHF simplex calling frequency"},
+        {"freq": "146.7000", "tone": "100.0","mode": "FM", "tag": "2m Repeater",  "notes": "-600 kHz offset  -  verify local repeater tone"},
+        {"freq": "147.3300", "tone": "100.0","mode": "FM", "tag": "2m Repeater 2","notes": "+600 kHz offset  -  verify local repeater tone"},
+        {"freq": "446.0000", "tone": null,   "mode": "FM", "tag": "UHF Calling",  "notes": "National UHF simplex calling frequency"}
+      ]
+    }
+  ]
+}

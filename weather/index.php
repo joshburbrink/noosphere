@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
             $out = []; $code = 0;
             exec('sudo -n /usr/local/bin/noosphere-set-nwr-freq.sh ' . escapeshellarg($freq) . ' 2>&1', $out, $code);
             if ($code === 0) {
-                $msg = "NWR frequency set to {$freq} MHz — capture restarting…";
+                $msg = "NWR frequency set to {$freq} MHz  -  capture restarting…";
             } else {
                 $error = 'Could not change frequency: ' . htmlspecialchars(implode(' ', $out));
             }
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         }
         if (!empty($channels)) {
             $scan_results = $channels;
-            $msg = 'Scan complete — strongest channel highlighted below.';
+            $msg = 'Scan complete  -  strongest channel highlighted below.';
         } else {
             $error = 'Scan failed: ' . htmlspecialchars(implode(' ', $out));
         }
@@ -124,7 +124,7 @@ $site_label = get_setting('weather_label','Weather Log');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= htmlspecialchars($site_label) ?> — <?= htmlspecialchars($name) ?></title>
+<title><?= htmlspecialchars($site_label) ?>  -  <?= htmlspecialchars($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -182,7 +182,7 @@ tr:hover td { background:#1a1f35; }
       <div>
         <label>Conditions</label>
         <select name="conditions">
-          <option value="">— select —</option>
+          <option value=""> -  select  - </option>
           <?php foreach ($CONDITIONS as $c): ?>
             <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
           <?php endforeach ?>
@@ -192,7 +192,7 @@ tr:hover td { background:#1a1f35; }
         <label>Wind Direction</label>
         <select name="wind_dir">
           <?php foreach ($WIND_DIRS as $d): ?>
-            <option value="<?= htmlspecialchars($d) ?>"><?= $d ?: '— none —' ?></option>
+            <option value="<?= htmlspecialchars($d) ?>"><?= $d ?: ' -  none  - ' ?></option>
           <?php endforeach ?>
         </select>
       </div>
@@ -252,10 +252,10 @@ tr:hover td { background:#1a1f35; }
     <?php foreach ($rows as $r): ?>
       <tr>
         <td style="white-space:nowrap;color:#aaa"><?= date('m/d H:i', $r['logged_at']) ?></td>
-        <td style="white-space:nowrap"><?= $r['temp_f'] !== null ? htmlspecialchars($r['temp_f']) . '°F' : '—' ?></td>
-        <td><?= $r['conditions'] ? '<span class="cond-badge">'.htmlspecialchars($r['conditions']).'</span>' : '—' ?></td>
-        <td style="white-space:nowrap"><?= htmlspecialchars(trim(($r['wind_dir'] ?? '') . ' ' . ($r['wind_speed'] ?? ''))) ?: '—' ?></td>
-        <td><?= $r['humidity'] ? htmlspecialchars($r['humidity']).'%' : '—' ?></td>
+        <td style="white-space:nowrap"><?= $r['temp_f'] !== null ? htmlspecialchars($r['temp_f']) . '°F' : ' - ' ?></td>
+        <td><?= $r['conditions'] ? '<span class="cond-badge">'.htmlspecialchars($r['conditions']).'</span>' : ' - ' ?></td>
+        <td style="white-space:nowrap"><?= htmlspecialchars(trim(($r['wind_dir'] ?? '') . ' ' . ($r['wind_speed'] ?? ''))) ?: ' - ' ?></td>
+        <td><?= $r['humidity'] ? htmlspecialchars($r['humidity']).'%' : ' - ' ?></td>
         <td class="notes-cell">
           <?php
             $note = $r['notes'] ?? '';

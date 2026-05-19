@@ -1,12 +1,12 @@
 #!/bin/bash
-# Noosphere operator troubleshooting guide — pipe to less -R for color paging
+# Noosphere operator troubleshooting guide  -  pipe to less -R for color paging
 
 G='\e[32m'; Y='\e[33m'; R='\e[31m'; C='\e[36m'; B='\e[34m'; W='\e[1m'; X='\e[0m'
 
 {
 printf "${W}${C}
 ╔══════════════════════════════════════════════════════════════╗
-║           NOOSPHERE — OPERATOR TROUBLESHOOTING GUIDE        ║
+║           NOOSPHERE  -  OPERATOR TROUBLESHOOTING GUIDE        ║
 ╚══════════════════════════════════════════════════════════════╝${X}
 
 This guide walks through diagnosing and fixing common problems.
@@ -33,7 +33,7 @@ printf "  ${C}systemctl list-units --type=service --state=running${X}  (show run
 
 printf "Check if the web server is answering:\n"
 printf "  ${C}curl -s -o /dev/null -w '%%{http_code}' http://localhost/${X}\n"
-printf "  (should print 200 — anything else means the web server is broken)\n\n"
+printf "  (should print 200  -  anything else means the web server is broken)\n\n"
 
 
 # ── 2. RESTART SERVICES ─────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ printf "Make a service start automatically on boot:\n"
 printf "  ${C}systemctl enable nginx${X}\n\n"
 
 printf "After editing a config file, reload nginx without dropping connections:\n"
-printf "  ${C}nginx -t${X}                      (test config first — fix errors before reloading)\n"
+printf "  ${C}nginx -t${X}                      (test config first  -  fix errors before reloading)\n"
 printf "  ${C}systemctl reload nginx${X}\n\n"
 
 
@@ -89,7 +89,7 @@ printf "${W}━━  4. NETWORK  ━━━━━━━━━━━━━━━━
 
 printf "Show all IP addresses:\n"
 printf "  ${C}hostname -I${X}\n"
-printf "  ${C}ip addr show${X}                  (detailed — look for 'inet' lines)\n\n"
+printf "  ${C}ip addr show${X}                  (detailed  -  look for 'inet' lines)\n\n"
 
 printf "Show just wifi IP:\n"
 printf "  ${C}ip -4 addr show wlan0${X}         (may be wlan0, wlan1, etc.)\n\n"
@@ -97,14 +97,14 @@ printf "  ${C}ip -4 addr show wlan0${X}         (may be wlan0, wlan1, etc.)\n\n"
 printf "Show ethernet IP:\n"
 printf "  ${C}ip -4 addr show eno1${X}\n\n"
 
-printf "Test internet connectivity (will fail in offline mode — that is normal):\n"
+printf "Test internet connectivity (will fail in offline mode  -  that is normal):\n"
 printf "  ${C}ping -c 3 8.8.8.8${X}\n\n"
 
 printf "Test that devices can reach this server:\n"
 printf "  ${C}curl http://localhost/${X}         (from this machine)\n"
 printf "  From another device, open a browser and go to http://<IP from hostname -I>/\n\n"
 
-printf "WiFi is not connecting — force reconnect:\n"
+printf "WiFi is not connecting  -  force reconnect:\n"
 printf "  ${C}systemctl restart wifi-reconnect${X}\n"
 printf "  ${C}ip link set wlan0 down && ip link set wlan0 up${X}\n\n"
 
@@ -122,7 +122,7 @@ printf "  ${C}df -h /${X}                       (just the main drive)\n\n"
 printf "Find what is using the most space:\n"
 printf "  ${C}du -sh /var/lib/noosphere/*${X}   (noosphere databases)\n"
 printf "  ${C}du -sh /var/www/noosphere/*${X}   (web files)\n"
-printf "  ${C}du -sh /var/lib/kiwix/zim/*${X}   (ZIM files — can be large)\n\n"
+printf "  ${C}du -sh /var/lib/kiwix/zim/*${X}   (ZIM files  -  can be large)\n\n"
 
 printf "If / is full, check logs first:\n"
 printf "  ${C}du -sh /var/log/*${X}\n"
@@ -166,13 +166,13 @@ printf "  ${C}df -h /${X}\n"
 printf "  ${C}ls -lh /var/lib/noosphere/*.db${X}   (check DB files exist)\n\n"
 
 printf "${Y}Problem:${X} noosphere-selftest shows WARN for NRestarts > 5\n"
-printf "${G}Fix:${X}     Service is crashing and restarting in a loop — check its log.\n"
+printf "${G}Fix:${X}     Service is crashing and restarting in a loop  -  check its log.\n"
 printf "  ${C}journalctl -u <service-name> -n 100${X}\n\n"
 
 printf "${Y}Problem:${X} Server very slow\n"
 printf "${G}Fix:${X}     Check memory and CPU.\n"
-printf "  ${C}free -h${X}                       (memory — if Avail is near 0, something is leaking)\n"
-printf "  ${C}top${X}                           (live process list — press Q to quit)\n"
+printf "  ${C}free -h${X}                       (memory  -  if Avail is near 0, something is leaking)\n"
+printf "  ${C}top${X}                           (live process list  -  press Q to quit)\n"
 printf "  ${C}ps aux --sort=-%mem | head -10${X}  (top memory users)\n\n"
 
 printf "${Y}Problem:${X} Can't log in to Nextcloud\n"
@@ -200,8 +200,8 @@ printf "  ${C}nginx -t && systemctl reload nginx${X}   (test then reload)\n\n"
 printf "${W}━━  9. WiFi ACCESS POINT (HOSTAPD)  ━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n\n"
 
 printf "Noosphere supports two WiFi modes:\n"
-printf "  ${W}Hostapd${X}       — laptop broadcasts its own WiFi network (USB adapter required)\n"
-printf "  ${W}Ext. router${X}   — GL.iNet or any router connected via ethernet (eno1)\n\n"
+printf "  ${W}Hostapd${X}        -  laptop broadcasts its own WiFi network (USB adapter required)\n"
+printf "  ${W}Ext. router${X}    -  GL.iNet or any router connected via ethernet (eno1)\n\n"
 
 printf "Check current mode:\n"
 printf "  ${C}setup-hostapd.sh status${X}\n\n"
@@ -209,7 +209,7 @@ printf "  ${C}setup-hostapd.sh status${X}\n\n"
 printf "${W}First-time AP setup (hostapd mode):${X}\n"
 printf "  1. Plug in USB WiFi adapter\n"
 printf "  2. ${C}setup-hostapd.sh configure${X}   (pick interface, set SSID/password)\n"
-printf "  3. ${C}setup-hostapd.sh enable${X}       (starts AP — clients can connect immediately)\n\n"
+printf "  3. ${C}setup-hostapd.sh enable${X}       (starts AP  -  clients can connect immediately)\n\n"
 
 printf "Enable / disable AP mode:\n"
 printf "  ${C}setup-hostapd.sh enable${X}          start AP mode\n"
@@ -221,7 +221,7 @@ printf "  DHCP range:   192.168.4.100 – 192.168.4.200\n"
 printf "  Captive portal redirects all clients to http://192.168.4.1/\n\n"
 
 printf "External router mode:\n"
-printf "  Connect eno1 ethernet port → router LAN port\n"
+printf "  Connect eno1 ethernet port -> router LAN port\n"
 printf "  Captive portal redirects clients to http://192.168.8.2/\n"
 printf "  Run setup-router.sh if router needs initial config\n\n"
 
@@ -242,7 +242,7 @@ printf "${G}Fix:${X}\n"
 printf "  ${C}systemctl enable hostapd${X}       (make it start on boot)\n"
 printf "  ${C}systemctl start hostapd${X}\n\n"
 
-printf "${Y}Problem:${X} hostapd fails — \"nl80211: Could not configure driver\"\n"
+printf "${Y}Problem:${X} hostapd fails  -  \"nl80211: Could not configure driver\"\n"
 printf "${G}Fix:${X}     Interface may be in use as a client. Pick the correct interface.\n"
 printf "  ${C}setup-hostapd.sh configure${X}\n"
 printf "  ${C}journalctl -u hostapd -n 30${X}\n\n"

@@ -1,6 +1,6 @@
 <?php
 /*
- * shared/head.php — theme bootstrap and picker widget
+ * shared/head.php  -  theme bootstrap and picker widget
  * Include this BEFORE any CSS link/style in <head>.
  * Requires shared/settings.php to already be loaded.
  */

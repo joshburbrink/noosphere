@@ -1,0 +1,19 @@
+{
+  "slug": "world",
+  "label": "Generic / no region",
+  "country": "",
+  "state": "",
+  "counties": [],
+  "climate_zone": "",
+  "center": { "lat": 39.5, "lng": -98.35 },
+  "zoom": 4,
+  "min_zoom": 2,
+  "max_zoom": 14,
+  "radio": { "counties": [] },
+  "seeds": {
+    "zone_label": "No region set",
+    "last_frost": "unknown",
+    "first_frost": "unknown"
+  },
+  "notes": "Fallback pack. Install a region pack from Admin -> Region to get local tiles, frequencies, topo PDFs, and a planting calendar."
+}

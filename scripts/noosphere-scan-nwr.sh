@@ -3,7 +3,7 @@
 # on stdout. Stops noaa-weather.service for the duration of the scan,
 # then restarts it (whatever channel it was on stays the same).
 #
-# IMPORTANT: no `set -e` — we MUST restart the service even if rtl_power
+# IMPORTANT: no `set -e`  -  we MUST restart the service even if rtl_power
 # or the parser fails. EXIT trap handles cleanup + restart.
 set -u
 GAIN=49.6

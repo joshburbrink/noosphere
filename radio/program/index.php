@@ -1,12 +1,13 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 if (get_setting('show_radio','0') !== '1') { http_response_code(404); exit; }
 
 $name = get_setting('instance_name', 'Noosphere');
 $MODELS_JSON  = '/var/lib/noosphere/radio/chirp-models.json';
-$COUNTY_DIR   = '/var/lib/noosphere/radio/reference';
+$COUNTY_DIR   = region_path('radio');
 $PROG_SCRIPT  = '/usr/local/bin/noosphere-radio-program.py';
 
 // AJAX: start programming job
@@ -78,7 +79,7 @@ foreach (glob("$COUNTY_DIR/*.json") ?: [] as $f) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Radio Programmer — <?= htmlspecialchars($name) ?></title>
+<title>Radio Programmer  -  <?= htmlspecialchars($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -136,10 +137,10 @@ td { padding:5px 8px; border-bottom:1px solid #161628; }
   <!-- LEFT: Hardware -->
   <div>
     <div class="card">
-      <h2>1 — USB Port</h2>
+      <h2>1  -  USB Port</h2>
       <div class="port-row">
         <select id="port-sel">
-          <option value="">— scanning… —</option>
+          <option value=""> -  scanning…  - </option>
         </select>
         <button class="btn-icon" onclick="refreshPorts()" title="Refresh">↺</button>
       </div>
@@ -149,18 +150,18 @@ td { padding:5px 8px; border-bottom:1px solid #161628; }
     </div>
 
     <div class="card">
-      <h2>2 — Radio Model</h2>
+      <h2>2  -  Radio Model</h2>
       <div class="search-box">
         <input type="text" id="model-search" placeholder="Search models… (e.g. UV-5R, FT-60R)" oninput="filterModels()">
       </div>
       <select id="brand-sel" onchange="populateModels()">
-        <option value="">— select brand —</option>
+        <option value=""> -  select brand  - </option>
         <?php foreach ($brands as $b): ?>
         <option value="<?= htmlspecialchars($b['brand']) ?>"><?= htmlspecialchars($b['brand']) ?> (<?= count($b['radios']) ?>)</option>
         <?php endforeach; ?>
       </select>
       <select id="model-sel" size="7" style="height:160px;margin-top:0">
-        <option value="">— select brand first —</option>
+        <option value=""> -  select brand first  - </option>
       </select>
     </div>
   </div>
@@ -168,7 +169,7 @@ td { padding:5px 8px; border-bottom:1px solid #161628; }
   <!-- RIGHT: Data -->
   <div>
     <div class="card">
-      <h2>3 — Frequency Data</h2>
+      <h2>3  -  Frequency Data</h2>
       <label>Counties to include</label>
       <div class="county-checks">
         <?php foreach ($counties as $c): ?>
@@ -179,12 +180,12 @@ td { padding:5px 8px; border-bottom:1px solid #161628; }
         <?php endforeach; ?>
       </div>
       <div style="font-size:11px;color:#555;margin-top:10px">
-        Source: <code style="color:#888">/var/lib/noosphere/radio/reference/</code>
+        Source: <code style="color:#888"><?= htmlspecialchars($COUNTY_DIR) ?>/</code>
       </div>
     </div>
 
     <div class="card">
-      <h2>4 — Channel Preview</h2>
+      <h2>4  -  Channel Preview</h2>
       <div id="preview-area">
         <div class="no-port">Select radio model and county data to preview channels.</div>
       </div>
@@ -194,7 +195,7 @@ td { padding:5px 8px; border-bottom:1px solid #161628; }
 
 <div class="card">
   <div id="status-box" class="status-box">
-    <div id="status-msg">—</div>
+    <div id="status-msg"> - </div>
     <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
     <div id="status-detail" style="font-size:11px;color:#555;margin-top:6px"></div>
   </div>
@@ -216,7 +217,7 @@ function refreshPorts() {
     var prev = sel.value;
     sel.innerHTML = ports.length
       ? ports.map(p=>`<option value="${p}"${p===prev?' selected':''}>${p}</option>`).join('')
-      : '<option value="">No USB serial devices found — plug in cable</option>';
+      : '<option value="">No USB serial devices found  -  plug in cable</option>';
     checkReady();
   });
 }
@@ -291,7 +292,7 @@ function updatePreview() {
       <td style="color:#555;font-size:11px">${String(e.ch).padStart(3,'0')}</td>
       <td><span class="freq-val">${e.freq} MHz</span></td>
       <td><span class="ch-name">${e.name}</span></td>
-      <td><span class="badge-sm">${e.tone ? e.tone+' Hz' : '—'}</span></td>
+      <td><span class="badge-sm">${e.tone ? e.tone+' Hz' : ' - '}</span></td>
       <td style="color:#555;font-size:11px">${e.mode}</td>
       <td style="color:#666;font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.agency}</td>
     </tr>`).join('');

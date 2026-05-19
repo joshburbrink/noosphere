@@ -1,19 +1,22 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 
 if (get_setting('show_topo','1') !== '1') { http_response_code(404); exit; }
 
-$pdf_dir = '/var/www/noosphere/maps/topo/';
-$files   = glob($pdf_dir . '*.pdf') ?: [];
-$quads   = [];
+$pdf_dir   = region_path('topo') . '/';
+$url_base  = region_url('topo') . '/';
+$files     = glob($pdf_dir . '*.pdf') ?: [];
+$quads     = [];
 foreach ($files as $f) {
     $name    = basename($f, '.pdf');
     $display = ucwords(str_replace('_', ' ', $name));
     $size    = round(filesize($f) / 1024 / 1024, 1);
     $quads[] = ['name' => $display, 'slug' => $name, 'size' => $size];
 }
+$region_label = get_setting('region_label', region_meta('label', ''));
 usort($quads, fn($a,$b) => strcmp($a['name'], $b['name']));
 $count    = count($quads);
 $total_mb = array_sum(array_column($quads, 'size'));
@@ -23,7 +26,7 @@ $total_mb = array_sum(array_column($quads, 'size'));
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Topo Maps — Noosphere</title>
+<title>Topo Maps  -  Noosphere</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; }
@@ -85,7 +88,7 @@ header h1 { font-size: 16px; color: #e94560; flex: 1; }
 
 <div class="container">
   <div class="info">
-    <b>USGS 1:24,000 Topographic Quadrangles</b> — Bartholomew &amp; Brown County, Indiana.
+    <b>USGS 1:24,000 Topographic Quadrangles</b><?= $region_label ? '  -  ' . htmlspecialchars($region_label) . '.' : '.' ?>
     Opens as a PDF you can print or zoom. Each sheet covers a 7.5-minute area (~9 × 7 miles) at full survey detail.
   </div>
 
@@ -93,7 +96,7 @@ header h1 { font-size: 16px; color: #e94560; flex: 1; }
 
   <div class="grid" id="grid">
     <?php foreach ($quads as $quad): ?>
-    <a class="quad-card" href="/maps/topo/<?= htmlspecialchars($quad['slug']) ?>.pdf" target="_blank" data-name="<?= strtolower($quad['name']) ?>">
+    <a class="quad-card" href="<?= htmlspecialchars($url_base . $quad['slug']) ?>.pdf" target="_blank" data-name="<?= strtolower($quad['name']) ?>">
       <span class="quad-icon">🗾</span>
       <div class="quad-info">
         <div class="quad-name"><?= htmlspecialchars($quad['name']) ?></div>

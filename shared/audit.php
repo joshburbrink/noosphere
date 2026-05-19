@@ -1,5 +1,5 @@
 <?php
-// Audit log — append-only record of admin actions.
+// Audit log  -  append-only record of admin actions.
 // Call log_audit() from any admin action handler.
 
 define('AUDIT_DB', '/var/lib/noosphere/audit.db');

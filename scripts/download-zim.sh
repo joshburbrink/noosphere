@@ -1,5 +1,5 @@
 #!/bin/bash
-# download-zim.sh — Download Kiwix ZIM content for Noosphere
+# download-zim.sh  -  Download Kiwix ZIM content for Noosphere
 # Usage: ./download-zim.sh [destination]
 # Default destination: /mnt/noosphere/kiwix
 
@@ -53,12 +53,12 @@ FAILED=()
 
 for name in "${!BOOKS[@]}"; do
     desc="${BOOKS[$name]}"
-    log "Resolving: $name — $desc"
+    log "Resolving: $name  -  $desc"
 
     url=$(get_url "$name" || true)
 
     if [[ -z "$url" ]]; then
-        log "WARNING: Could not resolve URL for $name — skipping"
+        log "WARNING: Could not resolve URL for $name  -  skipping"
         FAILED+=("$name")
         continue
     fi
@@ -66,7 +66,7 @@ for name in "${!BOOKS[@]}"; do
     filename=$(basename "$url")
 
     if [[ -f "$DEST/$filename" ]]; then
-        log "Already exists: $filename — skipping"
+        log "Already exists: $filename  -  skipping"
         ((TOTAL_SKIPPED++)) || true
         continue
     fi

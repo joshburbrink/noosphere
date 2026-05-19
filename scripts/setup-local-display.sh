@@ -2,7 +2,7 @@
 # setup-local-display.sh -- Set up a local monitor/touchscreen for Noosphere.
 # Installs X11 + Chromium, creates the noosphere-display launcher and systemd
 # service. Supports both server-local (HDMI/VGA) and Raspberry Pi scenarios.
-# (#77 — local monitor / touchscreen display)
+# (#77  -  local monitor / touchscreen display)
 
 set -e
 
@@ -55,7 +55,7 @@ PKGS=(
     unclutter-xfixes # hide cursor after inactivity
 )
 
-# On Pi, xserver-xorg-video-fbturbo or vc4 is used — xorg meta pulls what's needed
+# On Pi, xserver-xorg-video-fbturbo or vc4 is used  -  xorg meta pulls what's needed
 if grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
     echo "Raspberry Pi detected."
     PKGS+=(raspi-config)
@@ -98,7 +98,7 @@ if [[ "$DISPLAY_MODE" == "off" ]]; then
 fi
 
 URL="${SERVER_URL}/${DISPLAY_MODE}/"
-echo "Starting Noosphere display: $DISPLAY_MODE → $URL"
+echo "Starting Noosphere display: $DISPLAY_MODE -> $URL"
 
 # Clean stale Chromium locks that prevent restart
 rm -f /root/.config/chromium/SingletonLock
@@ -198,7 +198,7 @@ if [[ "$MODE" == "pi" ]]; then
     echo
     echo "--- Pi-specific setup ---"
 
-    # On Pi OS Lite, set up autologin on tty1 → startx
+    # On Pi OS Lite, set up autologin on tty1 -> startx
     if [[ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]]; then
         echo "Autologin already configured."
     else

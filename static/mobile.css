@@ -1,4 +1,4 @@
-/* mobile.css — universal mobile-friendly defaults (#37).
+/* mobile.css  -  universal mobile-friendly defaults (#37).
  * Loaded by shared/head.php after theme.css. Scoped to small-viewport media
  * queries so module-specific layouts are untouched on desktop. */
 
@@ -47,12 +47,12 @@ input[type="time"], input[type="datetime-local"], select, textarea {
   /* Container padding: keep content off the edge */
   .container, .wrap, main { padding-left: 12px !important; padding-right: 12px !important; }
 
-  /* Identity strip — already responsive but make it a touch larger to hit */
+  /* Identity strip  -  already responsive but make it a touch larger to hit */
   #ns-identity-strip { padding: 6px 8px; }
   #ns-identity-strip a { padding: 4px 6px; }
 }
 
-/* Small phones (iPhone SE et al.) — tighter still */
+/* Small phones (iPhone SE et al.)  -  tighter still */
 @media (max-width: 380px) {
   body { font-size: 14px; }
   .tab, .sub-tab { padding: 8px 10px !important; font-size: 12px !important; }

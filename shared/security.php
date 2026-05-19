@@ -92,7 +92,7 @@ function verify_pin($name, $pin, $require_admin = false) {
     return false;
 }
 
-// MIME validation — deny executable types regardless of extension
+// MIME validation  -  deny executable types regardless of extension
 function check_mime_safe($tmp_path) {
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime  = $finfo->file($tmp_path);

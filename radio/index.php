@@ -25,8 +25,8 @@ $db->exec("CREATE TABLE IF NOT EXISTS radio_log (
 @$db->exec("ALTER TABLE radio_log ADD COLUMN clip_path TEXT");
 @$db->exec("ALTER TABLE radio_log ADD COLUMN duration REAL");
 
-$SIGNAL_LABELS = [1=>'1 — Barely readable', 2=>'2 — Readable with effort',
-                  3=>'3 — Readable', 4=>'4 — Good', 5=>'5 — Excellent'];
+$SIGNAL_LABELS = [1=>'1  -  Barely readable', 2=>'2  -  Readable with effort',
+                  3=>'3  -  Readable', 4=>'4  -  Good', 5=>'5  -  Excellent'];
 
 $msg = ''; $error = '';
 
@@ -82,7 +82,7 @@ $site_label = get_setting('radio_label','Radio Net Log');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= htmlspecialchars($site_label) ?> — <?= htmlspecialchars($name) ?></title>
+<title><?= htmlspecialchars($site_label) ?>  -  <?= htmlspecialchars($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -149,7 +149,7 @@ tr:hover td { background:#1a1f35; }
       <div>
         <label>Signal Strength (RS)</label>
         <select name="signal">
-          <option value="0">— not rated —</option>
+          <option value="0"> -  not rated  - </option>
           <?php foreach ($SIGNAL_LABELS as $v => $l): ?>
             <option value="<?= $v ?>"><?= htmlspecialchars($l) ?></option>
           <?php endforeach ?>
@@ -162,7 +162,7 @@ tr:hover td { background:#1a1f35; }
       </div>
       <div class="form-full">
         <label>Traffic / Message</label>
-        <textarea name="traffic" placeholder="What was passed — status update, request, info..."></textarea>
+        <textarea name="traffic" placeholder="What was passed  -  status update, request, info..."></textarea>
       </div>
       <div class="form-full">
         <label>Notes</label>
@@ -206,7 +206,7 @@ tr:hover td { background:#1a1f35; }
     <tbody>
     <?php foreach ($rows as $r):
       $sig = (int)($r['signal'] ?? 0);
-      $sig_html = $sig ? str_repeat('●',$sig).str_repeat('○',5-$sig) : '—';
+      $sig_html = $sig ? str_repeat('●',$sig).str_repeat('○',5-$sig) : ' - ';
       $is_auto = ($r['source'] ?? '') === 'monitor-auto';
     ?>
       <tr>
@@ -217,7 +217,7 @@ tr:hover td { background:#1a1f35; }
           <?php endif ?>
         </td>
         <td><span class="callsign"><?= htmlspecialchars($r['callsign']) ?></span></td>
-        <td><span class="freq"><?= htmlspecialchars($r['frequency'] ?? '—') ?></span></td>
+        <td><span class="freq"><?= htmlspecialchars($r['frequency'] ?? ' - ') ?></span></td>
         <td><span class="sig-dots" title="<?= $sig ? htmlspecialchars($SIGNAL_LABELS[$sig]) : '' ?>"><?= $sig_html ?></span></td>
         <td class="notes-cell">
           <?php if ($is_auto && !empty($r['transcript'])): ?>

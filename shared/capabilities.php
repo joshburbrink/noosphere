@@ -1,10 +1,10 @@
 <?php
 /*
- * shared/capabilities.php — central role/capability map for #68.
+ * shared/capabilities.php  -  central role/capability map for #68.
  *
  * Modules call can('weather.set_freq') or require_capability('weather.set_freq')
  * instead of `if ($is_admin)`. Admin (the password-protected $_SESSION['admin']
- * flag) always passes — admin is the superuser.
+ * flag) always passes  -  admin is the superuser.
  *
  * Roles are stored on registry rows as a CSV in the `roles` column.
  * Known roles: operator, shelter_staff, sar, medical, comms, volunteer.
@@ -30,7 +30,7 @@ function capability_map(): array {
         'incidents.delete'      => ['operator'],
         'incidents.resolve'     => ['operator', 'sar', 'medical'],
 
-        // Damage (legacy → incidents, kept for /damage/ redirect compatibility)
+        // Damage (legacy -> incidents, kept for /damage/ redirect compatibility)
         'damage.edit'           => ['operator'],
         'damage.delete'         => ['operator'],
 
@@ -73,7 +73,7 @@ function capability_map(): array {
 }
 
 /*
- * can($cap) — true if the current session is allowed to perform $cap.
+ * can($cap)  -  true if the current session is allowed to perform $cap.
  * Admin always wins. Unknown caps default-deny (returns false, logs warning
  * to error_log for the developer who forgot to register the cap).
  */
@@ -82,7 +82,7 @@ function can(string $cap): bool {
 
     $map = capability_map();
     if (!array_key_exists($cap, $map)) {
-        error_log("noosphere: unknown capability '$cap' — default-deny. Add it to shared/capabilities.php.");
+        error_log("noosphere: unknown capability '$cap'  -  default-deny. Add it to shared/capabilities.php.");
         return false;
     }
     $allowed = $map[$cap];

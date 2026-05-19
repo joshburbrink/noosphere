@@ -1,7 +1,7 @@
 #!/bin/bash
 # clone-usb.sh -- Create a byte-for-byte backup of the Noosphere boot USB drive.
 # Run this on any Linux machine (not on the USB itself while booted).
-# (#13 — kit redundancy: backup boot drive)
+# (#13  -  kit redundancy: backup boot drive)
 #
 # Kit redundancy checklist (see also admin wiki):
 #   [x] Backup USB drive (this script)
@@ -20,7 +20,7 @@ Usage: $0 <source> <dest> [--verify]
   --verify  After clone, verify with SHA256 checksum
 
 Examples:
-  $0 /dev/sdb /dev/sdc              # Clone sdb → sdc
+  $0 /dev/sdb /dev/sdc              # Clone sdb -> sdc
   $0 /dev/sdb /dev/sdc --verify     # Clone and verify
   $0 /dev/sdb backup-$(date +%Y%m%d).img  # Clone to image file
 
@@ -66,7 +66,7 @@ if [ -b "$DST" ]; then
     read -rp "Type YES to confirm: " confirm
     [ "$confirm" = "YES" ] || { echo "Aborted."; exit 1; }
 else
-    echo "=== Noosphere USB → Image File ==="
+    echo "=== Noosphere USB -> Image File ==="
     echo "Source: $SRC"
     echo "Image:  $DST"
 fi
@@ -107,7 +107,7 @@ if [ "$VERIFY" = "--verify" ] || [ "$VERIFY" = "-v" ]; then
         echo "✓ Checksums match: $SRC_SHA"
         echo "  Backup drive is a verified identical copy."
     else
-        echo "✗ CHECKSUM MISMATCH — clone may be corrupt!"
+        echo "✗ CHECKSUM MISMATCH  -  clone may be corrupt!"
         echo "  Source: $SRC_SHA"
         echo "  Dest:   $DST_SHA"
         exit 1

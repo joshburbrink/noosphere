@@ -21,7 +21,7 @@ if grep -q "allow-hotplug $WIFI" "$INTERFACES"; then
 elif grep -q "auto $WIFI" "$INTERFACES"; then
     echo "$INTERFACES already has 'auto $WIFI', no change needed."
 else
-    echo "WARNING: $WIFI not found in $INTERFACES — add it manually."
+    echo "WARNING: $WIFI not found in $INTERFACES  -  add it manually."
 fi
 
 # Install watchdog script

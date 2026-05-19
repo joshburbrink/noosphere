@@ -14,7 +14,7 @@ if (empty($_SESSION['admin'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Wiki — Noosphere</title>
+<title>Admin Wiki  -  Noosphere</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, sans-serif; background: #0f0f1a; color: #e0e0e0; }
@@ -118,17 +118,17 @@ pre {
 <!-- ── 1. Overview ───────────────────────────────────────────────────────── -->
 <div class="section" id="overview">
   <h2>1. Overview</h2>
-  <p>Noosphere is a self-contained offline information hub that runs on a laptop (HP 3105m) booting from a USB drive. Anyone on the local WiFi network gets directed to this hub — no internet required.</p>
+  <p>Noosphere is a self-contained offline information hub that runs on a laptop (HP 3105m) booting from a USB drive. Anyone on the local WiFi network gets directed to this hub  -  no internet required.</p>
   <h3>What it provides</h3>
   <ul>
-    <li><b>Registry</b> — community check-in, missing persons, skills &amp; supplies</li>
-    <li><b>Chat</b> — local real-time messaging</li>
-    <li><b>Forum</b> — threaded discussions by category (missing persons, lost &amp; found, general)</li>
-    <li><b>Files</b> — shared file uploads and downloads</li>
-    <li><b>Map</b> — offline vector tile map with custom markers for coordination</li>
-    <li><b>Library</b> — offline Wikipedia, first aid, repair guides (via Kiwix)</li>
-    <li><b>Topo PDFs</b> — USGS topographic maps for Bartholomew + Brown County</li>
-    <li><b>Calendar</b> — shared event calendar</li>
+    <li><b>Registry</b>  -  community check-in, missing persons, skills &amp; supplies</li>
+    <li><b>Chat</b>  -  local real-time messaging</li>
+    <li><b>Forum</b>  -  threaded discussions by category (missing persons, lost &amp; found, general)</li>
+    <li><b>Files</b>  -  shared file uploads and downloads</li>
+    <li><b>Map</b>  -  offline vector tile map with custom markers for coordination</li>
+    <li><b>Library</b>  -  offline Wikipedia, first aid, repair guides (via Kiwix)</li>
+    <li><b>Topo PDFs</b>  -  USGS topographic maps for Bartholomew + Brown County</li>
+    <li><b>Calendar</b>  -  shared event calendar</li>
   </ul>
   <h3>Network topology</h3>
   <pre>Laptop (192.168.8.2) ──ethernet──▶ GL-SFT1200 router (192.168.8.1)
@@ -143,22 +143,22 @@ pre {
 <!-- ── 2. Settings Reference ─────────────────────────────────────────────── -->
 <div class="section" id="settings">
   <h2>2. Settings Reference</h2>
-  <p>Settings are stored in <code>/var/lib/noosphere/settings.db</code> and managed from the Admin → Settings tab.</p>
+  <p>Settings are stored in <code>/var/lib/noosphere/settings.db</code> and managed from the Admin -> Settings tab.</p>
 
   <h3>Instance</h3>
   <table class="setting-table">
     <tr><th>Key</th><th>Description</th></tr>
     <tr><td>instance_name</td><td>Site title shown in browser tabs and the top of each page</td></tr>
-    <tr><td>instance_tagline</td><td>Subtitle on the homepage (e.g. "Offline hub — no internet needed")</td></tr>
+    <tr><td>instance_tagline</td><td>Subtitle on the homepage (e.g. "Offline hub  -  no internet needed")</td></tr>
     <tr><td>homepage_alert</td><td>Red alert banner on the homepage. Leave blank to hide it.</td></tr>
-    <tr><td>readonly</td><td>When <b>1</b>, the entire site becomes read-only — chat, registry, forum, file upload are all blocked. Use for kiosk/display deployments.</td></tr>
+    <tr><td>readonly</td><td>When <b>1</b>, the entire site becomes read-only  -  chat, registry, forum, file upload are all blocked. Use for kiosk/display deployments.</td></tr>
   </table>
 
   <h3>Registry</h3>
   <table class="setting-table">
     <tr><th>Key</th><th>Description</th></tr>
     <tr><td>show_registry</td><td>Show/hide the Registry feature entirely</td></tr>
-    <tr><td>registry_label</td><td>What to call it — "Registry", "Event Check-In", "Shelter Check-In", etc.</td></tr>
+    <tr><td>registry_label</td><td>What to call it  -  "Registry", "Event Check-In", "Shelter Check-In", etc.</td></tr>
     <tr><td>registry_checkin</td><td>Enable the check-in form (name, status, location)</td></tr>
     <tr><td>registry_statuses</td><td>Comma-separated list of status options shown in the dropdown. Example: <code>OK, Need Help, Checking In</code></td></tr>
     <tr><td>registry_skills</td><td>Show "Skills available" field (medical, ham radio, search &amp; rescue, etc.)</td></tr>
@@ -178,7 +178,7 @@ pre {
     <tr><th>Key</th><th>Description</th></tr>
     <tr><td>show_chat</td><td>Enable the community chat page</td></tr>
     <tr><td>show_forum</td><td>Enable the community forum / bulletin board</td></tr>
-    <tr><td>forum_categories</td><td>JSON array of category objects. Manage from the Settings UI — do not edit raw JSON here unless necessary.</td></tr>
+    <tr><td>forum_categories</td><td>JSON array of category objects. Manage from the Settings UI  -  do not edit raw JSON here unless necessary.</td></tr>
     <tr><td>show_files</td><td>Enable shared file uploads</td></tr>
     <tr><td>show_library</td><td>Enable the Kiwix offline library link</td></tr>
     <tr><td>show_maps</td><td>Enable the offline map</td></tr>
@@ -190,12 +190,12 @@ pre {
   <h3>Quick Start Presets</h3>
   <table class="setting-table">
     <tr><th>Preset</th><th>Best for</th></tr>
-    <tr><td>Emergency</td><td>General disaster response — all features on, skills &amp; missing persons enabled</td></tr>
-    <tr><td>Event</td><td>Festival, fair, or community event — simplified check-in, no missing persons</td></tr>
-    <tr><td>Search &amp; Rescue</td><td>SAR operations — map &amp; missing persons focused, no calendar or library</td></tr>
-    <tr><td>Shelter</td><td>Shelter management — bunk tracking, dietary, next-of-kin fields</td></tr>
-    <tr><td>Kiosk</td><td>Read-only display — no chat/registry, just library, forum, and map</td></tr>
-    <tr><td>Resource Hub</td><td>Supply coordination — skills &amp; supplies fields enabled</td></tr>
+    <tr><td>Emergency</td><td>General disaster response  -  all features on, skills &amp; missing persons enabled</td></tr>
+    <tr><td>Event</td><td>Festival, fair, or community event  -  simplified check-in, no missing persons</td></tr>
+    <tr><td>Search &amp; Rescue</td><td>SAR operations  -  map &amp; missing persons focused, no calendar or library</td></tr>
+    <tr><td>Shelter</td><td>Shelter management  -  bunk tracking, dietary, next-of-kin fields</td></tr>
+    <tr><td>Kiosk</td><td>Read-only display  -  no chat/registry, just library, forum, and map</td></tr>
+    <tr><td>Resource Hub</td><td>Supply coordination  -  skills &amp; supplies fields enabled</td></tr>
   </table>
   <div class="warn">Applying a preset <b>overwrites all settings</b>. Use "Reset Instance" in the Status tab to wipe data and start fresh (requires typing RESET to confirm).</div>
 </div>
@@ -208,7 +208,7 @@ pre {
     <li>Boot laptop from the USB drive (press F9 or F10 on HP 3105m for boot menu)</li>
     <li>Login: <code>root</code> / <em>password set during install</em></li>
     <li>Verify services are running: <code>systemctl status nginx php8.4-fpm mbtileserver kiwix mariadb</code></li>
-    <li>Check IP address: <code>ip addr show</code> — look for <code>192.168.2.x</code> (WiFi) or <code>192.168.8.2</code> (eth)</li>
+    <li>Check IP address: <code>ip addr show</code>  -  look for <code>192.168.2.x</code> (WiFi) or <code>192.168.8.2</code> (eth)</li>
     <li>Open a browser to <code>http://192.168.2.167</code> (or <code>http://192.168.8.2</code>) to verify the hub loads</li>
     <li>Log in to admin panel (keyboard shortcut <kbd>aaa</kbd> on the homepage, or go to <code>/admin/</code>)</li>
     <li>Set instance name and tagline for your deployment</li>
@@ -255,7 +255,7 @@ pre {
   <ol>
     <li>Plug an ethernet cable from the laptop's <b>eth0 / eno1</b> port into any <b>LAN port</b> on the GL-SFT1200 (not the WAN port)</li>
     <li>The router's WAN port should be left disconnected (no internet)</li>
-    <li>The router DHCP will assign the laptop <code>192.168.8.x</code> — set it static at <code>192.168.8.2</code></li>
+    <li>The router DHCP will assign the laptop <code>192.168.8.x</code>  -  set it static at <code>192.168.8.2</code></li>
   </ol>
 
   <h3>Run router setup</h3>
@@ -271,7 +271,7 @@ pre {
     <li>Detection endpoints at <code>/hotspot-detect.html</code>, <code>/generate_204</code>, <code>/ncsi.txt</code> are served by Nginx</li>
   </ol>
 
-  <div class="note">HTTPS sites will not captive-portal correctly — the redirect only works for plain HTTP. This is normal and expected behavior.</div>
+  <div class="note">HTTPS sites will not captive-portal correctly  -  the redirect only works for plain HTTP. This is normal and expected behavior.</div>
 
   <h3>Checking if captive portal is working</h3>
   <pre>iptables -t nat -L PREROUTING -n --line-numbers   # should show redirect rules
@@ -291,15 +291,15 @@ systemctl status dnsmasq</pre>
   <table class="setting-table">
     <tr><th>Tab</th><th>What it contains</th></tr>
     <tr><td>Dashboard</td><td>Service status cards, disk usage, registry/chat/forum/map quick stats, active bans count</td></tr>
-    <tr><td>Network</td><td>Connected devices list with IP/MAC — ban by IP directly from here</td></tr>
+    <tr><td>Network</td><td>Connected devices list with IP/MAC  -  ban by IP directly from here</td></tr>
     <tr><td>Community</td><td>Registry entries, forum threads/posts, bans (add/remove by name or IP), calendar events, uploaded files</td></tr>
-    <tr><td>Content</td><td>Uploaded files, registry photos, map markers, ZIM library enable/disable — all deletable</td></tr>
+    <tr><td>Content</td><td>Uploaded files, registry photos, map markers, ZIM library enable/disable  -  all deletable</td></tr>
     <tr><td>System</td><td>CPU temp, disk usage, top processes, nginx/php/system logs, database backup download</td></tr>
     <tr><td>Settings</td><td>Four sub-tabs: <b>Configure</b> (identity, read-only, registration access), <b>Modules</b> (per-feature toggles, custom registry fields, forum categories), <b>Security</b> (change Linux and admin passwords), <b>Tools</b> (presets, utility scripts, Reset Instance)</td></tr>
   </table>
 
   <h3>Changing the admin password</h3>
-  <p>Use the admin panel: <b>Settings → Security → Admin Panel Password</b>. Enter your current password and set a new one.</p>
+  <p>Use the admin panel: <b>Settings -> Security -> Admin Panel Password</b>. Enter your current password and set a new one.</p>
   <p>Command-line fallback (if locked out):</p>
   <pre># Generate a bcrypt hash:
 NEW_HASH=$(php -r "echo password_hash('your-new-password', PASSWORD_DEFAULT);")
@@ -309,13 +309,13 @@ sqlite3 /var/lib/noosphere/settings.db \
   <div class="warn">Change the admin password before deploying in a real scenario. Registry users with admin privilege can also log in with their registry PIN.</div>
 
   <h3>Changing Linux system passwords</h3>
-  <p>Use <b>Settings → Security → Linux System Credentials</b> to change the password for the Linux user and/or root. These passwords control SSH and console access and persist when cloning the drive.</p>
+  <p>Use <b>Settings -> Security -> Linux System Credentials</b> to change the password for the Linux user and/or root. These passwords control SSH and console access and persist when cloning the drive.</p>
 
   <h3>Banning a user</h3>
   <p>Two ways to ban from the admin panel:</p>
   <ul>
-    <li><b>Network tab</b> — shows all connected devices by IP/MAC. Click Ban next to a device to ban by IP immediately.</li>
-    <li><b>Community tab</b> — add a ban by name, IP, or both, with an optional reason. Also shows the full ban list for removal.</li>
+    <li><b>Network tab</b>  -  shows all connected devices by IP/MAC. Click Ban next to a device to ban by IP immediately.</li>
+    <li><b>Community tab</b>  -  add a ban by name, IP, or both, with an optional reason. Also shows the full ban list for removal.</li>
   </ul>
   <p>Banned IPs are blocked from chat, posting, and file uploads. To inspect bans directly:</p>
   <pre>sqlite3 /var/lib/noosphere/admin.db "SELECT * FROM bans;"</pre>
@@ -376,7 +376,7 @@ nmcli device connect wlan0
 # Or using wpa_supplicant directly:
 wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf
 dhclient wlan0</pre>
-  <div class="note">In production the laptop is the <b>access point</b> (via the GL router), so the laptop's own WiFi adapter is less critical — ethernet to the router is the primary connection path.</div>
+  <div class="note">In production the laptop is the <b>access point</b> (via the GL router), so the laptop's own WiFi adapter is less critical  -  ethernet to the router is the primary connection path.</div>
 
   <h3>Database errors / locked database</h3>
   <pre># Check WAL mode is on (should say 'wal'):
@@ -414,7 +414,7 @@ sqlite3 /var/lib/noosphere/ratelimit.db "DELETE FROM hits;"
   <h3>PHP errors</h3>
   <pre>tail -100 /var/log/php8.4-fpm.log
 # Enable error display temporarily (ONLY for debugging, disable after):
-# In /etc/php/8.4/fpm/php.ini — set display_errors = On, restart php-fpm</pre>
+# In /etc/php/8.4/fpm/php.ini  -  set display_errors = On, restart php-fpm</pre>
 </div>
 
 <!-- ── 7. Cloning the Drive ────────────────────────────────────────────────── -->
@@ -435,7 +435,7 @@ dd if=/dev/sda of=/dev/sdb bs=4M status=progress conv=fsync
 
 # This will take 20-40 minutes for a 64GB drive.</pre>
 
-  <h3>Clone with partclone (faster — skips empty blocks)</h3>
+  <h3>Clone with partclone (faster  -  skips empty blocks)</h3>
   <pre>apt install partclone
 # Copy only used blocks:
 partclone.ext4 -c -s /dev/sda2 | partclone.ext4 -r -o /dev/sdb2</pre>
@@ -482,8 +482,8 @@ systemctl restart nginx php8.4-fpm</pre>
   <h2>9. Service Reference</h2>
   <table class="setting-table">
     <tr><th>Service</th><th>Purpose</th><th>Control</th></tr>
-    <tr><td>nginx</td><td>Web server — routes all HTTP traffic</td><td><code>systemctl restart nginx</code></td></tr>
-    <tr><td>php8.4-fpm</td><td>PHP process manager — runs all app logic</td><td><code>systemctl restart php8.4-fpm</code></td></tr>
+    <tr><td>nginx</td><td>Web server  -  routes all HTTP traffic</td><td><code>systemctl restart nginx</code></td></tr>
+    <tr><td>php8.4-fpm</td><td>PHP process manager  -  runs all app logic</td><td><code>systemctl restart php8.4-fpm</code></td></tr>
     <tr><td>mbtileserver</td><td>Serves vector map tiles on port 8889</td><td><code>systemctl restart mbtileserver</code></td></tr>
     <tr><td>kiwix</td><td>Serves offline Wikipedia/library on port 8888</td><td><code>systemctl restart kiwix</code></td></tr>
     <tr><td>mariadb</td><td>MySQL-compatible database (registry, forum, chat, calendar)</td><td><code>systemctl restart mariadb</code></td></tr>
@@ -526,7 +526,7 @@ nginx -t && systemctl reload nginx</pre>
     <tr><td>wikipedia_en_medicine</td><td>~11 GB</td><td>First aid, medical reference</td></tr>
     <tr><td>wikipedia_en_simple_all</td><td>~1 GB</td><td>Plain-English Wikipedia</td></tr>
     <tr><td>wiktionary_en_all</td><td>~2 GB</td><td>Dictionary</td></tr>
-    <tr><td>ifixit_en_all</td><td>~1.5 GB</td><td>Repair guides — generators, equipment</td></tr>
+    <tr><td>ifixit_en_all</td><td>~1.5 GB</td><td>Repair guides  -  generators, equipment</td></tr>
     <tr><td>lrnselfreliance_en_all</td><td>~200 MB</td><td>Preparedness and self-reliance guides</td></tr>
     <tr><td>wikispecies_en_all</td><td>~300 MB</td><td>Species identification</td></tr>
   </table>
@@ -538,22 +538,22 @@ nginx -t && systemctl reload nginx</pre>
 <!-- ── 11. Offline Map ───────────────────────────────────────────────────── -->
 <div class=section id=map>
   <h2>11. Offline Map</h2>
-  <p>The map is built on <b>MapLibre GL JS</b> with offline vector tiles covering Bartholomew and Brown County, Indiana. Everything — tiles, fonts, satellite imagery — is served from the server with no internet dependency.</p>
+  <p>The map is built on <b>MapLibre GL JS</b> with offline vector tiles covering Bartholomew and Brown County, Indiana. Everything  -  tiles, fonts, satellite imagery  -  is served from the server with no internet dependency.</p>
 
   <h3>Features</h3>
   <ul>
-    <li><b>Street names</b> — rendered from the <code>transportation_name</code> vector layer at zoom 11+</li>
-    <li><b>Themes</b> — Dark, Light, Hi-Vis (toggle in header)</li>
-    <li><b>Satellite</b> — USGS NAIP aerial imagery layer (toggle in header); overlays road labels for context</li>
-    <li><b>Pins</b> — any user can drop a pin (type, title, note, name); creator sees a Delete button in the popup via a localStorage token; admins can delete any pin</li>
-    <li><b>Topo PDFs</b> — 28 USGS 1:24,000 quad sheets for both counties, downloadable from the Topo PDFs link</li>
+    <li><b>Street names</b>  -  rendered from the <code>transportation_name</code> vector layer at zoom 11+</li>
+    <li><b>Themes</b>  -  Dark, Light, Hi-Vis (toggle in header)</li>
+    <li><b>Satellite</b>  -  USGS NAIP aerial imagery layer (toggle in header); overlays road labels for context</li>
+    <li><b>Pins</b>  -  any user can drop a pin (type, title, note, name); creator sees a Delete button in the popup via a localStorage token; admins can delete any pin</li>
+    <li><b>Topo PDFs</b>  -  28 USGS 1:24,000 quad sheets for both counties, downloadable from the Topo PDFs link</li>
   </ul>
 
   <h3>Tile files</h3>
   <table class=setting-table>
     <tr><th>File</th><th>Contents</th></tr>
-    <tr><td><code>/var/www/noosphere/maps/counties.mbtiles</code></td><td>Vector tiles — roads, buildings, water, labels (zoom 4–14)</td></tr>
-    <tr><td><code>/var/www/noosphere/maps/satellite.mbtiles</code></td><td>Raster satellite imagery — USGS NAIP (zoom 10–16)</td></tr>
+    <tr><td><code>/var/www/noosphere/maps/counties.mbtiles</code></td><td>Vector tiles  -  roads, buildings, water, labels (zoom 4–14)</td></tr>
+    <tr><td><code>/var/www/noosphere/maps/satellite.mbtiles</code></td><td>Raster satellite imagery  -  USGS NAIP (zoom 10–16)</td></tr>
   </table>
 
   <h3>Glyph fonts</h3>
@@ -565,10 +565,10 @@ nginx -t && systemctl reload nginx</pre>
   <pre>python3 /usr/local/bin/download-satellite.py</pre>
   <p>Monitor progress:</p>
   <pre>tail -f /var/log/satellite-download.log</pre>
-  <p>Once <code>satellite.mbtiles</code> exists, mbtileserver auto-detects it. The Satellite button in the map will start working immediately — no service restart needed.</p>
+  <p>Once <code>satellite.mbtiles</code> exists, mbtileserver auto-detects it. The Satellite button in the map will start working immediately  -  no service restart needed.</p>
 
   <h3>Pin ownership</h3>
-  <p>When a pin is created, the server returns a one-time 32-character token stored in the browser's <code>localStorage</code>. That browser can delete its own pins. Tokens do not transfer across devices — if you need to delete a pin from a different device, use an admin account.</p>
+  <p>When a pin is created, the server returns a one-time 32-character token stored in the browser's <code>localStorage</code>. That browser can delete its own pins. Tokens do not transfer across devices  -  if you need to delete a pin from a different device, use an admin account.</p>
 
   <h3>Adding / rebuilding tiles</h3>
   <p>The vector tiles were built with <code>tilemaker</code> from an OSM extract of Indiana. Config files are in <code>/var/www/noosphere/maps/tilemaker/</code>.</p>
@@ -580,21 +580,21 @@ tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --out
 
 <div class="section" id="hardware">
   <h2>12. Optional Hardware</h2>
-  <p>Noosphere works without any additional hardware, but these peripherals unlock specific modules. All are passive add-ons — plug in and configure from the admin panel.</p>
+  <p>Noosphere works without any additional hardware, but these peripherals unlock specific modules. All are passive add-ons  -  plug in and configure from the admin panel.</p>
 
   <h3>RTL-SDR Dongle</h3>
   <p><strong>Enables:</strong> NOAA Weather Radio streaming + SAME alert decoding (<code>/weather/</code>), spectrum waterfall scanner (<code>/radio/</code>).</p>
   <h4>Recommended models</h4>
   <ul>
-    <li><strong>RTL-SDR Blog V3 / V4</strong> (~$30) — best sensitivity, TCXO clock, bias-tee for powered antennas</li>
-    <li><strong>NooElec NESDR Smart</strong> (~$25) — solid budget option, TCXO, SMA connector</li>
+    <li><strong>RTL-SDR Blog V3 / V4</strong> (~$30)  -  best sensitivity, TCXO clock, bias-tee for powered antennas</li>
+    <li><strong>NooElec NESDR Smart</strong> (~$25)  -  solid budget option, TCXO, SMA connector</li>
     <li>Any RTL2832U-based dongle works; avoid the cheapest no-brand units (high PPM drift)</li>
   </ul>
   <h4>Setup</h4>
   <ol>
     <li>Plug dongle into any USB port on the server</li>
     <li>Drivers are pre-installed; DVB modules are blacklisted at <code>/etc/modprobe.d/rtlsdr-blacklist.conf</code></li>
-    <li>Go to <strong>Admin → Settings → Modules → SDR Radio</strong> — select NWR or Scanner mode</li>
+    <li>Go to <strong>Admin -> Settings -> Modules -> SDR Radio</strong>  -  select NWR or Scanner mode</li>
     <li>Configure frequency, gain, and PPM offset; hit Save</li>
   </ol>
   <h4>Verify detection</h4>
@@ -606,43 +606,43 @@ tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --out
   <h4>DIY quarter-wave dipole (~$5 in parts)</h4>
   <ul>
     <li>Two 462 mm (~18.2 in) wire elements, vertical orientation</li>
-    <li>Mount near a window — metal roofs and walls block VHF significantly</li>
-    <li>Connect to dongle via PL-259 or BNC → SMA adapter</li>
+    <li>Mount near a window  -  metal roofs and walls block VHF significantly</li>
+    <li>Connect to dongle via PL-259 or BNC -> SMA adapter</li>
   </ul>
   <h4>Commercial options</h4>
   <ul>
-    <li><strong>Bingfu VHF UHF Scanner Antenna</strong> (~$15) — magnetic base, telescoping, covers 136–512 MHz</li>
-    <li><strong>Tram 1410</strong> (~$25) — discone, covers 25–1300 MHz, best all-around if you also run the scanner</li>
+    <li><strong>Bingfu VHF UHF Scanner Antenna</strong> (~$15)  -  magnetic base, telescoping, covers 136–512 MHz</li>
+    <li><strong>Tram 1410</strong> (~$25)  -  discone, covers 25–1300 MHz, best all-around if you also run the scanner</li>
     <li>Search terms: VHF scanner antenna SMA or 162 MHz weather radio antenna</li>
   </ul>
   <div class=note>Even a basic telescoping antenna extended to 462 mm and placed near a window will dramatically outperform the stock whip at 162 MHz.</div>
 
   <h3>Radio Programming Cable (Baofeng / CHIRP)</h3>
-  <p><strong>Enables:</strong> <a href="/radio/program/" style="color:#7ad">/radio/program/</a> — direct USB programming of 500+ radios from county frequency data without a separate laptop.</p>
+  <p><strong>Enables:</strong> <a href="/radio/program/" style="color:#7ad">/radio/program/</a>  -  direct USB programming of 500+ radios from county frequency data without a separate laptop.</p>
   <h4>Compatible cables</h4>
   <ul>
-    <li><strong>Baofeng USB-K cable</strong> (~$8) — works with UV-5R, UV-82, BF-888S, UV-17, and most Baofeng models; 3.5mm/2.5mm K-plug</li>
-    <li><strong>Kenwood KPG-22U / KPG-46U clone</strong> (~$10) — Kenwood and compatible models</li>
-    <li><strong>FTDI-based USB cables</strong> — Yaesu, Icom, Wouxun, and other brands; check CHIRP wiki for your specific model</li>
-    <li>Avoid cables marked charge only — they lack the data lines needed for programming</li>
+    <li><strong>Baofeng USB-K cable</strong> (~$8)  -  works with UV-5R, UV-82, BF-888S, UV-17, and most Baofeng models; 3.5mm/2.5mm K-plug</li>
+    <li><strong>Kenwood KPG-22U / KPG-46U clone</strong> (~$10)  -  Kenwood and compatible models</li>
+    <li><strong>FTDI-based USB cables</strong>  -  Yaesu, Icom, Wouxun, and other brands; check CHIRP wiki for your specific model</li>
+    <li>Avoid cables marked charge only  -  they lack the data lines needed for programming</li>
   </ul>
   <h4>Drivers</h4>
-  <p>Most cables use CP2102, CH340, or PL2303 USB-serial chips — all are supported by the Debian kernel with no manual install. The cable will appear as <code>/dev/ttyUSB0</code> when plugged in.</p>
+  <p>Most cables use CP2102, CH340, or PL2303 USB-serial chips  -  all are supported by the Debian kernel with no manual install. The cable will appear as <code>/dev/ttyUSB0</code> when plugged in.</p>
   <h4>Setup</h4>
   <ol>
     <li>Plug cable into the server USB port, other end into radio (radio powered on, in normal mode)</li>
     <li>Go to <a href="/radio/program/" style="color:#7ad">/radio/program/</a></li>
     <li>Select the detected port, choose brand and model, pick county data, click Program</li>
   </ol>
-  <div class=note>The radio model cannot be auto-detected from USB — always select the correct model before programming. Programming the wrong model may corrupt the radio's memory; verify with the CHIRP channel preview before hitting Program.</div>
+  <div class=note>The radio model cannot be auto-detected from USB  -  always select the correct model before programming. Programming the wrong model may corrupt the radio's memory; verify with the CHIRP channel preview before hitting Program.</div>
 
   <h3>USB Ethernet Adapter</h3>
-  <p><strong>Enables:</strong> Wired backbone connection to the GL.iNet router (or any switch), freeing the server's internal WiFi for internet uplink or client connections. Also useful when deploying to a location without a wireless uplink — the server runs entirely over ethernet.</p>
+  <p><strong>Enables:</strong> Wired backbone connection to the GL.iNet router (or any switch), freeing the server's internal WiFi for internet uplink or client connections. Also useful when deploying to a location without a wireless uplink  -  the server runs entirely over ethernet.</p>
   <h4>Recommended adapters</h4>
   <ul>
-    <li><strong>ASIX AX88179 / AX88179A</strong> — USB 3.0 Gigabit; best-in-class Linux support, driver built into Debian kernel; look for brands like Cable Matters, Anker, j5create (~$15–25)</li>
-    <li><strong>Realtek RTL8153</strong> — USB 3.0 Gigabit; also well-supported in Debian, very common in Amazon Basics and Uni adapters (~$12–20)</li>
-    <li><strong>ASIX AX88772</strong> — USB 2.0 100 Mbps; plenty fast for this use case, extremely reliable (~$10)</li>
+    <li><strong>ASIX AX88179 / AX88179A</strong>  -  USB 3.0 Gigabit; best-in-class Linux support, driver built into Debian kernel; look for brands like Cable Matters, Anker, j5create (~$15–25)</li>
+    <li><strong>Realtek RTL8153</strong>  -  USB 3.0 Gigabit; also well-supported in Debian, very common in Amazon Basics and Uni adapters (~$12–20)</li>
+    <li><strong>ASIX AX88772</strong>  -  USB 2.0 100 Mbps; plenty fast for this use case, extremely reliable (~$10)</li>
     <li>Avoid adapters that require proprietary drivers or Windows-only setup utilities</li>
   </ul>
   <h4>Linux detection</h4>
@@ -650,22 +650,22 @@ tilemaker --input /var/www/noosphere/maps/indiana-latest.osm.pbf           --out
   <pre>ip link show            # look for enx* interface
 dmesg | grep -i ax88   # ASIX driver messages
 dmesg | grep -i r8152  # Realtek driver messages</pre>
-  <h4>Setup — production wired mode (router backbone)</h4>
+  <h4>Setup  -  production wired mode (router backbone)</h4>
   <ol>
     <li>Plug adapter into a USB 3.0 port on the server</li>
     <li>Run <code>setup-usb-ethernet.sh detect</code> to confirm the adapter and interface name</li>
     <li>Run <code>setup-usb-ethernet.sh static</code> to configure static <code>192.168.8.2/24</code> and persist across reboots</li>
     <li>Plug the other end into a LAN port on the GL.iNet router (not the WAN port)</li>
-    <li>Verify with <code>setup-usb-ethernet.sh status</code> or Admin → Network → USB Ethernet</li>
+    <li>Verify with <code>setup-usb-ethernet.sh status</code> or Admin -> Network -> USB Ethernet</li>
   </ol>
-  <h4>Setup — DHCP / home network mode</h4>
+  <h4>Setup  -  DHCP / home network mode</h4>
   <ol>
     <li>Plug adapter into the server and into any DHCP network</li>
     <li>Run <code>setup-usb-ethernet.sh dhcp</code> to request an address immediately</li>
     <li>For persistent DHCP on boot, run <code>setup-usb-ethernet.sh dhcp --persist</code></li>
   </ol>
   <h4>Monitoring and troubleshooting</h4>
-  <p>Use <strong>Admin → Network → USB Ethernet</strong> to check link state, IP address, run a ping test, or request DHCP without SSH.</p>
+  <p>Use <strong>Admin -> Network -> USB Ethernet</strong> to check link state, IP address, run a ping test, or request DHCP without SSH.</p>
   <pre>setup-usb-ethernet.sh status    # current state of all USB ethernet interfaces
 setup-usb-ethernet.sh ping      # ping gateway via USB ethernet
 setup-usb-ethernet.sh detect    # show hardware info and driver</pre>

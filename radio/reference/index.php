@@ -1,12 +1,16 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 if (get_setting('show_radio','0') !== '1') { http_response_code(404); exit; }
 
-$data_dir = '/var/lib/noosphere/radio/reference';
+$data_dir   = region_path('radio');
+$reg_counties = region_meta('radio.counties', []);
 $counties = [];
-foreach (['bartholomew', 'brown'] as $slug) {
+foreach ($reg_counties as $rc) {
+    $slug = $rc['slug'] ?? '';
+    if (!$slug) continue;
     $path = "$data_dir/$slug.json";
     if (file_exists($path)) {
         $c = json_decode(file_get_contents($path), true);
@@ -15,6 +19,7 @@ foreach (['bartholomew', 'brown'] as $slug) {
 }
 
 $name = get_setting('instance_name', 'Noosphere');
+$region_label = get_setting('region_label', region_meta('label', ''));
 
 // CHIRP CSV export
 if (isset($_GET['chirp'])) {
@@ -46,7 +51,7 @@ if (isset($_GET['chirp'])) {
                 $f['mode'],               // Mode
                 '5.00',                   // TStep
                 '',                       // Skip
-                addslashes($a['name'] . ' — ' . $f['tag']),  // Comment
+                addslashes($a['name'] . '  -  ' . $f['tag']),  // Comment
                 '', '', '', ''            // URCALL/RPT
             ]) . "\r\n";
         }
@@ -59,7 +64,7 @@ if (isset($_GET['chirp'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Radio Reference — <?= htmlspecialchars($name) ?></title>
+<title>Radio Reference  -  <?= htmlspecialchars($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -93,13 +98,22 @@ td { padding:6px 8px; border-bottom:1px solid #161628; vertical-align:top; }
 </head>
 <body>
 <div class="topbar">
-  <h1>📡 Radio Reference — Bartholomew &amp; Brown County</h1>
+  <h1>📡 Radio Reference<?= $region_label ? '  -  ' . htmlspecialchars($region_label) : '' ?></h1>
   <a class="back" href="/radio/">← Radio Log</a>
   <a href="/radio/program/" style="font-size:13px;color:#2ecc71;text-decoration:none;border:1px solid #2a2a4a;border-radius:4px;padding:4px 10px;">⚡ Program Radio</a>
 </div>
 
 <div class="card">
-  <div class="note">⚠ Approximate data — verify frequencies at <strong>radioreference.com</strong> before programming radios. Last updated: <?= htmlspecialchars(array_values($counties)[0]['last_updated'] ?? '—') ?></div>
+<?php if (!$counties): ?>
+  <div style="padding:1.5rem;text-align:center;color:#aaa">
+    <p style="margin-bottom:.5rem"><strong>No frequency data for the active region.</strong></p>
+    <p style="font-size:13px;color:#777">Install a region pack from <a href="/admin/" style="color:#7ad">Admin -> Region</a> to load county frequencies.</p>
+  </div>
+</div>
+<?php
+} else {
+?>
+  <div class="note">⚠ Approximate data  -  verify frequencies at <strong>radioreference.com</strong> before programming radios. Last updated: <?= htmlspecialchars(array_values($counties)[0]['last_updated'] ?? ' - ') ?></div>
 
   <div class="filter-bar">
     <input type="text" id="search" placeholder="Filter by agency, frequency, or tag…" oninput="filterRef()">
@@ -145,7 +159,7 @@ td { padding:6px 8px; border-bottom:1px solid #161628; vertical-align:top; }
           <tr>
             <td><span class="freq"><?= htmlspecialchars($f['freq']) ?> MHz</span></td>
             <td><span class="tag"><?= htmlspecialchars($f['tag']) ?></span></td>
-            <td><span class="tone"><?= $f['tone'] ? htmlspecialchars($f['tone']) . ' Hz' : '—' ?></span></td>
+            <td><span class="tone"><?= $f['tone'] ? htmlspecialchars($f['tone']) . ' Hz' : ' - ' ?></span></td>
             <td style="color:#aaa;font-size:11px"><?= htmlspecialchars($f['mode']) ?></td>
             <td style="color:#888;font-size:11px"><?= htmlspecialchars($f['notes'] ?? '') ?></td>
           </tr>
@@ -158,6 +172,7 @@ td { padding:6px 8px; border-bottom:1px solid #161628; vertical-align:top; }
   </div>
   <?php $i++; endforeach; ?>
 </div>
+<?php } ?>
 
 <script>
 var activeCounty = '<?= htmlspecialchars(array_key_first($counties) ?? '') ?>';

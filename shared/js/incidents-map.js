@@ -48,7 +48,7 @@ function clearToken(id) {
 }
 
 // Build a marker DOM element for an incident.
-// opts.size — pixel size of the square (default 24)
+// opts.size  -  pixel size of the square (default 24)
 function markerEl(r, opts) {
   opts = opts || {};
   var tcfg = TYPE[r.type] || TYPE.general;
@@ -66,9 +66,9 @@ function markerEl(r, opts) {
 }
 
 // Render popup HTML for an incident.
-// opts.command   — true to show status badge
-// opts.canDelete — true to render a Delete button (caller wires onclick)
-// opts.deleteFn  — name of the global function to call from the button (default 'deleteIncident')
+// opts.command    -  true to show status badge
+// opts.canDelete  -  true to render a Delete button (caller wires onclick)
+// opts.deleteFn   -  name of the global function to call from the button (default 'deleteIncident')
 function popupHtml(r, opts) {
   opts = opts || {};
   var tcfg = TYPE[r.type] || TYPE.general;

@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 ");
 
-$CATS = ['announcements' => ['label' => 'Announcements', 'icon' => '📢', 'desc' => 'Official updates — shelter, roads, water, power']];
+$CATS = ['announcements' => ['label' => 'Announcements', 'icon' => '📢', 'desc' => 'Official updates  -  shelter, roads, water, power']];
 foreach (get_forum_categories() as $cat) {
     $CATS[$cat['key']] = ['label' => $cat['label'], 'icon' => $cat['icon'], 'desc' => $cat['desc'] ?? ''];
 }
@@ -158,7 +158,7 @@ $error_msg = $error_msg ?? '';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Forum — Noosphere</title>
+<title>Forum  -  Noosphere</title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:system-ui,sans-serif; background:#0f0f1a; color:#e0e0e0; min-height:100vh; }

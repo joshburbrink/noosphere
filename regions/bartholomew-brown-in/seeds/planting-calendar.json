@@ -1,0 +1,31 @@
+{
+  "zone_label": "Zone 6a  -  Southern Indiana",
+  "last_frost": "April 15",
+  "first_frost": "October 15",
+  "crops": [
+    {"crop":"Tomato",      "start_indoors":"Feb 15–Mar 15", "transplant":"May 1–15",     "direct_sow":" - ",                                "harvest":"Jul–Oct",          "dtm":"60–85 days"},
+    {"crop":"Pepper",      "start_indoors":"Feb 1–Mar 1",   "transplant":"May 15–Jun 1", "direct_sow":" - ",                                "harvest":"Aug–Oct",          "dtm":"70–90 days"},
+    {"crop":"Squash",      "start_indoors":"Apr 15–May 1",  "transplant":"May 10–20",    "direct_sow":"May 1–20",                         "harvest":"Jul–Oct",          "dtm":"50–65 days"},
+    {"crop":"Zucchini",    "start_indoors":"Apr 15–May 1",  "transplant":"May 10–20",    "direct_sow":"May 1–20",                         "harvest":"Jun–Sep",          "dtm":"45–55 days"},
+    {"crop":"Bean",        "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"May 1–Jul 1",                      "harvest":"Jul–Sep",          "dtm":"50–60 days"},
+    {"crop":"Corn",        "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"May 1–Jun 1",                      "harvest":"Aug–Sep",          "dtm":"65–90 days"},
+    {"crop":"Potato",      "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Apr 1–May 1",                      "harvest":"Jul–Sep",          "dtm":"70–120 days"},
+    {"crop":"Onion",       "start_indoors":"Jan 15–Feb 15", "transplant":"Mar 15–Apr 15","direct_sow":"Mar–Apr",                          "harvest":"Jul–Aug",          "dtm":"100–120 days"},
+    {"crop":"Carrot",      "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Apr 1–Aug 1",                      "harvest":"Jun–Oct",          "dtm":"70–80 days"},
+    {"crop":"Lettuce",     "start_indoors":"Feb 15–Mar 15", "transplant":"Apr 1–15",     "direct_sow":"Apr 1–May 1, Aug–Sep",             "harvest":"May–Jun, Sep–Oct", "dtm":"45–60 days"},
+    {"crop":"Broccoli",    "start_indoors":"Feb 15–Mar 15", "transplant":"Apr 1–15",     "direct_sow":" - ",                                "harvest":"May–Jun",          "dtm":"60–80 days"},
+    {"crop":"Cabbage",     "start_indoors":"Feb 1–Mar 1",   "transplant":"Mar 15–Apr 15","direct_sow":" - ",                                "harvest":"Jun–Jul",          "dtm":"80–100 days"},
+    {"crop":"Kale",        "start_indoors":"Feb 15–Mar 15", "transplant":"Apr 1–15",     "direct_sow":"Apr–May, Jul–Aug",                 "harvest":"May–Nov",          "dtm":"50–70 days"},
+    {"crop":"Cucumber",    "start_indoors":"Apr 15–May 1",  "transplant":"May 15–Jun 1", "direct_sow":"May 15–Jun 1",                     "harvest":"Jul–Sep",          "dtm":"50–70 days"},
+    {"crop":"Pumpkin",     "start_indoors":"Apr 15–May 1",  "transplant":"May 10–20",    "direct_sow":"May 1–15",                         "harvest":"Sep–Oct",          "dtm":"90–120 days"},
+    {"crop":"Sunflower",   "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"May 1–Jun 1",                      "harvest":"Aug–Sep",          "dtm":"70–100 days"},
+    {"crop":"Basil",       "start_indoors":"Apr 1–May 1",   "transplant":"May 15–Jun 1", "direct_sow":"May 15+",                          "harvest":"Jun–Sep",          "dtm":"25–30 days"},
+    {"crop":"Cilantro",    "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Apr–May, Aug–Sep",                 "harvest":"May–Jun, Sep–Oct", "dtm":"45–70 days"},
+    {"crop":"Radish",      "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Apr–May, Aug–Sep",                 "harvest":"May, Sep",         "dtm":"25–30 days"},
+    {"crop":"Spinach",     "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Mar–Apr, Aug–Sep",                 "harvest":"Apr–May, Sep–Oct", "dtm":"40–50 days"},
+    {"crop":"Sweet Potato","start_indoors":"Mar 1–Apr 1",   "transplant":"May 15–Jun 1", "direct_sow":" - ",                                "harvest":"Sep–Oct",          "dtm":"90–120 days"},
+    {"crop":"Garlic",      "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Oct (fall)",                        "harvest":"Jun–Jul",          "dtm":"240–270 days"},
+    {"crop":"Pea",         "start_indoors":" - ",             "transplant":" - ",            "direct_sow":"Mar 15–Apr 15",                    "harvest":"May–Jun",          "dtm":"55–75 days"},
+    {"crop":"Watermelon",  "start_indoors":"Apr 15–May 1",  "transplant":"May 20–Jun 1", "direct_sow":"May 20+",                          "harvest":"Aug–Sep",          "dtm":"80–90 days"}
+  ]
+}

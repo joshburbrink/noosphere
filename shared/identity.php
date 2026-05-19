@@ -1,14 +1,14 @@
 <?php
 /*
- * shared/identity.php — session identity helpers for #68.
+ * shared/identity.php  -  session identity helpers for #68.
  *
  * Reads/writes:
- *   $_SESSION['admin']          (existing) — password-gated admin superuser
- *   $_SESSION['admin_name']     (existing) — admin display name
- *   $_SESSION['reg_user_id']    (new)      — registry row id of signed-in user
- *   $_SESSION['reg_name']       (existing) — registry display name
- *   $_SESSION['reg_roles']      (new)      — CSV roles from registry row
- *   $_SESSION['reg_admin']      (existing) — legacy registry-side admin flag
+ *   $_SESSION['admin']          (existing)  -  password-gated admin superuser
+ *   $_SESSION['admin_name']     (existing)  -  admin display name
+ *   $_SESSION['reg_user_id']    (new)       -  registry row id of signed-in user
+ *   $_SESSION['reg_name']       (existing)  -  registry display name
+ *   $_SESSION['reg_roles']      (new)       -  CSV roles from registry row
+ *   $_SESSION['reg_admin']      (existing)  -  legacy registry-side admin flag
  *
  * Schema: ensures `roles` TEXT column exists on registry table (idempotent).
  */
@@ -34,7 +34,7 @@ function _identity_ensure_schema(): void {
 _identity_ensure_schema();
 
 /*
- * current_user() — associative array describing the current session, or [] if anonymous.
+ * current_user()  -  associative array describing the current session, or [] if anonymous.
  * Keys: id, name, roles (array), is_admin (bool), source ('admin'|'registry'|'').
  */
 function current_user(): array {
@@ -71,7 +71,7 @@ function current_name(): string {
 }
 
 /*
- * sign_in_registry_user($row) — promotes a registry row to a logged-in session.
+ * sign_in_registry_user($row)  -  promotes a registry row to a logged-in session.
  * $row is a registry table row (PDO assoc fetch). Caller is responsible for
  * having verified the PIN.
  */
@@ -89,7 +89,7 @@ function sign_out_registry_user(): void {
 }
 
 /*
- * Backwards-compat shim — modules that still test $is_admin should keep working.
+ * Backwards-compat shim  -  modules that still test $is_admin should keep working.
  * Returns true for password admin, registry-side admin flag, OR a signed-in
  * registry user holding the 'operator' role (so the role actually grants the
  * admin-equivalent powers that ungated $is_admin checks expect).

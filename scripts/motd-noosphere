@@ -1,5 +1,5 @@
 #!/bin/bash
-# Noosphere login MOTD — live status summary + quick reference
+# Noosphere login MOTD  -  live status summary + quick reference
 
 G='\e[32m'; Y='\e[33m'; R='\e[31m'; C='\e[36m'; W='\e[1m'; X='\e[0m'
 
@@ -14,7 +14,7 @@ svc_status() {
             printf "${G}✓ %-20s${X}\n" "$label"
         fi
     else
-        printf "${R}✗ %-20s${X} STOPPED — see below to restart\n" "$label"
+        printf "${R}✗ %-20s${X} STOPPED  -  see below to restart\n" "$label"
     fi
 }
 
@@ -26,7 +26,7 @@ http_ok() {
 
 echo ""
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
-printf "  ${C}${W}Noosphere${X}  —  offline community hub\n"
+printf "  ${C}${W}Noosphere${X}   -   offline community hub\n"
 printf "  Uptime: %s\n" "$(uptime -p 2>/dev/null || uptime)"
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 echo ""
@@ -45,7 +45,7 @@ printf "  ${W}Web${X}\n"
 if http_ok "http://localhost/"; then
     printf "${G}✓ %-20s${X}\n" "homepage responding"
 else
-    printf "${R}✗ %-20s${X} not responding — restart nginx + php-fpm\n" "homepage"
+    printf "${R}✗ %-20s${X} not responding  -  restart nginx + php-fpm\n" "homepage"
 fi
 
 # ── Network ────────────────────────────────────────────────────────────────
@@ -80,18 +80,18 @@ if [[ "$NET_MODE" == "hostapd" ]]; then
         printf "${G}✓ AP (hostapd)${X}  SSID: ${W}%s${X}  %s\n" \
             "$AP_SSID_MOTD" "${PORTAL_URL:-http://$AP_IP_MOTD/}"
     else
-        printf "${R}✗ AP (hostapd)${X}  configured but hostapd STOPPED — run: ${C}systemctl start hostapd${X}\n"
+        printf "${R}✗ AP (hostapd)${X}  configured but hostapd STOPPED  -  run: ${C}systemctl start hostapd${X}\n"
     fi
 elif [[ "$NET_MODE" == "external-router" ]]; then
-    printf "${C}○ external router${X}  eno1 → GL.iNet  (captive → 192.168.8.2)\n"
+    printf "${C}○ external router${X}  eno1 -> GL.iNet  (captive -> 192.168.8.2)\n"
 elif [[ -f /etc/noosphere/ap.conf ]]; then
     printf "${Y}○ AP mode configured but not enabled${X}\n"
     printf "  Run: ${C}setup-hostapd.sh enable${X}   to start AP\n"
     printf "       ${C}setup-hostapd.sh disable${X}  to use external router\n"
 else
-    printf "${Y}○ WiFi mode not set up${X}  —  no AP config found\n"
+    printf "${Y}○ WiFi mode not set up${X}   -   no AP config found\n"
     printf "  First time? Run: ${C}setup-hostapd.sh configure${X}  (USB WiFi adapter required)\n"
-    printf "  External router? Connect eno1 to router LAN port — no extra setup needed\n"
+    printf "  External router? Connect eno1 to router LAN port  -  no extra setup needed\n"
 fi
 
 CONNECT_IP=${ETH_IP:-$WIFI_IP}

@@ -1,0 +1,71 @@
+{
+  "county": "Brown",
+  "state": "Indiana",
+  "fips": "018013",
+  "county_seat": "Nashville",
+  "last_updated": "2026-05-16",
+  "source_note": "Approximate data  -  verify at radioreference.com/db/browse/ctid/1128 before programming radios",
+  "agencies": [
+    {
+      "name": "Brown County Sheriff's Office",
+      "short": "BCSO",
+      "type": "Law Enforcement",
+      "frequencies": [
+        {"freq": "154.8150", "tone": "100.0", "mode": "FM", "tag": "Dispatch",    "notes": "Primary dispatch"},
+        {"freq": "155.6850", "tone": null,     "mode": "FM", "tag": "Car-to-Car", "notes": "Vehicle-to-vehicle tactical"}
+      ]
+    },
+    {
+      "name": "Brown County Fire / Nashville Fire",
+      "short": "BC Fire",
+      "type": "Fire",
+      "frequencies": [
+        {"freq": "154.2800", "tone": "77.0", "mode": "FM", "tag": "Dispatch",        "notes": "Primary fire dispatch"},
+        {"freq": "154.1300", "tone": null,   "mode": "FM", "tag": "Fire Mutual Aid", "notes": "Statewide fire mutual aid"}
+      ]
+    },
+    {
+      "name": "Brown County EMS",
+      "short": "BC EMS",
+      "type": "EMS",
+      "frequencies": [
+        {"freq": "155.3400", "tone": null, "mode": "FM", "tag": "MERCI Med", "notes": "Indiana MERCI medical coordination channel"},
+        {"freq": "155.3700", "tone": null, "mode": "FM", "tag": "EMS Ops",   "notes": "EMS operations / hospital notification"}
+      ]
+    },
+    {
+      "name": "Indiana State Police (Versailles Post)",
+      "short": "ISP",
+      "type": "Law Enforcement",
+      "frequencies": [
+        {"freq": "154.9200", "tone": null, "mode": "FM", "tag": "ISP Primary",   "notes": "ISP District 36 primary"},
+        {"freq": "155.4750", "tone": null, "mode": "FM", "tag": "ISP Secondary", "notes": "ISP secondary / interop"}
+      ]
+    },
+    {
+      "name": "Brown County Highway",
+      "short": "BCHWY",
+      "type": "Public Works",
+      "frequencies": [
+        {"freq": "158.9850", "tone": null, "mode": "FM", "tag": "Highway", "notes": "County highway and road crew"}
+      ]
+    },
+    {
+      "name": "NOAA Weather Radio",
+      "short": "NWR",
+      "type": "Weather",
+      "frequencies": [
+        {"freq": "162.5500", "tone": null, "mode": "FM", "tag": "WXL58", "notes": "Indianapolis NWR station  -  serves Brown & Bartholomew Counties"}
+      ]
+    },
+    {
+      "name": "Amateur Radio Emergency Service (ARES)",
+      "short": "ARES",
+      "type": "Amateur / Emergency",
+      "frequencies": [
+        {"freq": "146.5200", "tone": null,   "mode": "FM", "tag": "VHF Calling", "notes": "National VHF simplex calling frequency"},
+        {"freq": "446.0000", "tone": null,   "mode": "FM", "tag": "UHF Calling", "notes": "National UHF simplex calling frequency"}
+      ]
+    }
+  ]
+}

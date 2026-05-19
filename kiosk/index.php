@@ -54,7 +54,7 @@ if ($show_incidents) {
     } catch(Throwable $e) {}
 }
 
-// Forum announcements — latest 3 from announcements category
+// Forum announcements  -  latest 3 from announcements category
 $announcements = [];
 if ($show_forum) {
     try {
@@ -81,7 +81,7 @@ function ks_age($ts) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kiosk — <?= htmlspecialchars($name) ?></title>
+<title>Kiosk  -  <?= htmlspecialchars($name) ?></title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: #0a0a14; color: #e0e0e0; font-family: system-ui, sans-serif; }

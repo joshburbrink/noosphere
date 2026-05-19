@@ -10,10 +10,10 @@ ZIM files downloaded for offline reference. All content is served via `kiwix-ser
 | WikiMed | `wikimed_en_all_maxi` | ~3GB | Medical encyclopedia |
 | WikiHow | `wikihow_en_maxi` | ~10GB | Step-by-step how-to guides |
 | iFixit | `ifixit_en_all` | ~5GB | Repair guides for electronics & appliances |
-| Wikibooks | `wikibooks_en_all_maxi` | ~5GB | Free textbooks — mechanics, cooking, engineering |
+| Wikibooks | `wikibooks_en_all_maxi` | ~5GB | Free textbooks  -  mechanics, cooking, engineering |
 | Stack Overflow | `stackoverflow.com_en_all` | ~34GB | Tech troubleshooting |
 | Wikivoyage | `wikivoyage_en_all_maxi` | ~1GB | Geography, infrastructure, regional info |
-| Khan Academy | `khan_academy_en_all` | ~30GB | Education — math, science, medicine |
+| Khan Academy | `khan_academy_en_all` | ~30GB | Education  -  math, science, medicine |
 | Project Gutenberg | `gutenberg_en_all` | ~60GB | 70k+ books, classics, reference |
 | SE: Home Improvement | `home.stackexchange.com_en_all` | ~2GB | Repairs, construction, utilities |
 | SE: Cooking | `cooking.stackexchange.com_en_all` | ~1GB | Food prep, preservation |
@@ -32,7 +32,7 @@ sudo bash scripts/download-zim.sh /mnt/noosphere/kiwix
 ```
 
 - Requires `wget` (default) or `aria2c` (faster, parallel)
-- All downloads are resumable — safe to interrupt and restart
+- All downloads are resumable  -  safe to interrupt and restart
 - Script skips files that already exist
 - Resolves current URLs automatically from the Kiwix catalog API
 

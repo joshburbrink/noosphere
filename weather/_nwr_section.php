@@ -1,5 +1,5 @@
 <?php
-// NWR section — always included from /weather/index.php.
+// NWR section  -  always included from /weather/index.php.
 // Alert history is always visible. Live stream only shown when radio_mode=nwr.
 
 $nwr_db_path = '/var/lib/noosphere/weather/alerts.db';
@@ -29,7 +29,7 @@ if (file_exists($nwr_db_path)) {
     } catch (Exception $e) { /* swallow */ }
 }
 
-// Heartbeat from playlist mtime — only relevant when streaming
+// Heartbeat from playlist mtime  -  only relevant when streaming
 $m3u8 = '/var/www/noosphere/weather/stream/live.m3u8';
 $stream_age = file_exists($m3u8) ? (time() - filemtime($m3u8)) : 9999;
 $stream_alive = $nwr_stream_mode && ($stream_age < 10);
@@ -37,7 +37,7 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
 
 <?php if ($nwr_active): ?>
 <div style="background:#3a0a0a;border:2px solid #e94560;padding:14px;border-radius:8px;margin-bottom:12px">
-  <div style="font-weight:bold;color:#e94560;font-size:16px;margin-bottom:4px">⚠ ACTIVE ALERT — <?= htmlspecialchars($nwr_active['event_name']) ?></div>
+  <div style="font-weight:bold;color:#e94560;font-size:16px;margin-bottom:4px">⚠ ACTIVE ALERT  -  <?= htmlspecialchars($nwr_active['event_name']) ?></div>
   <div style="font-size:13px;color:#ccc">Issued <?= date('M j g:i a', $nwr_active['ts']) ?> by <?= htmlspecialchars($nwr_active['station']) ?> · counties: <?= htmlspecialchars($nwr_active['fips']) ?> · duration <?= htmlspecialchars($nwr_active['duration']) ?></div>
 </div>
 <?php endif; ?>
@@ -67,14 +67,14 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       <div style="flex:1;height:6px;background:#111;border-radius:3px;overflow:hidden">
         <div id="nwr-signal-fill" style="height:100%;width:0%;background:#555;border-radius:3px;transition:width 0.4s,background 0.4s"></div>
       </div>
-      <span id="nwr-signal-db" style="font-family:monospace;min-width:52px;text-align:right">— dB</span>
+      <span id="nwr-signal-db" style="font-family:monospace;min-width:52px;text-align:right"> -  dB</span>
     </div>
     <?php if ($is_admin): ?>
     <div id="nwr-squelch-bar" style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:#888">
-      <span title="Browser-side gate. Mutes when live audio RMS falls below threshold. Server keeps streaming so adjustment is instant — no audio gap.">Squelch</span>
+      <span title="Browser-side gate. Mutes when live audio RMS falls below threshold. Server keeps streaming so adjustment is instant  -  no audio gap.">Squelch</span>
       <input id="nwr-squelch" type="range" min="-80" max="0" step="1" value="-80" style="flex:1">
       <span id="nwr-squelch-val" style="font-family:monospace;min-width:54px;text-align:right">off</span>
-      <span id="nwr-squelch-state" style="font-family:monospace;min-width:46px;text-align:right;color:#555">—</span>
+      <span id="nwr-squelch-state" style="font-family:monospace;min-width:46px;text-align:right;color:#555"> - </span>
     </div>
     <?php endif ?>
   </div>
@@ -116,14 +116,14 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
 </div>
 <?php else: ?>
 <div style="background:#1a1a2e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#555">
-  📡 Live NWR stream unavailable in this mode — enable NWR in Admin → SDR Radio to stream.
+  📡 Live NWR stream unavailable in this mode  -  enable NWR in Admin -> SDR Radio to stream.
 </div>
 <?php endif; ?>
 
 <div class="card" style="background:#16213e;border:1px solid #2a2a4a;border-radius:10px;padding:1.25rem;margin-bottom:1.25rem">
   <h2 style="font-size:1rem;color:#e94560;margin-bottom:1rem">SAME Alert History (<?= count($nwr_alerts) ?> recent)</h2>
   <?php if (!$nwr_alerts): ?>
-    <div style="color:#666;font-size:12px;padding:6px 0">No alerts decoded yet. Routine weekly tests (RWT) fire most Wednesdays around noon — if you don't see one in a week, check antenna placement.</div>
+    <div style="color:#666;font-size:12px;padding:6px 0">No alerts decoded yet. Routine weekly tests (RWT) fire most Wednesdays around noon  -  if you don't see one in a week, check antenna placement.</div>
   <?php else: ?>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -268,7 +268,7 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
       var lbl  = document.getElementById('nwr-signal-db');
       if (!d.ok || d.max_db === null) {
         fill.style.width = '0%'; fill.style.background = '#555';
-        lbl.textContent = '— dB'; return;
+        lbl.textContent = ' -  dB'; return;
       }
       // Map -60dB..0dB to 0..100%
       var pct = Math.max(0, Math.min(100, (d.max_db + 60) / 60 * 100));
@@ -307,7 +307,7 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
         var best = entries[0][0];
         var spread = (max - min).toFixed(1);
         var html = '<div style="font-size:12px;color:#888;margin-bottom:6px">Strongest: <strong style="color:#2ecc71;font-family:monospace">'+best+' MHz</strong> · spread '+spread+' dB '+
-                   (spread < 3 ? '<span style="color:#f39c12">(low — likely noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal)</span>')+'</div>';
+                   (spread < 3 ? '<span style="color:#f39c12">(low  -  likely noise floor, check antenna)</span>' : '<span style="color:#2ecc71">(usable signal)</span>')+'</div>';
         entries.forEach(function(e){
           var ch = e[0], db = e[1];
           var pct = (db - min) / range * 100;
@@ -322,7 +322,7 @@ $stream_alive = $nwr_stream_mode && ($stream_age < 10);
         });
         box.innerHTML = html;
         box.style.display = 'block';
-        // Stream just restarted with fresh MEDIA-SEQUENCE — re-init HLS so the
+        // Stream just restarted with fresh MEDIA-SEQUENCE  -  re-init HLS so the
         // player follows the new playlist instead of stalling on stale state.
         setTimeout(initHls, 1500);
       })

@@ -1,5 +1,5 @@
 <?php
-// Shared init for /incidents/ module — DB schema, constants, helpers.
+// Shared init for /incidents/ module  -  DB schema, constants, helpers.
 // Loaded by index.php, api.php, export.php.
 
 require_once '/var/www/noosphere/shared/security.php';

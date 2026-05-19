@@ -7,15 +7,15 @@ if (get_setting('show_games','0') !== '1') {
 }
 
 $multiplayer = [
-    ['file'=>'battleship/', 'icon'=>'⚓', 'title'=>'Battleship',  'desc'=>'2 players — sink the fleet · share link to join'],
-    ['file'=>'codenames/',  'icon'=>'🕵️', 'title'=>'Codenames',   'desc'=>'2–8 players — one-word clues, two teams'],
-    ['file'=>'pictionary/', 'icon'=>'🎨', 'title'=>'Pictionary',  'desc'=>'2+ players — draw and guess · 90s per turn'],
+    ['file'=>'battleship/', 'icon'=>'⚓', 'title'=>'Battleship',  'desc'=>'2 players  -  sink the fleet · share link to join'],
+    ['file'=>'codenames/',  'icon'=>'🕵️', 'title'=>'Codenames',   'desc'=>'2–8 players  -  one-word clues, two teams'],
+    ['file'=>'pictionary/', 'icon'=>'🎨', 'title'=>'Pictionary',  'desc'=>'2+ players  -  draw and guess · 90s per turn'],
 ];
 $games = [
-    ['file'=>'snake.html',      'icon'=>'🐍', 'title'=>'Snake',       'desc'=>'Classic snake — eat, grow, survive'],
-    ['file'=>'tetris.html',     'icon'=>'🧱', 'title'=>'Tetris',      'desc'=>'Stack falling blocks — clear lines'],
-    ['file'=>'2048.html',       'icon'=>'🔢', 'title'=>'2048',        'desc'=>'Slide tiles — reach 2048'],
-    ['file'=>'breakout.html',   'icon'=>'🏓', 'title'=>'Breakout',    'desc'=>'Paddle + ball — smash the bricks'],
+    ['file'=>'snake.html',      'icon'=>'🐍', 'title'=>'Snake',       'desc'=>'Classic snake  -  eat, grow, survive'],
+    ['file'=>'tetris.html',     'icon'=>'🧱', 'title'=>'Tetris',      'desc'=>'Stack falling blocks  -  clear lines'],
+    ['file'=>'2048.html',       'icon'=>'🔢', 'title'=>'2048',        'desc'=>'Slide tiles  -  reach 2048'],
+    ['file'=>'breakout.html',   'icon'=>'🏓', 'title'=>'Breakout',    'desc'=>'Paddle + ball  -  smash the bricks'],
     ['file'=>'minesweeper.html','icon'=>'💣', 'title'=>'Minesweeper', 'desc'=>'Find all mines without triggering one'],
     ['file'=>'tictactoe.html',  'icon'=>'⭕', 'title'=>'Tic Tac Toe', 'desc'=>'Two players or vs computer'],
 ];
@@ -25,7 +25,7 @@ $games = [
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Games — Noosphere</title>
+<title>Games  -  Noosphere</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:sans-serif;background:#1a1a2e;color:#eee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
@@ -45,7 +45,7 @@ a.tile:hover .desc{color:#fff}
 </head>
 <body>
 <h1>🎮 Games</h1>
-<div class="sub">Browser-based games — no internet required · high scores saved per device</div>
+<div class="sub">Browser-based games  -  no internet required · high scores saved per device</div>
 <div style="font-size:.82rem;color:#888;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.05em">Multiplayer</div>
 <div class="grid" style="margin-bottom:1.5rem">
 <?php foreach ($multiplayer as $g): ?>

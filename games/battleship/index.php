@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Battleship — Noosphere</title>
+<title>Battleship  -  Noosphere</title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -204,11 +204,11 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
 </head>
 <body>
 <h1>⚓ Battleship</h1>
-<div class="sub">2 players — share the room link</div>
+<div class="sub">2 players  -  share the room link</div>
 <div class="status" id="status">Connecting…</div>
 
 <div id="setup-panel" style="display:none;text-align:center;margin-bottom:.75rem">
-  <div style="font-size:.85rem;color:var(--text-muted,#aaa);margin-bottom:.5rem">Place your ships — click a ship, then click your grid. <button class="dir-btn active" id="dir-btn" onclick="toggleDir()">→ Horizontal</button></div>
+  <div style="font-size:.85rem;color:var(--text-muted,#aaa);margin-bottom:.5rem">Place your ships  -  click a ship, then click your grid. <button class="dir-btn active" id="dir-btn" onclick="toggleDir()">-> Horizontal</button></div>
   <div class="ships-tray" id="ships-tray"></div>
 </div>
 
@@ -234,11 +234,11 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
     <p style="margin-top:.4rem"><strong>Setup:</strong> Each player places 5 ships on their 10×10 grid. Ships cannot overlap or touch diagonally. Click a ship in the tray to select it, press <kbd>R</kbd> to rotate, then click the grid to place it.</p>
     <p style="margin-top:.4rem"><strong>Ships:</strong></p>
     <ul style="margin:.3rem 0 .3rem 1.2rem">
-      <li>Carrier — 5 cells</li>
-      <li>Battleship — 4 cells</li>
-      <li>Cruiser — 3 cells</li>
-      <li>Submarine — 3 cells</li>
-      <li>Destroyer — 2 cells</li>
+      <li>Carrier  -  5 cells</li>
+      <li>Battleship  -  4 cells</li>
+      <li>Cruiser  -  3 cells</li>
+      <li>Submarine  -  3 cells</li>
+      <li>Destroyer  -  2 cells</li>
     </ul>
     <p style="margin-top:.4rem"><strong>Taking a turn:</strong> Click a cell on your opponent's grid (right side) to fire. 🔴 = hit, ⬜ = miss. Your grid on the left shows incoming shots.</p>
     <p style="margin-top:.4rem"><strong>Win:</strong> The first player to sink all 5 enemy ships wins. A ship sinks when every one of its cells has been hit.</p>
@@ -344,7 +344,7 @@ function render(st) {
       document.getElementById('setup-panel').style.display = 'block';
       renderPlacingGrid();
     } else {
-      setStatus(oppPlaced ? 'Both placed! Starting…' : 'Ships placed — waiting for opponent…');
+      setStatus(oppPlaced ? 'Both placed! Starting…' : 'Ships placed  -  waiting for opponent…');
       document.getElementById('setup-panel').style.display = 'none';
       var cells = {};
       placedShips.forEach(function(s){ s.cells.forEach(function(c){ cells[c]={ship:true}; }); });
@@ -353,7 +353,7 @@ function render(st) {
     }
   } else if (st.phase === 'battle') {
     var myTurn = st.turn === role;
-    setStatus(myTurn ? '🎯 Your turn — click a cell to fire!' : "⏳ Opponent's turn…", myTurn ? '#4a9eff' : '');
+    setStatus(myTurn ? '🎯 Your turn  -  click a cell to fire!' : "⏳ Opponent's turn…", myTurn ? '#4a9eff' : '');
     document.getElementById('setup-panel').style.display = 'none';
     var cells = computeCells(st);
     buildGrid('my-grid', cells.my, false, false);
@@ -440,7 +440,7 @@ function renderShipTray() {
 
 function toggleDir() {
   selDir = selDir==='h' ? 'v' : 'h';
-  document.getElementById('dir-btn').textContent = selDir==='h' ? '→ Horizontal' : '↓ Vertical';
+  document.getElementById('dir-btn').textContent = selDir==='h' ? '-> Horizontal' : '↓ Vertical';
   renderPlacingGrid();
 }
 

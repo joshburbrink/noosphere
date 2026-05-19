@@ -3,13 +3,13 @@
 //
 // Idempotent: each incoming damage row gets meta.legacy_damage_id; re-runs
 // skip rows already imported. Photos are copied into the incidents photo
-// dir under new filenames. Settings: copies show_damage → show_incidents
+// dir under new filenames. Settings: copies show_damage -> show_incidents
 // for any preset value that is currently '1' (unless show_incidents is set).
 //
 // Usage:  php /var/www/noosphere/scripts/migrate-damage-to-incidents.php
 //
 // Run as root (needs write access to /var/lib/noosphere/incidents.db and
-// to /var/lib/noosphere/incident_photos/) — the systemd-managed nginx/php
+// to /var/lib/noosphere/incident_photos/)  -  the systemd-managed nginx/php
 // runs as www-data so make sure perms allow www-data to keep using the
 // resulting files (script chowns photos to www-data:www-data).
 
@@ -20,7 +20,7 @@ $DAMAGE_PHOTOS = '/var/lib/noosphere/damage_photos';
 $SETTINGS_DB   = '/var/lib/noosphere/settings.db';
 
 if (!file_exists($DAMAGE_DB)) {
-    fwrite(STDERR, "No damage.db at $DAMAGE_DB — nothing to migrate.\n");
+    fwrite(STDERR, "No damage.db at $DAMAGE_DB  -  nothing to migrate.\n");
     exit(0);
 }
 
@@ -148,7 +148,7 @@ if (file_exists($SETTINGS_DB)) {
                    ON CONFLICT(key) DO UPDATE SET value='0'")->execute();
     fwrite(STDOUT, "Settings: show_damage forced to 0 (the old module is now a redirect).\n");
 } else {
-    fwrite(STDERR, "No settings.db at $SETTINGS_DB — skipped settings migration.\n");
+    fwrite(STDERR, "No settings.db at $SETTINGS_DB  -  skipped settings migration.\n");
 }
 
 fwrite(STDOUT, "Done.\n");

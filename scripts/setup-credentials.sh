@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup-credentials.sh — configure Linux user credentials for Noosphere
+# setup-credentials.sh  -  configure Linux user credentials for Noosphere
 # Run as root before imaging or after first boot
 #
 # Usage:

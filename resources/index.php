@@ -5,7 +5,7 @@ sec_session_start();
 
 $modules = [];
 if (get_setting('show_supplies','0')==='1')
-    $modules[] = ['href'=>'/supplies/', 'icon'=>'📦', 'label'=>'Supply Inventory', 'desc'=>'Track shelter resources — water, food, fuel, medical'];
+    $modules[] = ['href'=>'/supplies/', 'icon'=>'📦', 'label'=>'Supply Inventory', 'desc'=>'Track shelter resources  -  water, food, fuel, medical'];
 if (get_setting('show_seeds','0')==='1')
     $modules[] = ['href'=>'/seeds/', 'icon'=>'🌱', 'label'=>'Seed Library', 'desc'=>'Zone 6a seed catalog and planting calendar'];
 if (get_setting('show_tools','0')==='1')
@@ -21,7 +21,7 @@ $name = get_setting('instance_name', 'Noosphere');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Resources — <?= htmlspecialchars($name) ?></title>
+<title>Resources  -  <?= htmlspecialchars($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }

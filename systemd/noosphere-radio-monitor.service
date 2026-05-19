@@ -1,5 +1,5 @@
 [Unit]
-Description=Noosphere radio monitor — squelch-aware capture and transcription
+Description=Noosphere radio monitor  -  squelch-aware capture and transcription
 After=network.target
 
 [Service]

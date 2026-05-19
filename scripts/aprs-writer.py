@@ -54,7 +54,7 @@ def parse_aprs(callsign, payload):
         return None
     dti = payload[0]
 
-    # !=/@` — position types
+    # !=/@`  -  position types
     if dti in ('!', '=', '@', '/'):
         # Uncompressed: !DDMM.HH[NS]xDDDMM.HH[EW]x...
         m = re.search(r'(\d{4}\.\d{2}[NS])(.)(\d{5}\.\d{2}[EW])(.)(.*)', payload[1:])
@@ -125,5 +125,5 @@ while True:
                     upsert(db, callsign, lat, lng, symbol, comment)
 
     except (ConnectionError, OSError) as e:
-        print(f'AGW connection error: {e} — retrying in 10s', file=sys.stderr)
+        print(f'AGW connection error: {e}  -  retrying in 10s', file=sys.stderr)
         time.sleep(10)

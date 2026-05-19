@@ -2,7 +2,7 @@
 # cache-drivers.sh -- Download WiFi/ethernet driver packages for offline install on unknown hardware.
 # Run this on a machine with internet access. Cached .deb files can be installed later
 # on any hardware with: cd <CACHE_DIR> && dpkg -i *.deb
-# (#9 — preload broad driver support)
+# (#9  -  preload broad driver support)
 
 set -e
 
@@ -17,7 +17,7 @@ echo
 
 apt-get update -qq
 
-# Firmware blobs (no DKMS needed — just firmware files)
+# Firmware blobs (no DKMS needed  -  just firmware files)
 FIRMWARE_PKGS=(
     firmware-realtek        # rtl8188ee, rtl8192ce, rtl8821ce, rtl8822be, rtl8723be, rtl8188eu
     firmware-iwlwifi        # Intel WiFi 3160/7260/7265/8265/9260/AX200/AX201/AX210
@@ -34,7 +34,7 @@ NIC_PKGS=(
     firmware-bnx2x          # Broadcom 10GbE
     firmware-qlogic         # QLogic NICs
     firmware-myricom        # Myri10GE
-    r8168-dkms              # Realtek RTL8111/8168 (PCI ethernet) — DKMS
+    r8168-dkms              # Realtek RTL8111/8168 (PCI ethernet)  -  DKMS
 )
 
 # Build dependencies for DKMS (RTL8812AU already installed but deps needed on new hw)

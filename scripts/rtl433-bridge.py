@@ -63,7 +63,7 @@ for line in sys.stdin:
     if conf['sensor_model'] and model.lower() != conf['sensor_model'].lower():
         continue
 
-    # Temperature — prefer _C then _F
+    # Temperature  -  prefer _C then _F
     temp_f = None
     if d.get('temperature_C') is not None:
         temp_f = round(float(d['temperature_C']) * 9 / 5 + 32, 1)

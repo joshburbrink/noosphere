@@ -228,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $st['revealed'][$idx] = true;
         $color = $st['colors'][$idx];
         $word  = $st['words'][$idx];
-        log_entry($st, $st['players'][$pid]['name'].' guessed "'.$word.'" — '.$color);
+        log_entry($st, $st['players'][$pid]['name'].' guessed "'.$word.'"  -  '.$color);
         if ($color === 'assassin') {
             $st['phase'] = 'done';
             $st['winner'] = $st['turn']==='red' ? 'blue' : 'red';
@@ -238,26 +238,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($st['remaining'][$color] === 0) {
                 $st['phase'] = 'done';
                 $st['winner'] = $color;
-                log_entry($st, ucfirst($color).' found all agents — '.ucfirst($color).' wins!');
+                log_entry($st, ucfirst($color).' found all agents  -  '.ucfirst($color).' wins!');
             } else {
                 $st['guesses_left']--;
                 if ($st['guesses_left'] <= 0) {
                     $st['turn'] = $st['turn']==='red'?'blue':'red';
                     $st['clue'] = null;
-                    log_entry($st, 'Out of guesses — '.ucfirst($st['turn']).' team\'s turn.');
+                    log_entry($st, 'Out of guesses  -  '.ucfirst($st['turn']).' team\'s turn.');
                 }
             }
         } else {
-            // Wrong color or neutral — end turn
+            // Wrong color or neutral  -  end turn
             if ($color !== 'neutral') $st['remaining'][$color]--;
             if (isset($st['remaining'][$color]) && $st['remaining'][$color]===0) {
                 $st['phase'] = 'done';
                 $st['winner'] = $color;
-                log_entry($st, ucfirst($color).' found — '.ucfirst($color).' wins!');
+                log_entry($st, ucfirst($color).' found  -  '.ucfirst($color).' wins!');
             } else {
                 $st['turn'] = $st['turn']==='red'?'blue':'red';
                 $st['clue'] = null;
-                log_entry($st, 'Wrong card — '.ucfirst($st['turn']).' team\'s turn.');
+                log_entry($st, 'Wrong card  -  '.ucfirst($st['turn']).' team\'s turn.');
             }
         }
         room_save($room_id, $st);
@@ -274,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $st['turn'] = $st['turn']==='red'?'blue':'red';
         $st['clue'] = null;
-        log_entry($st, 'Passed — '.ucfirst($st['turn']).' team\'s turn.');
+        log_entry($st, 'Passed  -  '.ucfirst($st['turn']).' team\'s turn.');
         room_save($room_id, $st);
         echo json_encode(['ok'=>true,'state'=>filter_state($st,$pid)]);
         exit;
@@ -324,7 +324,7 @@ function filter_state($st, $pid) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Codenames — Noosphere</title>
+<title>Codenames  -  Noosphere</title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -414,18 +414,18 @@ h1{color:var(--accent,#e94560);font-size:1.4rem;margin-bottom:.25rem}
     <p><strong>Goal:</strong> Each team has a Spymaster and at least one Operative. Find all your team's agents before the other team finds theirs.</p>
     <p style="margin-top:.4rem"><strong>Roles:</strong></p>
     <ul style="margin:.3rem 0 .3rem 1.2rem">
-      <li><strong>Spymaster</strong> — sees all card colors. Gives one-word clues + a number (how many cards the clue applies to).</li>
-      <li><strong>Operative</strong> — sees the board. Guesses which cards match the clue by clicking them.</li>
+      <li><strong>Spymaster</strong>  -  sees all card colors. Gives one-word clues + a number (how many cards the clue applies to).</li>
+      <li><strong>Operative</strong>  -  sees the board. Guesses which cards match the clue by clicking them.</li>
     </ul>
     <p style="margin-top:.4rem"><strong>Taking a turn:</strong></p>
     <ol style="margin:.3rem 0 .3rem 1.2rem">
       <li>Spymaster gives a one-word clue and a count.</li>
       <li>Operatives discuss, then click cards to guess. You get count+1 guesses max.</li>
-      <li>If you hit your color, keep guessing. Hit the wrong color or run out → your turn ends.</li>
+      <li>If you hit your color, keep guessing. Hit the wrong color or run out -> your turn ends.</li>
     </ol>
-    <p style="margin-top:.4rem"><strong>Special cards:</strong> ⬛ Assassin — if you guess it, your team <em>immediately loses</em>. Neutral cards just end your turn.</p>
-    <p style="margin-top:.4rem"><strong>Win:</strong> Reveal all your agents first. Red has 9 cards, Blue has 8 — Red always goes first.</p>
-    <p style="margin-top:.4rem"><strong>Word themes:</strong> Change the word pack in the lobby — Emergency (disaster ops), Classic (everyday nouns), Camping (gear &amp; outdoors), Wilderness (nature).</p>
+    <p style="margin-top:.4rem"><strong>Special cards:</strong> ⬛ Assassin  -  if you guess it, your team <em>immediately loses</em>. Neutral cards just end your turn.</p>
+    <p style="margin-top:.4rem"><strong>Win:</strong> Reveal all your agents first. Red has 9 cards, Blue has 8  -  Red always goes first.</p>
+    <p style="margin-top:.4rem"><strong>Word themes:</strong> Change the word pack in the lobby  -  Emergency (disaster ops), Classic (everyday nouns), Camping (gear &amp; outdoors), Wilderness (nature).</p>
   </div>
 </details>
 <div class="back"><a href="/games/">← Games</a></div>
@@ -530,7 +530,7 @@ function buildPlayerList(st) {
     var ppid = kv[0], p = kv[1];
     var roleLabel = p.role ? p.role.replace('_',' ').replace('red','🔴').replace('blue','🔵') : 'no role';
     var me = ppid===pid;
-    rp.innerHTML += '<div style="font-size:.8rem;padding:.2rem 0;color:'+(me?'var(--accent2,#4a9eff)':'var(--text,#eee)')+'">'+p.name+' — '+roleLabel+'</div>';
+    rp.innerHTML += '<div style="font-size:.8rem;padding:.2rem 0;color:'+(me?'var(--accent2,#4a9eff)':'var(--text,#eee)')+'">'+p.name+'  -  '+roleLabel+'</div>';
   });
   if (st.phase === 'lobby') {
     rp.innerHTML += '<h3 style="margin-top:.5rem">Choose Role</h3>';
@@ -556,14 +556,14 @@ function applyState(st, ts) {
   var turn = st.turn;
 
   // Status
-  if (phase==='lobby') setStatus('Lobby — choose a role and wait for others');
+  if (phase==='lobby') setStatus('Lobby  -  choose a role and wait for others');
   else if (phase==='playing') {
     var myTurn = myRole && myRole.includes(turn);
-    setStatus((turn==='red'?'🔴 Red':'🔵 Blue') + ' team\'s turn' + (myTurn?' — your move!':''), myTurn?(turn==='red'?'#e74c3c':'#2980b9'):'');
+    setStatus((turn==='red'?'🔴 Red':'🔵 Blue') + ' team\'s turn' + (myTurn?'  -  your move!':''), myTurn?(turn==='red'?'#e74c3c':'#2980b9'):'');
   }
   else if (phase==='done') setStatus((st.winner==='red'?'🔴 Red wins!':'🔵 Blue wins!'), st.winner==='red'?'#e74c3c':'#2980b9');
 
-  // Board needs real colors for revealed cells — store in st
+  // Board needs real colors for revealed cells  -  store in st
   if (!st.colors_real) st.colors_real = st.colors;
 
   buildBoard(st);

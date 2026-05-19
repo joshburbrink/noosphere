@@ -16,7 +16,7 @@ VENV_PYTHON   = '/opt/noosphere-whisper/bin/python3'
 SITE_PACKAGES = '/opt/noosphere-whisper/lib/python3.13/site-packages'
 
 SAMPLE_RATE   = 16000
-SQUELCH_DB    = -40.0    # dBFS — below this is silence
+SQUELCH_DB    = -40.0    # dBFS  -  below this is silence
 SILENCE_DUR   = 1.5      # seconds of silence to end a clip
 MIN_CLIP_SEC  = 0.5      # ignore very short blips
 MAX_CLIP_SEC  = 120      # cap clip length
@@ -167,7 +167,7 @@ def run_monitor(freq, backend):
     print(f'[radio-monitor] Starting on {freq}, backend={backend}')
     write_status('running', freq)
 
-    # rtl_fm → raw 16-bit signed PCM at 16kHz mono
+    # rtl_fm -> raw 16-bit signed PCM at 16kHz mono
     rtl_cmd = [
         'rtl_fm', '-f', freq, '-M', 'fm', '-s', '200k',
         '-r', str(SAMPLE_RATE), '-l', '0',  # squelch=0, we do our own

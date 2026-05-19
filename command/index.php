@@ -1,7 +1,7 @@
 <?php
 /*
- * /command/ — Incident Command dense operator dashboard (#76).
- * Counterpart to /kiosk/ — same compact data feeds, opposite audience.
+ * /command/  -  Incident Command dense operator dashboard (#76).
+ * Counterpart to /kiosk/  -  same compact data feeds, opposite audience.
  */
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
@@ -22,7 +22,7 @@ $name = get_setting('instance_name', 'Noosphere');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Command — <?= htmlspecialchars($name) ?></title>
+<title>Command  -  <?= htmlspecialchars($name) ?></title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -125,7 +125,7 @@ a:hover { text-decoration: underline; }
 
 <div class="grid">
   <div class="panel" style="grid-column: span 2; grid-row: span 2">
-    <h2>🚨 Active Incidents <span class="count" id="cnt-incidents">—</span></h2>
+    <h2>🚨 Active Incidents <span class="count" id="cnt-incidents"> - </span></h2>
     <div class="panel-body" id="p-incidents"><div class="empty">Loading…</div></div>
   </div>
 
@@ -140,12 +140,12 @@ a:hover { text-decoration: underline; }
   </div>
 
   <div class="panel">
-    <h2>🏃 Runners <span class="count" id="cnt-runners">—</span></h2>
+    <h2>🏃 Runners <span class="count" id="cnt-runners"> - </span></h2>
     <div class="panel-body" id="p-runners"><div class="empty">Loading…</div></div>
   </div>
 
   <div class="panel">
-    <h2>📦 Supply Alerts <span class="count" id="cnt-supplies">—</span></h2>
+    <h2>📦 Supply Alerts <span class="count" id="cnt-supplies"> - </span></h2>
     <div class="panel-body" id="p-supplies"><div class="empty">Loading…</div></div>
   </div>
 
@@ -192,7 +192,7 @@ function renderIncidents(d) {
       '<span class="sev sev-' + sev + '">' + esc(sev.toUpperCase()) + '</span>' +
       '<span class="title"><a href="/incidents/?id=' + r.id + '">' + esc(r.title) + '</a>' +
         (r.location_text ? ' <span class="meta">· ' + esc(r.location_text) + '</span>' : '') +
-        (r.assigned_to ? ' <span class="meta">· → ' + esc(r.assigned_to) + '</span>' : '') +
+        (r.assigned_to ? ' <span class="meta">· -> ' + esc(r.assigned_to) + '</span>' : '') +
       '</span>' +
       '<span class="meta">' + esc(r.status) + ' · ' + ageStr(r.submitted_at) + '</span>' +
     '</div>';
@@ -205,7 +205,7 @@ function renderRunners(d) {
   return d.rows.map(r => {
     const overdue = r.overdue ? '<span class="overdue">OVERDUE</span> · ' : '';
     return '<div class="row"><span class="title">' + esc(r.name) +
-      ' <span class="meta">→ ' + esc(r.destination) + '</span></span>' +
+      ' <span class="meta">-> ' + esc(r.destination) + '</span></span>' +
       '<span class="meta">' + overdue + ageStr(r.departed_at) + ' out</span></div>';
   }).join('');
 }
@@ -219,8 +219,8 @@ function renderWeather(d) {
   }
   if (d.obs) {
     html += '<div class="weather-grid">' +
-      '<div class="field"><div class="v">' + (d.obs.temp_f !== null ? Math.round(d.obs.temp_f) + '°' : '—') + '</div><div class="l">temp</div></div>' +
-      '<div class="field"><div class="v" style="font-size:13px">' + esc(d.obs.conditions || '—') + '</div><div class="l">cond</div></div>' +
+      '<div class="field"><div class="v">' + (d.obs.temp_f !== null ? Math.round(d.obs.temp_f) + '°' : ' - ') + '</div><div class="l">temp</div></div>' +
+      '<div class="field"><div class="v" style="font-size:13px">' + esc(d.obs.conditions || ' - ') + '</div><div class="l">cond</div></div>' +
       '<div class="field"><div class="v" style="font-size:13px">' + esc((d.obs.wind_dir || '') + ' ' + (d.obs.wind_speed || '')) + '</div><div class="l">wind</div></div>' +
     '</div>';
   }
@@ -257,7 +257,7 @@ function renderRadio(d) {
   if (!d.enabled) return '<div class="empty">Module disabled</div>';
   let html = '<div style="font-size:12px;color:#888">Mode: <strong style="color:#e0e0e0">' + esc(d.mode) + '</strong></div>';
   if (d.signal_dbfs !== null) {
-    // -80 → 0% green, -20 → 100% red
+    // -80 -> 0% green, -20 -> 100% red
     const pct = Math.max(0, Math.min(100, ((d.signal_dbfs + 80) / 80) * 100));
     const col = d.signal_dbfs > -30 ? '#e94560' : d.signal_dbfs > -50 ? '#f39c12' : '#2ecc71';
     html += '<div style="margin-top:8px"><div class="signal-bar"><div class="signal-fill" style="width:' + pct +
@@ -288,7 +288,7 @@ function refresh() {
     })
     .catch(err => {
       document.querySelectorAll('.panel-body').forEach(b => b.classList.add('fade-stale'));
-      document.getElementById('last-update').textContent = 'error — retrying';
+      document.getElementById('last-update').textContent = 'error  -  retrying';
     });
 }
 refresh();

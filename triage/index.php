@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && can('triage.edit') && !$is_readonly
         $s->bindValue(9,  $now,       SQLITE3_INTEGER);
         $s->bindValue(10, $now,       SQLITE3_INTEGER);
         $s->execute();
-        $msg = $tag_id . ' logged — ' . $PRIORITIES[$priority]['label'];
+        $msg = $tag_id . ' logged  -  ' . $PRIORITIES[$priority]['label'];
     }
 
     if ($act === 'edit') {
@@ -136,7 +136,7 @@ $name = get_setting('instance_name', 'Noosphere');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Triage Log — <?= htmlspecialchars($name) ?></title>
+<title>Triage Log  -  <?= htmlspecialchars($name) ?></title>
 <?= csrf_js() ?>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -223,7 +223,7 @@ td { padding:9px 10px; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px">
       <div style="background:#2a0a12;border:1px solid #e9456044;border-radius:6px;padding:10px">
         <div style="color:#e94560;font-weight:bold;margin-bottom:4px">🔴 IMMEDIATE</div>
-        <div style="color:#ccc">Breathing only after repositioning airway — or respirations &gt;30/min — or poor radial pulse / capillary refill &gt;2s — or cannot follow commands</div>
+        <div style="color:#ccc">Breathing only after repositioning airway  -  or respirations &gt;30/min  -  or poor radial pulse / capillary refill &gt;2s  -  or cannot follow commands</div>
       </div>
       <div style="background:#2a1a00;border:1px solid #f39c1244;border-radius:6px;padding:10px">
         <div style="color:#f39c12;font-weight:bold;margin-bottom:4px">🟡 DELAYED</div>
@@ -239,11 +239,11 @@ td { padding:9px 10px; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
       </div>
     </div>
     <div style="margin-top:10px;color:#555;font-size:11px">
-      START sequence: <strong style="color:#aaa">1)</strong> Direct walking wounded away (→ Minor) &nbsp;
-      <strong style="color:#aaa">2)</strong> Respirations? If none after reposition → Expectant &nbsp;
-      <strong style="color:#aaa">3)</strong> Resp rate? &gt;30 → Immediate &nbsp;
-      <strong style="color:#aaa">4)</strong> Perfusion (cap refill or radial pulse)? Poor → Immediate &nbsp;
-      <strong style="color:#aaa">5)</strong> Mental status? Can't follow commands → Immediate · Otherwise → Delayed
+      START sequence: <strong style="color:#aaa">1)</strong> Direct walking wounded away (-> Minor) &nbsp;
+      <strong style="color:#aaa">2)</strong> Respirations? If none after reposition -> Expectant &nbsp;
+      <strong style="color:#aaa">3)</strong> Resp rate? &gt;30 -> Immediate &nbsp;
+      <strong style="color:#aaa">4)</strong> Perfusion (cap refill or radial pulse)? Poor -> Immediate &nbsp;
+      <strong style="color:#aaa">5)</strong> Mental status? Can't follow commands -> Immediate · Otherwise -> Delayed
     </div>
   </div>
 </details>
@@ -299,8 +299,8 @@ td { padding:9px 10px; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
         <?php endif ?>
       </td>
       <td class="notes-cell"><?= htmlspecialchars($p['complaint'] ?? '') ?></td>
-      <td style="color:#aaa;white-space:nowrap"><?= htmlspecialchars($p['location'] ?? '—') ?></td>
-      <td style="color:#aaa"><?= htmlspecialchars($p['caregiver'] ?? '—') ?></td>
+      <td style="color:#aaa;white-space:nowrap"><?= htmlspecialchars($p['location'] ?? ' - ') ?></td>
+      <td style="color:#aaa"><?= htmlspecialchars($p['caregiver'] ?? ' - ') ?></td>
       <td class="<?= $disp_cls ?>"><?= htmlspecialchars($DISPOSITIONS[$p['disposition']] ?? $p['disposition']) ?></td>
       <td style="color:#555;white-space:nowrap;font-size:12px"><?= date('H:i', $p['created_at']) ?></td>
       <td style="color:#555;white-space:nowrap;font-size:12px"><?= date('H:i', $p['updated_at']) ?></td>

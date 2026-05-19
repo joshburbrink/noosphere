@@ -10,7 +10,7 @@ $db          = incidents_db();
 
 $msg = ''; $error = '';
 
-// Handle POST (submit / admin actions). Non-JS fallback path — api.php is the JS path.
+// Handle POST (submit / admin actions). Non-JS fallback path  -  api.php is the JS path.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
     csrf_verify();
     $act = $_POST['act'] ?? '';
@@ -138,7 +138,7 @@ function esc($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= esc($module_label) ?> — <?= esc($name) ?></title>
+<title><?= esc($module_label) ?>  -  <?= esc($name) ?></title>
 <?php if ($maps_on): ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
 <script src="/maps/lib/maplibre-gl.js"></script>
@@ -249,7 +249,7 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
     <div class="form-grid">
       <div class="form-full">
         <label>Title *</label>
-        <input type="text" name="title" maxlength="200" required placeholder="Short summary — e.g. 'Tree across Marr Rd at 5th'">
+        <input type="text" name="title" maxlength="200" required placeholder="Short summary  -  e.g. 'Tree across Marr Rd at 5th'">
       </div>
       <div>
         <label>Type</label>
@@ -275,7 +275,7 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
       </div>
       <div class="form-full">
         <label>Description</label>
-        <textarea name="description" placeholder="Details — what, when, who, what's needed…"></textarea>
+        <textarea name="description" placeholder="Details  -  what, when, who, what's needed…"></textarea>
       </div>
       <div>
         <label>Reporter (optional)</label>
@@ -316,7 +316,7 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
           </div>
           <div>
             <label>Number of Occupants (if known)</label>
-            <input type="number" name="damage_occupant_count" min="0" max="999" placeholder="—">
+            <input type="number" name="damage_occupant_count" min="0" max="999" placeholder=" - ">
           </div>
           <div class="form-full">
             <label>Utilities Affected</label>
@@ -399,7 +399,7 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
           <td style="white-space:nowrap;color:#aaa;font-size:12px"><?= date('m/d H:i', $r['submitted_at']) ?></td>
           <td><span class="badge" style="background:<?= $tc ?>22;color:<?= $tc ?>;border:1px solid <?= $tc ?>44"><?= esc(INCIDENT_TYPES[$r['type']] ?? $r['type']) ?></span></td>
           <?php if ($is_command): ?>
-          <td><?= $r['severity'] ? '<span class="badge" style="background:'.$sc.'22;color:'.$sc.';border:1px solid '.$sc.'44">'.esc(INCIDENT_SEVERITIES[$r['severity']] ?? $r['severity']).'</span>' : '<span style="color:#555">—</span>' ?></td>
+          <td><?= $r['severity'] ? '<span class="badge" style="background:'.$sc.'22;color:'.$sc.';border:1px solid '.$sc.'44">'.esc(INCIDENT_SEVERITIES[$r['severity']] ?? $r['severity']).'</span>' : '<span style="color:#555"> - </span>' ?></td>
           <td>
             <?php if ($is_admin): ?>
             <form method="post" style="display:inline">
@@ -456,7 +456,7 @@ body.drop-pin-mode #mainmap .maplibregl-canvas-container { cursor: crosshair !im
                 <?= csrf_field() ?>
                 <input type="hidden" name="act" value="assign">
                 <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-                <input type="text" name="assigned_to" value="<?= esc($r['assigned_to'] ?? '') ?>" onblur="if(this.value!==this.defaultValue)this.form.submit()" style="font-size:11px;padding:2px 4px;background:transparent;border:1px solid #2a2a4a;color:#eee;width:90px" placeholder="—">
+                <input type="text" name="assigned_to" value="<?= esc($r['assigned_to'] ?? '') ?>" onblur="if(this.value!==this.defaultValue)this.form.submit()" style="font-size:11px;padding:2px 4px;background:transparent;border:1px solid #2a2a4a;color:#eee;width:90px" placeholder=" - ">
               </form>
             <?php else: ?>
               <?= esc($r['assigned_to'] ?? '') ?>

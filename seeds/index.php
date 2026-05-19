@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 if (get_setting('show_seeds','0') !== '1') { http_response_code(404); exit; }
 
@@ -31,31 +32,36 @@ $db->exec("CREATE TABLE IF NOT EXISTS seeds (
 
 function esc($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
-// Zone 6a planting calendar — last frost ~Apr 15, first frost ~Oct 15
-$CALENDAR = [
-    ['crop'=>'Tomato',     'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'May 1–15',    'direct_sow'=>'—',          'harvest'=>'Jul–Oct',    'dtm'=>'60–85 days'],
-    ['crop'=>'Pepper',     'start_indoors'=>'Feb 1–Mar 1',   'transplant'=>'May 15–Jun 1', 'direct_sow'=>'—',          'harvest'=>'Aug–Oct',    'dtm'=>'70–90 days'],
+// Planting calendar from active region pack, with a built-in zone 6a fallback.
+$_cal_file = region_path('seeds/planting-calendar.json');
+$_cal_json = is_file($_cal_file) ? json_decode(file_get_contents($_cal_file), true) : null;
+$REGION_ZONE_LABEL  = $_cal_json['zone_label']  ?? region_meta('seeds.zone_label',  get_setting('region_label', 'No region set'));
+$REGION_LAST_FROST  = $_cal_json['last_frost']  ?? region_meta('seeds.last_frost',  'unknown');
+$REGION_FIRST_FROST = $_cal_json['first_frost'] ?? region_meta('seeds.first_frost', 'unknown');
+$CALENDAR = is_array($_cal_json['crops'] ?? null) ? $_cal_json['crops'] : [
+    ['crop'=>'Tomato',     'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'May 1–15',    'direct_sow'=>' - ',          'harvest'=>'Jul–Oct',    'dtm'=>'60–85 days'],
+    ['crop'=>'Pepper',     'start_indoors'=>'Feb 1–Mar 1',   'transplant'=>'May 15–Jun 1', 'direct_sow'=>' - ',          'harvest'=>'Aug–Oct',    'dtm'=>'70–90 days'],
     ['crop'=>'Squash',     'start_indoors'=>'Apr 15–May 1',  'transplant'=>'May 10–20',   'direct_sow'=>'May 1–20',   'harvest'=>'Jul–Oct',    'dtm'=>'50–65 days'],
     ['crop'=>'Zucchini',   'start_indoors'=>'Apr 15–May 1',  'transplant'=>'May 10–20',   'direct_sow'=>'May 1–20',   'harvest'=>'Jun–Sep',    'dtm'=>'45–55 days'],
-    ['crop'=>'Bean',       'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'May 1–Jul 1','harvest'=>'Jul–Sep',    'dtm'=>'50–60 days'],
-    ['crop'=>'Corn',       'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'May 1–Jun 1','harvest'=>'Aug–Sep',    'dtm'=>'65–90 days'],
-    ['crop'=>'Potato',     'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Apr 1–May 1','harvest'=>'Jul–Sep',    'dtm'=>'70–120 days'],
+    ['crop'=>'Bean',       'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'May 1–Jul 1','harvest'=>'Jul–Sep',    'dtm'=>'50–60 days'],
+    ['crop'=>'Corn',       'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'May 1–Jun 1','harvest'=>'Aug–Sep',    'dtm'=>'65–90 days'],
+    ['crop'=>'Potato',     'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Apr 1–May 1','harvest'=>'Jul–Sep',    'dtm'=>'70–120 days'],
     ['crop'=>'Onion',      'start_indoors'=>'Jan 15–Feb 15', 'transplant'=>'Mar 15–Apr 15','direct_sow'=>'Mar–Apr',   'harvest'=>'Jul–Aug',    'dtm'=>'100–120 days'],
-    ['crop'=>'Carrot',     'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Apr 1–Aug 1','harvest'=>'Jun–Oct',    'dtm'=>'70–80 days'],
+    ['crop'=>'Carrot',     'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Apr 1–Aug 1','harvest'=>'Jun–Oct',    'dtm'=>'70–80 days'],
     ['crop'=>'Lettuce',    'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'Apr 1–15',    'direct_sow'=>'Apr 1–May 1, Aug–Sep','harvest'=>'May–Jun, Sep–Oct','dtm'=>'45–60 days'],
-    ['crop'=>'Broccoli',   'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'Apr 1–15',    'direct_sow'=>'—',          'harvest'=>'May–Jun',    'dtm'=>'60–80 days'],
-    ['crop'=>'Cabbage',    'start_indoors'=>'Feb 1–Mar 1',   'transplant'=>'Mar 15–Apr 15','direct_sow'=>'—',          'harvest'=>'Jun–Jul',    'dtm'=>'80–100 days'],
+    ['crop'=>'Broccoli',   'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'Apr 1–15',    'direct_sow'=>' - ',          'harvest'=>'May–Jun',    'dtm'=>'60–80 days'],
+    ['crop'=>'Cabbage',    'start_indoors'=>'Feb 1–Mar 1',   'transplant'=>'Mar 15–Apr 15','direct_sow'=>' - ',          'harvest'=>'Jun–Jul',    'dtm'=>'80–100 days'],
     ['crop'=>'Kale',       'start_indoors'=>'Feb 15–Mar 15', 'transplant'=>'Apr 1–15',    'direct_sow'=>'Apr–May, Jul–Aug','harvest'=>'May–Nov','dtm'=>'50–70 days'],
     ['crop'=>'Cucumber',   'start_indoors'=>'Apr 15–May 1',  'transplant'=>'May 15–Jun 1','direct_sow'=>'May 15–Jun 1','harvest'=>'Jul–Sep',   'dtm'=>'50–70 days'],
     ['crop'=>'Pumpkin',    'start_indoors'=>'Apr 15–May 1',  'transplant'=>'May 10–20',   'direct_sow'=>'May 1–15',   'harvest'=>'Sep–Oct',    'dtm'=>'90–120 days'],
-    ['crop'=>'Sunflower',  'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'May 1–Jun 1','harvest'=>'Aug–Sep',    'dtm'=>'70–100 days'],
+    ['crop'=>'Sunflower',  'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'May 1–Jun 1','harvest'=>'Aug–Sep',    'dtm'=>'70–100 days'],
     ['crop'=>'Basil',      'start_indoors'=>'Apr 1–May 1',   'transplant'=>'May 15–Jun 1','direct_sow'=>'May 15+',    'harvest'=>'Jun–Sep',    'dtm'=>'25–30 days'],
-    ['crop'=>'Cilantro',   'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Apr–May, Aug–Sep','harvest'=>'May–Jun, Sep–Oct','dtm'=>'45–70 days'],
-    ['crop'=>'Radish',     'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Apr–May, Aug–Sep','harvest'=>'May, Sep','dtm'=>'25–30 days'],
-    ['crop'=>'Spinach',    'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Mar–Apr, Aug–Sep','harvest'=>'Apr–May, Sep–Oct','dtm'=>'40–50 days'],
-    ['crop'=>'Sweet Potato','start_indoors'=>'Mar 1–Apr 1',  'transplant'=>'May 15–Jun 1','direct_sow'=>'—',          'harvest'=>'Sep–Oct',    'dtm'=>'90–120 days'],
-    ['crop'=>'Garlic',     'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Oct (fall)',  'harvest'=>'Jun–Jul',    'dtm'=>'240–270 days'],
-    ['crop'=>'Pea',        'start_indoors'=>'—',             'transplant'=>'—',            'direct_sow'=>'Mar 15–Apr 15','harvest'=>'May–Jun',  'dtm'=>'55–75 days'],
+    ['crop'=>'Cilantro',   'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Apr–May, Aug–Sep','harvest'=>'May–Jun, Sep–Oct','dtm'=>'45–70 days'],
+    ['crop'=>'Radish',     'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Apr–May, Aug–Sep','harvest'=>'May, Sep','dtm'=>'25–30 days'],
+    ['crop'=>'Spinach',    'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Mar–Apr, Aug–Sep','harvest'=>'Apr–May, Sep–Oct','dtm'=>'40–50 days'],
+    ['crop'=>'Sweet Potato','start_indoors'=>'Mar 1–Apr 1',  'transplant'=>'May 15–Jun 1','direct_sow'=>' - ',          'harvest'=>'Sep–Oct',    'dtm'=>'90–120 days'],
+    ['crop'=>'Garlic',     'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Oct (fall)',  'harvest'=>'Jun–Jul',    'dtm'=>'240–270 days'],
+    ['crop'=>'Pea',        'start_indoors'=>' - ',             'transplant'=>' - ',            'direct_sow'=>'Mar 15–Apr 15','harvest'=>'May–Jun',  'dtm'=>'55–75 days'],
     ['crop'=>'Watermelon', 'start_indoors'=>'Apr 15–May 1',  'transplant'=>'May 20–Jun 1','direct_sow'=>'May 20+',    'harvest'=>'Aug–Sep',    'dtm'=>'80–90 days'],
 ];
 
@@ -142,7 +148,7 @@ $csrf = csrf_token();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Seed Library — <?= esc($name) ?></title>
+<title>Seed Library  -  <?= esc($name) ?></title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:sans-serif; background:#1a1a2e; color:#eee; min-height:100vh; padding:1.5rem; }
@@ -209,7 +215,7 @@ tr:last-child td { border-bottom:none; }
 <div class="topbar">
   <div>
     <h1>🌱 Seed Library</h1>
-    <div style="font-size:13px;color:#666;margin-top:2px">Zone 6a — Bartholomew &amp; Brown County, Indiana</div>
+    <div style="font-size:13px;color:#666;margin-top:2px"><?= esc($REGION_ZONE_LABEL) ?></div>
   </div>
   <div class="nav">
     <a href="/resources/">← Resources</a>
@@ -249,7 +255,7 @@ tr:last-child td { border-bottom:none; }
   <?php foreach ($seeds as $s): ?>
   <tr>
     <td class="cal-crop"><?= esc($s['crop']) ?></td>
-    <td><?= esc($s['variety']) ?: '<span style="color:#555">—</span>' ?></td>
+    <td><?= esc($s['variety']) ?: '<span style="color:#555"> - </span>' ?></td>
     <td><span class="tag tag-<?= esc($s['type']) ?>"><?= esc($TYPES[$s['type']] ?? $s['type']) ?></span></td>
     <td>
       <span class="<?= $s['quantity'] <= 0 ? 'qty-low' : '' ?>"><?= esc($s['quantity']) ?> <?= esc($s['unit']) ?></span>
@@ -257,8 +263,8 @@ tr:last-child td { border-bottom:none; }
       <?php if ($s['donated_by']): ?><div class="notes">From: <?= esc($s['donated_by']) ?></div><?php endif; ?>
       <?php if ($s['notes']): ?><div class="notes"><?= esc($s['notes']) ?></div><?php endif; ?>
     </td>
-    <td><?= esc($s['year_harvested']) ?: '<span style="color:#555">—</span>' ?></td>
-    <td><?= esc($s['storage_location']) ?: '<span style="color:#555">—</span>' ?></td>
+    <td><?= esc($s['year_harvested']) ?: '<span style="color:#555"> - </span>' ?></td>
+    <td><?= esc($s['storage_location']) ?: '<span style="color:#555"> - </span>' ?></td>
     <?php if ($is_admin): ?>
     <td>
       <button class="btn-sm" onclick="openEdit(<?= htmlspecialchars(json_encode($s), ENT_QUOTES) ?>)">Edit</button>
@@ -384,10 +390,9 @@ document.getElementById('editModal').addEventListener('click',function(e){ if(e.
 <?php else: // calendar tab ?>
 
 <div class="frost-note">
-  <strong>Zone 6a — Southern Indiana</strong> &nbsp;|&nbsp;
-  Last frost: <strong>~April 15</strong> &nbsp;|&nbsp;
-  First frost: <strong>~October 15</strong> &nbsp;|&nbsp;
-  Growing season: <strong>~183 days</strong>
+  <strong><?= esc($REGION_ZONE_LABEL) ?></strong> &nbsp;|&nbsp;
+  Last frost: <strong><?= esc($REGION_LAST_FROST) ?></strong> &nbsp;|&nbsp;
+  First frost: <strong><?= esc($REGION_FIRST_FROST) ?></strong>
 </div>
 
 <table class="cal-table">

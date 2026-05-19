@@ -39,11 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$is_readonly) {
         $dest_lat    = isset($_POST['dest_lat']) && $_POST['dest_lat'] !== '' ? (float)$_POST['dest_lat'] : null;
         $dest_lng    = isset($_POST['dest_lng']) && $_POST['dest_lng'] !== '' ? (float)$_POST['dest_lng'] : null;
 
-        // Parse expected return — offset in minutes from now, or blank
+        // Parse expected return  -  offset in minutes from now, or blank
         $expected_min = (int)($_POST['expected_min'] ?? 0);
         $expected_at  = $expected_min > 0 ? time() + ($expected_min * 60) : null;
 
-        // Custom departure time — default to now
+        // Custom departure time  -  default to now
         $depart_raw  = trim($_POST['departed_at'] ?? '');
         $departed_at = $depart_raw ? strtotime($depart_raw) : time();
         if (!$departed_at) $departed_at = time();
@@ -124,12 +124,12 @@ if (isset($_GET['msg'])) $msg = htmlspecialchars($_GET['msg']);
 
 $now = time();
 
-// Active runners — status=out
+// Active runners  -  status=out
 $res  = $db->query("SELECT * FROM runners WHERE status='out' ORDER BY departed_at ASC");
 $active = [];
 while ($r = $res->fetchArray(SQLITE3_ASSOC)) $active[] = $r;
 
-// Returned — last 24h
+// Returned  -  last 24h
 $since  = $now - 86400;
 $res2   = $db->query("SELECT * FROM runners WHERE status='returned' AND returned_at >= $since ORDER BY returned_at DESC");
 $returned = [];
@@ -139,7 +139,7 @@ $name_setting = get_setting('instance_name','Noosphere');
 $label        = get_setting('runners_label','Runner Board');
 
 function fmt_time($ts) {
-    if (!$ts) return '—';
+    if (!$ts) return ' - ';
     $diff = time() - $ts;
     $prefix = $diff < 0 ? 'in ' : '';
     $diff = abs($diff);
@@ -150,7 +150,7 @@ function fmt_time($ts) {
 }
 
 function expected_label($row) {
-    if (!$row['expected_at']) return '—';
+    if (!$row['expected_at']) return ' - ';
     $now  = time();
     $diff = $row['expected_at'] - $now;
     if ($row['status'] === 'returned') return date('H:i', $row['expected_at']);
@@ -163,7 +163,7 @@ function expected_label($row) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= htmlspecialchars($label) ?> — <?= htmlspecialchars($name_setting) ?></title>
+<title><?= htmlspecialchars($label) ?>  -  <?= htmlspecialchars($name_setting) ?></title>
 <?= csrf_js() ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
 <script src="/maps/lib/maplibre-gl.js"></script>
@@ -238,7 +238,7 @@ $overdue = array_filter($active, fn($r) => $r['expected_at'] && $r['expected_at'
 if ($overdue):
 ?>
 <div class="overdue-banner">
-  ⚠ <?= count($overdue) ?> runner<?= count($overdue) !== 1 ? 's are' : ' is' ?> overdue —
+  ⚠ <?= count($overdue) ?> runner<?= count($overdue) !== 1 ? 's are' : ' is' ?> overdue  - 
   <?= implode(', ', array_map(fn($r) => htmlspecialchars($r['name']), $overdue)) ?>
 </div>
 <?php endif ?>
@@ -325,7 +325,7 @@ if ($overdue):
         <td class="name-cell"><?= htmlspecialchars($r['name']) ?></td>
         <td class="dest-cell"><?= htmlspecialchars($r['destination']) ?><?php if (!empty($r['dest_lat']) && !empty($r['dest_lng'])): ?> 📍<?php endif ?></td>
         <td class="time-cell"><?= date('H:i', $r['departed_at']) ?></td>
-        <td class="time-cell" style="color:#2ecc71"><?= $r['returned_at'] ? date('H:i', $r['returned_at']) : '—' ?></td>
+        <td class="time-cell" style="color:#2ecc71"><?= $r['returned_at'] ? date('H:i', $r['returned_at']) : ' - ' ?></td>
         <td class="notes-cell"><?= htmlspecialchars($r['notes'] ?? '') ?></td>
         <?php if ($is_admin): ?>
         <td>
@@ -360,7 +360,7 @@ if ($overdue):
       <input type="text" name="destination" placeholder="Where are they headed?" maxlength="120" required>
       <label>Expected return</label>
       <select name="expected_min">
-        <option value="0">— no ETA —</option>
+        <option value="0"> -  no ETA  - </option>
         <option value="15">15 minutes</option>
         <option value="30">30 minutes</option>
         <option value="45">45 minutes</option>
@@ -412,7 +412,7 @@ if ($overdue):
       <input type="text" name="destination" id="edit-destination" maxlength="120" required>
       <label>Expected return (from departure time)</label>
       <select name="expected_min" id="edit-expected">
-        <option value="0">— no ETA —</option>
+        <option value="0"> -  no ETA  - </option>
         <option value="15">15 minutes</option>
         <option value="30">30 minutes</option>
         <option value="45">45 minutes</option>
@@ -468,7 +468,7 @@ function openEdit(id, row) {
   if (tog) {
     tog.style.display = '';
     tog.textContent = row.dest_lat && row.dest_lng
-      ? '📍 Pin set (' + parseFloat(row.dest_lat).toFixed(4) + ', ' + parseFloat(row.dest_lng).toFixed(4) + ') — click to view/change'
+      ? '📍 Pin set (' + parseFloat(row.dest_lat).toFixed(4) + ', ' + parseFloat(row.dest_lng).toFixed(4) + ')  -  click to view/change'
       : '📍 Set destination pin on map (optional)';
   }
   // Compute expected_min from departed_at and expected_at

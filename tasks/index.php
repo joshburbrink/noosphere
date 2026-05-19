@@ -63,7 +63,7 @@ if ($board_count === 0) {
     $now = time();
     $db->prepare("INSERT INTO boards (name,slug,description,categories,sort_order,created_at) VALUES (?,?,?,?,0,?)")
        ->execute(['Tasks', 'tasks', 'General task board', $default_cats, $now]);
-    // All existing tasks → board 1
+    // All existing tasks -> board 1
     $db->exec("UPDATE tasks SET board_id=1 WHERE board_id IS NULL OR board_id=0");
 }
 
@@ -104,10 +104,10 @@ if ($board_slug) {
     $s = $db->prepare("SELECT * FROM boards WHERE slug=?");
     $s->execute([$board_slug]);
     $board = $s->fetch(PDO::FETCH_ASSOC) ?: null;
-    if (!$board) $board_slug = ''; // invalid slug → fall through to auto
+    if (!$board) $board_slug = ''; // invalid slug -> fall through to auto
 }
 
-// Auto-route: single board → redirect straight in
+// Auto-route: single board -> redirect straight in
 if (!$board_slug && !$manage) {
     $all_boards = $db->query("SELECT * FROM boards ORDER BY sort_order ASC, created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
     if (count($all_boards) === 1) {
@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
                    ->execute([$pb['id'],$title,$category,$priority,$new_status,$location,$notes,
                               $group_name ?: null,$by,$rtype,$rdesc,$now,$now]);
-                $msg = $is_admin ? 'Task created.' : 'Task submitted — awaiting operator approval.';
+                $msg = $is_admin ? 'Task created.' : 'Task submitted  -  awaiting operator approval.';
             }
         }
 
@@ -354,7 +354,7 @@ function task_card_html($row, $is_admin, $is_readonly, $show_rewards, $require_l
       <?php if ($loc): ?><div class="card-loc">📍 <?= $loc ?></div><?php endif ?>
       <?php if ($notes): ?><div class="card-notes"><?= $notes ?></div><?php endif ?>
       <?php if ($show_rewards && $rtype !== 'none'): ?>
-        <div class="card-reward"><?= $REWARD_TYPES[$rtype] ?? $rtype ?><?php if ($rdesc): ?> — <?= $rdesc ?><?php endif ?></div>
+        <div class="card-reward"><?= $REWARD_TYPES[$rtype] ?? $rtype ?><?php if ($rdesc): ?>  -  <?= $rdesc ?><?php endif ?></div>
       <?php endif ?>
       <div class="card-meta">
         <?php if ($by): ?>by <?= $by ?><?php endif ?>
@@ -425,7 +425,7 @@ function task_card_html($row, $is_admin, $is_readonly, $show_rewards, $require_l
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= $board ? esc($board['name']).' — ' : '' ?>Tasks — <?= esc($name) ?></title>
+<title><?= $board ? esc($board['name']).'  -  ' : '' ?>Tasks  -  <?= esc($name) ?></title>
 <?= csrf_js() ?>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -797,7 +797,7 @@ else:
         <input type="text" value="<?= esc($session_name) ?>" disabled style="color:#888">
         <input type="hidden" name="claimed_by" value="<?= esc($session_name) ?>">
       <?php elseif ($require_login): ?>
-        <p style="color:#cf6f6f;font-size:13px;margin:8px 0">You must be registered to claim tasks. <a href="/registry/" style="color:#4a9eff">Register →</a></p>
+        <p style="color:#cf6f6f;font-size:13px;margin:8px 0">You must be registered to claim tasks. <a href="/registry/" style="color:#4a9eff">Register -></a></p>
       <?php else: ?>
         <label>Your name</label>
         <input type="text" name="claimed_by" id="claim-name" placeholder="Enter your name" maxlength="60" required>

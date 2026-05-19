@@ -79,7 +79,7 @@ if ($action === 'send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Initial load — last 60 messages for seeding
+// Initial load  -  last 60 messages for seeding
 $seed = $db->query('SELECT * FROM messages ORDER BY id DESC LIMIT 60')->fetchAll(PDO::FETCH_ASSOC);
 $seed = array_reverse($seed);
 $last_id = $seed ? end($seed)['id'] : 0;
@@ -89,7 +89,7 @@ $last_id = $seed ? end($seed)['id'] : 0;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Chat — Noosphere</title>
+<title>Chat  -  Noosphere</title>
 <?= csrf_js() ?>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }

@@ -9,7 +9,7 @@ if (get_setting('show_canvas','0') !== '1') { http_response_code(404); exit; }
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Canvas — <?= htmlspecialchars(get_setting('instance_name','Noosphere')) ?></title>
+<title>Canvas  -  <?= htmlspecialchars(get_setting('instance_name','Noosphere')) ?></title>
 <?php require_once '/var/www/noosphere/shared/head.php'; ?>
 <?php echo csrf_js(); ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
@@ -195,7 +195,7 @@ function toolLabel() {
   var base = mapMode ? '[MAP] ' : '';
   if (tool==='pen')    return base + 'Pen · size ' + size + (mapMode ? ' · hold Shift to pan map' : '');
   if (tool==='eraser') return base + 'Eraser · size ' + size;
-  if (tool==='text')   return base + 'Text — click to place';
+  if (tool==='text')   return base + 'Text  -  click to place';
   return base;
 }
 
@@ -377,11 +377,11 @@ function exitMapMode() {
 // We achieve this by making the draw canvas transparent to pointer events
 // when the Shift key is held OR when the active tool is neither pen/eraser/text.
 // Simpler: always let draw canvas capture, but forward non-drawing interactions
-// to the map by making dc pointer-events:none momentarily — handled via Shift.
+// to the map by making dc pointer-events:none momentarily  -  handled via Shift.
 document.addEventListener('keydown', function(e){
   if (mapMode && e.key==='Shift') {
     dc.style.pointerEvents = 'none';
-    setStatus('[MAP] Pan/zoom mode — release Shift to draw');
+    setStatus('[MAP] Pan/zoom mode  -  release Shift to draw');
   }
 });
 document.addEventListener('keyup', function(e){
@@ -414,7 +414,7 @@ function flattenedPNG(cb) {
       // works for a snapshot at the moment of export.
       fc.drawImage(mapgl.getCanvas(), 0, 0, w, h);
     } catch(ex) {
-      // WebGL canvas tainted or unavailable — fall back to bg color
+      // WebGL canvas tainted or unavailable  -  fall back to bg color
       if (!bgTransp) { fc.fillStyle = bgColor; fc.fillRect(0,0,w,h); }
     }
   } else if (!bgTransp) {

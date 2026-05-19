@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup-usb-ethernet.sh — manage USB ethernet adapters on Noosphere server
+# setup-usb-ethernet.sh  -  manage USB ethernet adapters on Noosphere server
 # Usage: setup-usb-ethernet.sh <detect|status|dhcp|static|ping|up|remove> [iface] [--persist]
 set -e
 
@@ -85,7 +85,7 @@ cmd_dhcp() {
     sleep 1
 
     if ! dhcpcd "$iface" 2>&1; then
-        echo "dhcpcd failed — trying to release and retry..."
+        echo "dhcpcd failed  -  trying to release and retry..."
         dhcpcd -k "$iface" 2>/dev/null || true
         sleep 1
         dhcpcd "$iface"
@@ -147,7 +147,7 @@ cmd_ping() {
     ip4=$(ip -4 addr show "$iface" 2>/dev/null | awk '/inet /{print $2}' | head -1 || echo '')
 
     if [ -z "$ip4" ]; then
-        echo "No IP address on $iface — cannot ping."
+        echo "No IP address on $iface  -  cannot ping."
         exit 1
     fi
 

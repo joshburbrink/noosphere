@@ -5,7 +5,7 @@ require_once '/var/www/noosphere/shared/identity.php';
 sec_session_start();
 
 $name    = get_setting('instance_name',    'Noosphere');
-$tagline = get_setting('instance_tagline', 'Offline information hub — no internet required');
+$tagline = get_setting('instance_tagline', 'Offline information hub  -  no internet required');
 $alert   = get_setting('homepage_alert',   '');
 
 $tiles = [];
@@ -36,17 +36,17 @@ if (get_setting('show_forum','1')==='1')
 if (get_setting('show_files','1')==='1')
     $tiles[] = ['href'=>'/files/',    'icon'=>'📁', 'label'=>'Files',           'desc'=>'Share documents, notices &amp; resources'];
 if (get_setting('show_tasks','1')==='1')
-    $tiles[] = ['href'=>'/tasks/',    'icon'=>'📋', 'label'=>'Tasks',            'desc'=>'Volunteer jobs — claim a task and help out'];
+    $tiles[] = ['href'=>'/tasks/',    'icon'=>'📋', 'label'=>'Tasks',            'desc'=>'Volunteer jobs  -  claim a task and help out'];
 if (get_setting('show_library','1')==='1')
     $tiles[] = ['href'=>'/library/',  'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
 if (get_setting('show_maps','1')==='1')
-    $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Bartholomew &amp; Brown County — offline map with shared markers'];
+    $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Bartholomew &amp; Brown County  -  offline map with shared markers'];
 if (get_setting('show_topo','1')==='1')
-    $tiles[] = ['href'=>'/topo/',      'icon'=>'⛰️',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads — Bartholomew &amp; Brown County'];
+    $tiles[] = ['href'=>'/topo/',      'icon'=>'⛰️',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads  -  Bartholomew &amp; Brown County'];
 if (get_setting('show_calendar','1')==='1')
     $tiles[] = ['href'=>'/calendar/', 'icon'=>'📅', 'label'=>'Calendar',        'desc'=>'Community events &amp; schedules'];
 if (get_setting('show_runners','0')==='1')
-    $tiles[] = ['href'=>'/runners/',  'icon'=>'🏃', 'label'=>get_setting('runners_label','Runner Board'),  'desc'=>'Track who\'s out in the field — flags overdue runners'];
+    $tiles[] = ['href'=>'/runners/',  'icon'=>'🏃', 'label'=>get_setting('runners_label','Runner Board'),  'desc'=>'Track who\'s out in the field  -  flags overdue runners'];
 if (get_setting('show_weather','0')==='1')
     $tiles[] = ['href'=>'/weather/',  'icon'=>'⛅', 'label'=>get_setting('weather_label','Weather Log'), 'desc'=>'Log weather observations &amp; conditions'];
 if (get_setting('show_radio','0')==='1')
@@ -56,21 +56,21 @@ if (get_setting('show_incidents','0')==='1') {
     $tiles[] = ['href'=>'/incidents/', 'icon'=>'📍',
                 'label'=>$inc_cmd ? 'Incident Reports' : 'Map Reports',
                 'desc'=>$inc_cmd
-                    ? 'Field reports with severity, status &amp; assignment — drop pins on the map'
-                    : 'Drop pins on the map — report what you see out there'];
+                    ? 'Field reports with severity, status &amp; assignment  -  drop pins on the map'
+                    : 'Drop pins on the map  -  report what you see out there'];
     if ($inc_cmd && can('command.view')) {
         $tiles[] = ['href'=>'/command/', 'icon'=>'🚨', 'label'=>'Command',
-                    'desc'=>'Operator dashboard — all active incidents, runners, supplies &amp; weather at a glance'];
+                    'desc'=>'Operator dashboard  -  all active incidents, runners, supplies &amp; weather at a glance'];
     }
 }
 if (get_setting('show_games','0')==='1')
-    $tiles[] = ['href'=>'/games/',  'icon'=>'🎮', 'label'=>'Games',        'desc'=>'Browser-based games — Snake, Tetris, 2048 and more'];
+    $tiles[] = ['href'=>'/games/',  'icon'=>'🎮', 'label'=>'Games',        'desc'=>'Browser-based games  -  Snake, Tetris, 2048 and more'];
 if (get_setting('show_wiki','1')==='1')
-    $tiles[] = ['href'=>'/wiki/',    'icon'=>'📖', 'label'=>'Local Knowledge Wiki', 'desc'=>'Community-editable reference — roads, water, skills, local know-how'];
+    $tiles[] = ['href'=>'/wiki/',    'icon'=>'📖', 'label'=>'Local Knowledge Wiki', 'desc'=>'Community-editable reference  -  roads, water, skills, local know-how'];
 if (get_setting('show_supplies','0')==='1' || get_setting('show_seeds','0')==='1' || get_setting('show_tools','0')==='1')
     $tiles[] = ['href'=>'/resources/', 'icon'=>'🗃️', 'label'=>'Resources', 'desc'=>'Supply inventory, seed library &amp; tool lending'];
 if (get_setting('show_triage','0')==='1')
-    $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking — START triage priority, print patient tags'];
+    $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking  -  START triage priority, print patient tags'];
 if (get_setting('show_canvas','0')==='1')
     $tiles[] = ['href'=>'/canvas/',  'icon'=>'🎨', 'label'=>'Canvas',     'desc'=>'Freehand drawing, diagrams &amp; annotated map sketches'];
 ?>

@@ -2,6 +2,7 @@
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 if (get_setting('show_maps','1') !== '1') { http_response_code(404); exit; }
 $is_admin    = legacy_is_admin();
@@ -10,13 +11,25 @@ $aprs_active   = (get_setting('radio_mode','off') === 'aprs');
 $incidents_active = (get_setting('show_incidents','0') === '1');
 $incidents_command = (get_setting('show_incidents_command','0') === '1');
 $runners_active    = (get_setting('show_runners','1') === '1');
+
+$map_center_lat  = (float)(region_meta('center.lat', 39.5));
+$map_center_lng  = (float)(region_meta('center.lng', -98.35));
+$map_zoom        = (int)(region_meta('zoom', 4));
+$map_min_zoom    = (int)(region_meta('min_zoom', 2));
+$map_max_zoom    = (int)(region_meta('max_zoom', 19));
+$tile_vector     = region_meta('tiles.vector', '/tiles/counties/tiles/{z}/{x}/{y}.pbf');
+$tile_satellite  = region_meta('tiles.satellite', '/tiles/satellite/tiles/{z}/{x}/{y}.jpg');
+$tile_v_minzoom  = (int)(region_meta('tiles.vector_minzoom', 4));
+$tile_v_maxzoom  = (int)(region_meta('tiles.vector_maxzoom', 14));
+$tile_s_minzoom  = (int)(region_meta('tiles.satellite_minzoom', 10));
+$tile_s_maxzoom  = (int)(region_meta('tiles.satellite_maxzoom', 16));
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Map — Noosphere</title>
+<title>Map  -  Noosphere</title>
 <?= csrf_js() ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
 <style>
@@ -91,7 +104,7 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <?php if ($aprs_active): ?>
   <button class="theme-btn" id="btn-aprs" onclick="toggleAprs()" title="Toggle APRS station markers">APRS</button>
 <?php endif; ?>
-<?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs →</a><?php endif; ?>
+<?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs -></a><?php endif; ?>
 </header>
 <?php if (!$is_readonly && $incidents_active): ?>
 <div class="tap-hint">Tap map to drop a pin</div>
@@ -111,12 +124,12 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
       <option value="resource">📦  Resource</option>
     </select>
     <label>Title *</label>
-    <input type="text" id="mk-title" placeholder="Short summary — e.g. 'Tree across Marr Rd'" maxlength="100">
+    <input type="text" id="mk-title" placeholder="Short summary  -  e.g. 'Tree across Marr Rd'" maxlength="100">
     <label>Description</label>
     <textarea id="mk-note" placeholder="Optional details…"></textarea>
     <label>Reporter name (optional)</label>
     <input type="text" id="mk-by" placeholder="Leave blank to stay anonymous" maxlength="80">
-    <label>Photo <span style="font-size:10px;color:#555">(optional — auto-resized)</span></label>
+    <label>Photo <span style="font-size:10px;color:#555">(optional  -  auto-resized)</span></label>
     <input type="file" id="mk-photo" accept="image/*" capture="environment"
            style="padding:5px 0;background:none;border:none;color:#888;font-size:12px;cursor:pointer">
     <div class="modal-btns">
@@ -171,13 +184,13 @@ function buildStyle(theme) {
         sources: {
             counties: {
                 type: 'vector',
-                tiles: [window.location.origin + '/tiles/counties/tiles/{z}/{x}/{y}.pbf'],
-                minzoom: 4, maxzoom: 14,
+                tiles: [window.location.origin + <?= json_encode($tile_vector) ?>],
+                minzoom: <?= $tile_v_minzoom ?>, maxzoom: <?= $tile_v_maxzoom ?>,
             },
             satellite: {
                 type: 'raster',
-                tiles: [window.location.origin + '/tiles/satellite/tiles/{z}/{x}/{y}.jpg'],
-                tileSize: 256, minzoom: 10, maxzoom: 16,
+                tiles: [window.location.origin + <?= json_encode($tile_satellite) ?>],
+                tileSize: 256, minzoom: <?= $tile_s_minzoom ?>, maxzoom: <?= $tile_s_maxzoom ?>,
             },
         },
         layers: [
@@ -264,10 +277,10 @@ function buildStyle(theme) {
 var map = new maplibregl.Map({
     container: 'map',
     style: buildStyle(currentTheme),
-    center: [-85.90, 39.20],
-    zoom: 11,
-    maxZoom: 19,
-    minZoom: 7,
+    center: [<?= $map_center_lng ?>, <?= $map_center_lat ?>],
+    zoom: <?= $map_zoom ?>,
+    maxZoom: <?= $map_max_zoom ?>,
+    minZoom: <?= $map_min_zoom ?>,
     attributionControl: false,
 });
 map.addControl(new maplibregl.NavigationControl(), 'top-left');
@@ -409,7 +422,7 @@ var mkTitle = document.getElementById('mk-title');
 if (mkTitle) mkTitle.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitIncident(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeMkDialog(); });
 
-// ── Incidents layer (default ON when enabled — it IS the pin layer) ──────────
+// ── Incidents layer (default ON when enabled  -  it IS the pin layer) ──────────
 var incMarkers = {};
 var incVisible = false;
 var incTimer   = null;
@@ -466,7 +479,7 @@ function toggleIncidents() {
   }
 }
 
-// Auto-show incidents layer if module is enabled — pins are the primary map content now.
+// Auto-show incidents layer if module is enabled  -  pins are the primary map content now.
 if (INCIDENTS_ACTIVE) { toggleIncidents(); }
 
 // ── Runner layer ─────────────────────────────────────────────────────────────

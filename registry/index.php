@@ -227,7 +227,7 @@ function ago($ts) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= esc(get_setting('registry_label','Registry')) ?> — Noosphere</title>
+<title><?= esc(get_setting('registry_label','Registry')) ?>  -  Noosphere</title>
 <style>
   :root { --bg:#0f0f1a; --card:#1a1a2e; --border:#2a2a4a; --accent:#e94560; --green:#2ecc71; --yellow:#f39c12; --text:#e0e0e0; --muted:#888; }
   * { box-sizing:border-box; margin:0; padding:0; }
@@ -365,7 +365,7 @@ function ago($ts) {
             </select>
           </div>
 
-          <!-- Dynamic extra fields — only shown for check-in -->
+          <!-- Dynamic extra fields  -  only shown for check-in -->
           <div id="checkin-section">
             <?php
             $edit_ef = $edit_row ? (json_decode($edit_row['extra_fields'] ?? '{}', true) ?: []) : [];
@@ -402,7 +402,7 @@ function ago($ts) {
           </div>
 
           <label>PIN (4+ digits)</label>
-          <input type="password" name="pin" required minlength="4" placeholder="<?= $edit_row ? 'Enter your PIN to confirm' : 'Choose a PIN — write it down' ?>">
+          <input type="password" name="pin" required minlength="4" placeholder="<?= $edit_row ? 'Enter your PIN to confirm' : 'Choose a PIN  -  write it down' ?>">
           <?php if (!$edit_row): ?><div class="pin-note">You need this PIN to update your entry later.</div><?php endif; ?>
 
           <button type="submit" class="btn"><?= $edit_row ? 'Save Changes' : 'Submit' ?></button>

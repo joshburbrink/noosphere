@@ -47,7 +47,7 @@ def db_to_rgb(db):
     t = (db - DB_MIN) / (DB_MAX - DB_MIN)
     return lerp_color(t)
 
-# Each scan sweep may take multiple CSV rows to cover the full band — rtl_power
+# Each scan sweep may take multiple CSV rows to cover the full band  -  rtl_power
 # emits one row per "chunk" of the band when the requested band exceeds the
 # dongle's instantaneous bandwidth. We aggregate by timestamp.
 def main():
