@@ -160,7 +160,7 @@ form.inline{display:inline;margin:0}
 
 <div style="margin-bottom:14px"><a href="/admin/">&larr; Back to admin</a></div>
 <h1>Optional Downloads</h1>
-<div class="sub">Browse the Kiwix catalog and queue ZIM downloads. Works offline once cached. (#82 Phase B)</div>
+<div class="sub">Browse the Kiwix catalog and queue ZIM downloads. Works offline once cached.</div>
 
 <?php if ($msg): ?><div class="msg ok"><?= esc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg err"><?= esc($err) ?></div><?php endif; ?>

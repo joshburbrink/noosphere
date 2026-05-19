@@ -539,7 +539,11 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $dst = $enable ? ZIM_DIR . $zim      : ZIM_DIS_DIR . $zim;
             if (file_exists($src)) {
                 if (!$enable && !is_dir(ZIM_DIS_DIR)) mkdir(ZIM_DIS_DIR, 0755, true);
-                rename($src, $dst);
+                if (!@rename($src, $dst)) {
+                    $msg = 'Move failed  -  check that /var/lib/kiwix/zim and disabled/ are owned by www-data.';
+                    log_audit('kiwix_toggle_fail', "rename $src -> $dst", 'warn');
+                    goto kiwix_toggle_end;
+                }
                 if ($enable) {
                     shell_exec('kiwix-manage ' . escapeshellarg(KIWIX_LIB) . ' add ' . escapeshellarg($dst) . ' 2>&1');
                 } else {
@@ -559,6 +563,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $msg = 'ZIM file not found.';
             }
+            kiwix_toggle_end:
         }
     }
 
@@ -2314,7 +2319,7 @@ if (!$usb_eths): ?>
 </details>
 
 <details class="cpanel" open>
-  <summary>Optional Downloads (#82)</summary>
+  <summary>Optional Downloads</summary>
   <div class="cpbody">
     <p style="font-size:13px;color:#aaa;margin-bottom:10px">
       Browse the Kiwix catalog (offline-cached) and queue ZIM downloads. Background worker handles transfers; downloads are resumable and survive reboots.
@@ -2357,7 +2362,7 @@ if (!$usb_eths): ?>
 </details>
 
 <details class="cpanel">
-  <summary>Custom Libraries (#79)</summary>
+  <summary>Custom Libraries</summary>
   <div class="cpbody">
     <p style="font-size:13px;color:#aaa;margin-bottom:10px">
       Operator-defined inventories that appear under /resources/. Use this for things outside the built-in supplies / seeds / tools modules - book lending, food pantry, seed exchange, etc.
@@ -2499,7 +2504,7 @@ if (!$usb_eths): ?>
 </details>
 
 <details class="cpanel">
-  <summary>Wipe Optional Content (#82)</summary>
+  <summary>Wipe Optional Content</summary>
   <div class="cpbody">
     <?php
       $wc_zims = get_zim_info();
