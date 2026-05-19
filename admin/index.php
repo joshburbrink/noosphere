@@ -794,6 +794,75 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // --- System: wipe optional content (#82 Phase A) ---
+    if ($act === 'wipe_content') {
+        $confirm = trim($_POST['wipe_confirm'] ?? '');
+        if ($confirm !== 'WIPE') {
+            $msg = 'Wipe cancelled  -  you must type WIPE exactly.';
+        } else {
+            $reclaimed   = 0;
+            $items_wiped = [];
+
+            // Per-ZIM (enabled + disabled). Posted as zims[]=<basename>.
+            $zim_picks = (array)($_POST['zims'] ?? []);
+            $all_zims  = get_zim_info();
+            foreach ($zim_picks as $zfname) {
+                $zfname = basename($zfname);
+                if (!isset($all_zims[$zfname])) continue;
+                $zpath = $all_zims[$zfname]['path'];
+                if (is_file($zpath)) {
+                    $reclaimed += (int)@filesize($zpath);
+                    @unlink($zpath);
+                    $items_wiped[] = 'zim:' . $zfname;
+                }
+            }
+            if ($zim_picks) {
+                @shell_exec('systemctl restart kiwix 2>&1');
+            }
+
+            // Topo PDFs
+            if (!empty($_POST['wipe_topo'])) {
+                foreach (glob('/var/www/noosphere/maps/topo/*.pdf') ?: [] as $pdf) {
+                    $reclaimed += (int)@filesize($pdf);
+                    @unlink($pdf);
+                }
+                $items_wiped[] = 'topo_pdfs';
+            }
+
+            // Satellite raster
+            if (!empty($_POST['wipe_satellite'])) {
+                foreach (['/var/www/noosphere/maps/satellite.mbtiles',
+                          '/var/www/noosphere/maps/satellite.mbtiles-journal'] as $sf) {
+                    if (is_file($sf)) {
+                        $reclaimed += (int)@filesize($sf);
+                        @unlink($sf);
+                    }
+                }
+                $items_wiped[] = 'satellite';
+            }
+
+            // Region packs (slug list from POST; 'world' refused)
+            $region_picks = (array)($_POST['regions'] ?? []);
+            foreach ($region_picks as $slug) {
+                $slug = preg_replace('/[^a-z0-9_-]/i', '', (string)$slug);
+                if ($slug === '' || $slug === 'world') continue;
+                $rdir = REGIONS_DIR . '/' . $slug;
+                if (!is_dir($rdir)) continue;
+                $reclaimed += (int)trim(shell_exec('du -sb ' . escapeshellarg($rdir) . " 2>/dev/null | awk '{print $1}'") ?: '0');
+                @shell_exec('rm -rf ' . escapeshellarg($rdir));
+                $items_wiped[] = 'region:' . $slug;
+            }
+
+            if (!$items_wiped) {
+                $msg = 'Nothing selected to wipe.';
+            } else {
+                $mb = round($reclaimed / 1048576);
+                log_audit('wipe_content', implode(',', $items_wiped) . ' (' . $mb . ' MB reclaimed)', 'critical');
+                $msg = 'Wiped ' . count($items_wiped) . ' item(s)  -  ~' . $mb . ' MB reclaimed.';
+            }
+        }
+    }
+
     // --- Settings: reset instance ---
     if ($act === 'reset_instance') {
         $confirm = trim($_POST['reset_confirm'] ?? '');
@@ -2415,6 +2484,107 @@ if (!$usb_eths): ?>
   <div class="cpbody">
     <?php $df_out = shell_exec('df -h 2>/dev/null') ?: ''; ?>
     <div class="logbox"><?= esc($df_out) ?></div>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Wipe Optional Content (#82)</summary>
+  <div class="cpbody">
+    <?php
+      $wc_zims = get_zim_info();
+      $wc_topo = glob('/var/www/noosphere/maps/topo/*.pdf') ?: [];
+      $wc_topo_bytes = 0; foreach ($wc_topo as $f) $wc_topo_bytes += (int)@filesize($f);
+      $wc_sat = 0;
+      foreach (['/var/www/noosphere/maps/satellite.mbtiles',
+                '/var/www/noosphere/maps/satellite.mbtiles-journal'] as $sf) {
+        if (is_file($sf)) $wc_sat += (int)filesize($sf);
+      }
+      $wc_regions = [];
+      if (is_dir(REGIONS_DIR)) {
+        foreach (scandir(REGIONS_DIR) as $e) {
+          if ($e === '.' || $e === '..' || $e === 'world') continue;
+          $rdir = REGIONS_DIR . '/' . $e;
+          if (!is_dir($rdir)) continue;
+          $b = (int)trim(shell_exec('du -sb ' . escapeshellarg($rdir) . " 2>/dev/null | awk '{print $1}'") ?: '0');
+          $wc_regions[$e] = $b;
+        }
+      }
+    ?>
+    <div style="font-size:12px;color:#aaa;margin-bottom:14px">
+      Reclaim disk by removing optional downloadable content. User-generated data (incidents, registry, wiki, logs) is <strong>not</strong> touched here  -  use Reset Instance in Settings for that. All wipes are audit-logged.
+    </div>
+
+    <form method="post" onsubmit="return confirm('Permanently delete the selected content?')">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="wipe_content">
+
+      <!-- ZIMs -->
+      <div style="margin-bottom:18px">
+        <div style="font-weight:600;color:#e0e0e0;margin-bottom:6px">ZIM libraries  -  <span style="color:#888;font-weight:400;font-size:12px">re-downloadable, slow</span></div>
+        <?php if (!$wc_zims): ?>
+          <div style="color:#555;font-size:12px;padding:4px 0">No ZIM files on disk.</div>
+        <?php else: ?>
+          <div style="margin-bottom:4px">
+            <label style="font-size:11px;color:#888;cursor:pointer">
+              <input type="checkbox" onclick="document.querySelectorAll('.wc-zim').forEach(c=>c.checked=this.checked)"> select all
+            </label>
+          </div>
+          <?php foreach ($wc_zims as $f => $z):
+            $mb = round($z['size'] / 1048576);
+            $disp = zim_display_name($f, $z['title']);
+          ?>
+            <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
+              <input type="checkbox" class="wc-zim" name="zims[]" value="<?= esc($f) ?>">
+              <span style="flex:1;color:#e0e0e0"><?= esc($disp) ?></span>
+              <span style="color:#666;font-size:11px"><?= esc($f) ?></span>
+              <span style="color:#888;flex-shrink:0;min-width:60px;text-align:right"><?= $mb ?> MB</span>
+            </label>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+
+      <!-- Topo PDFs -->
+      <div style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" name="wipe_topo" value="1" <?= $wc_topo ? '' : 'disabled' ?>>
+          <span style="flex:1;color:<?= $wc_topo ? '#e0e0e0' : '#555' ?>">
+            <strong>USGS topo PDFs</strong>  -  <?= count($wc_topo) ?> file(s)
+          </span>
+          <span style="color:#888"><?= round($wc_topo_bytes/1048576) ?> MB</span>
+        </label>
+      </div>
+
+      <!-- Satellite -->
+      <div style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" name="wipe_satellite" value="1" <?= $wc_sat ? '' : 'disabled' ?>>
+          <span style="flex:1;color:<?= $wc_sat ? '#e0e0e0' : '#555' ?>">
+            <strong>Satellite raster cache</strong>  -  satellite.mbtiles
+          </span>
+          <span style="color:#888"><?= $wc_sat ? round($wc_sat/1048576) . ' MB' : 'absent' ?></span>
+        </label>
+      </div>
+
+      <!-- Region packs -->
+      <div style="margin-bottom:18px">
+        <div style="font-weight:600;color:#e0e0e0;margin-bottom:6px">Region packs  -  <span style="color:#888;font-weight:400;font-size:12px">re-installable; <code>world</code> base pack is protected</span></div>
+        <?php if (!$wc_regions): ?>
+          <div style="color:#555;font-size:12px;padding:4px 0">No removable region packs (only base <code>world</code>).</div>
+        <?php else: foreach ($wc_regions as $slug => $bytes): ?>
+          <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="regions[]" value="<?= esc($slug) ?>">
+            <span style="flex:1;color:#e0e0e0"><?= esc($slug) ?></span>
+            <span style="color:#888"><?= round($bytes/1048576) ?> MB</span>
+          </label>
+        <?php endforeach; endif; ?>
+      </div>
+
+      <div style="border-top:1px solid #2a2a4a;padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:#e94560">Type <strong>WIPE</strong> to confirm:</label>
+        <input type="text" name="wipe_confirm" autocomplete="off" style="padding:6px 10px;width:120px;background:#1a1a2e;border:1px solid #3a2a2a;color:#e0e0e0;font-family:monospace">
+        <button type="submit" class="btn-red" style="padding:8px 22px;font-size:13px">Wipe selected</button>
+      </div>
+    </form>
   </div>
 </details>
 
