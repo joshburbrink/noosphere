@@ -1,6 +1,8 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
+require_once '/var/www/noosphere/shared/libraries.php';
 sec_session_start();
 
 $modules = [];
@@ -10,6 +12,16 @@ if (get_setting('show_seeds','0')==='1')
     $modules[] = ['href'=>'/seeds/', 'icon'=>'🌱', 'label'=>'Seed Library', 'desc'=>'Zone 6a seed catalog and planting calendar'];
 if (get_setting('show_tools','0')==='1')
     $modules[] = ['href'=>'/tools/', 'icon'=>'🔧', 'label'=>'Tool Lending', 'desc'=>'Borrow and return community tools and equipment'];
+
+foreach (list_libraries(false) as $L) {
+    if (!lib_can($L, 'view')) continue;
+    $modules[] = [
+        'href'  => '/resources/lib/?slug=' . rawurlencode($L['slug']),
+        'icon'  => $L['icon'] ?: '📚',
+        'label' => $L['name'],
+        'desc'  => $L['description'] ?: 'Custom library',
+    ];
+}
 
 if (empty($modules)) { http_response_code(404); exit; }
 if (count($modules) === 1) { header('Location: '.$modules[0]['href']); exit; }

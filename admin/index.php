@@ -2276,6 +2276,22 @@ if (!$usb_eths): ?>
   </div>
 </details>
 
+<details class="cpanel">
+  <summary>Custom Libraries (#79)</summary>
+  <div class="cpbody">
+    <p style="font-size:13px;color:#aaa;margin-bottom:10px">
+      Operator-defined inventories that appear under /resources/. Use this for things outside the built-in supplies / seeds / tools modules - book lending, food pantry, seed exchange, etc.
+    </p>
+    <?php
+    require_once '/var/www/noosphere/shared/libraries.php';
+    $_libs_all = list_libraries(true);
+    ?>
+    <p style="font-size:12px;color:#888;margin-bottom:8px"><?= count($_libs_all) ?> defined</p>
+    <a class="btn-sm" href="/admin/libraries.php" style="margin-right:6px">Manage libraries</a>
+    <a class="btn-sm" href="/admin/libraries.php?new=1">+ New library</a>
+  </div>
+</details>
+
 </div><!-- #tab-content -->
 
 <!-- REGION -->

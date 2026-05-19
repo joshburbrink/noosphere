@@ -57,6 +57,10 @@ function capability_map(): array {
         'runners.manage'        => ['operator'],
         'tools.manage'          => ['operator', 'shelter_staff'],
 
+        // Custom libraries (#79) - define and edit library definitions.
+        // Per-item ops use lib_can() in shared/libraries.php.
+        'libraries.manage'      => ['operator'],
+
         // Files
         'files.upload'          => ['operator', 'volunteer'],
         'files.delete'          => ['operator'],
