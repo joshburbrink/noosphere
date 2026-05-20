@@ -335,9 +335,23 @@ fi
 ##############################################################################
 # 7. Done
 ##############################################################################
-info "Finalizing..."
+info "Finalizing (flushing ~tens of GB to a slow card can take a few min)..."
 sync
-umount "$BOOT_MNT"; umount "$ROOT_MNT"
+# After writing a large amount to a slow card the umount can briefly report
+# "target is busy" while the kernel settles - retry, then fall back to a lazy
+# unmount.  (Without this, set -e aborts before the success banner.)
+_umount_retry() {
+    local mp="$1" i
+    [ -n "$mp" ] || return 0
+    for i in 1 2 3 4 5 6; do
+        umount "$mp" 2>/dev/null && return 0
+        sync; sleep 3
+    done
+    warn "umount $mp still busy after retries - using lazy unmount (data is already synced)"
+    umount -l "$mp" 2>/dev/null || true
+}
+_umount_retry "$BOOT_MNT"
+_umount_retry "$ROOT_MNT"
 BOOT_MNT=""; ROOT_MNT=""
 ok "Drive prepared and unmounted."
 
