@@ -185,6 +185,26 @@ ROOT_PART="$(part_node "$TARGET" 2)"
 [ -b "$ROOT_PART" ] || die "root partition $ROOT_PART not found after flash"
 
 ##############################################################################
+# 2b. Grow rootfs to fill the drive (needed to stage data on THIS host).
+#     A fresh Pi OS image rootfs is only ~2.5GB and normally auto-expands on
+#     first boot - too late for host-side staging.  Skipped for --no-data
+#     (Pi OS will expand it on first boot as usual).
+##############################################################################
+if [ "$DATA_SOURCE" != "none" ]; then
+    info "Expanding root partition to fill the drive (for data staging)..."
+    if command -v parted >/dev/null && command -v resize2fs >/dev/null; then
+        parted -s "$TARGET" resizepart 2 100% || warn "resizepart failed - staging may run out of space"
+        command -v partprobe >/dev/null && partprobe "$TARGET" 2>/dev/null || true
+        sleep 1
+        e2fsck -fy "$ROOT_PART" || true
+        resize2fs "$ROOT_PART" || warn "resize2fs failed - staging may run out of space"
+        ok "Root partition expanded."
+    else
+        warn "parted/resize2fs missing - cannot expand rootfs; large data staging may fail."
+    fi
+fi
+
+##############################################################################
 # 3. Mount boot + root
 ##############################################################################
 info "Mounting partitions..."
