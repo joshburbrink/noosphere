@@ -334,7 +334,7 @@ cmd_status() {
     echo "  Configured:    $([ "$configured" = 1 ] && echo yes || echo no)"
     echo "  Enabled:       $([ "$enabled" = 1 ] && echo yes || echo no)"
     echo "  Server IP:     $ip"
-    local tftpd_state; tftpd_state=$(systemctl is-active tftpd-hpa 2>/dev/null); [ -n "$tftpd_state" ] || tftpd_state=inactive
+    local tftpd_state; tftpd_state=$(systemctl is-active tftpd-hpa 2>/dev/null || true); [ -n "$tftpd_state" ] || tftpd_state=inactive
     echo "  tftpd-hpa:     $tftpd_state"
     echo "  dnsmasq drop:  $([ -f "$DNSMASQ_DROP" ] && echo present || echo absent)"
     echo ""
