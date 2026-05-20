@@ -41,6 +41,13 @@ DISK_MOUNT=""
 IMAGE_PATH=""                # local image; if empty, download IMAGE_URL
 ASSUME_YES=0
 
+# Access point auto-config (broadcast on first boot, hands-off).  Onboard wlan0.
+ENABLE_AP=1
+AP_SSID="NET"
+AP_PASS=""                   # empty = open network
+AP_CHANNEL="6"
+AP_HOSTNAME_VAL="noosphere.net"
+
 STAGE_REL="var/lib/noosphere-migrate"   # staging dir on the new rootfs
 
 # rsync excludes for /var/lib/noosphere (transient / regenerable / dead)
@@ -94,6 +101,10 @@ while [ $# -gt 0 ]; do
         --user)        PI_USER="${2:-}";     shift 2 ;;
         --password)    PI_PASS="${2:-}";     shift 2 ;;
         --hostname)    PI_HOSTNAME="${2:-}"; shift 2 ;;
+        --ap-ssid)     AP_SSID="${2:-}";     shift 2 ;;
+        --ap-pass)     AP_PASS="${2:-}";     shift 2 ;;
+        --ap-channel)  AP_CHANNEL="${2:-}";  shift 2 ;;
+        --no-ap)       ENABLE_AP=0;          shift ;;
         -y|--yes)      ASSUME_YES=1;         shift ;;
         -h|--help)     grep '^#' "$0" | sed 's/^# \?//'; exit 0 ;;
         -*)            die "Unknown option: $1" ;;
@@ -241,7 +252,25 @@ info "Installing first-boot provisioning..."
 install -m 755 "$SCRIPT_DIR/noosphere-provision.sh"   "$ROOT_MNT/root/noosphere-provision.sh"
 install -m 755 "$SCRIPT_DIR/migrate-import.sh"        "$ROOT_MNT/root/noosphere-migrate-import.sh"
 
-cat > "$ROOT_MNT/etc/systemd/system/noosphere-firstboot.service" <<'SVCEOF'
+# Pre-configure the access point so it auto-broadcasts after first boot.
+# setup-hostapd.sh reads this ap.conf non-interactively at enable time.
+if [ "$ENABLE_AP" -eq 1 ]; then
+    mkdir -p "$ROOT_MNT/etc/noosphere"
+    cat > "$ROOT_MNT/etc/noosphere/ap.conf" <<EOF
+AP_INTERFACE=wlan0
+AP_SSID=$AP_SSID
+AP_CHANNEL=$AP_CHANNEL
+AP_PASSWORD=$AP_PASS
+AP_IP=192.168.4.1
+AP_HOSTNAME=$AP_HOSTNAME_VAL
+EOF
+    ok "AP pre-configured: SSID '$AP_SSID' on wlan0 ($([ -n "$AP_PASS" ] && echo WPA2-PSK || echo open)) - auto-broadcasts after first boot."
+fi
+
+# First-boot service. ExecStartPost order = import -> [enable AP] -> self-disable.
+# The AP enable runs only after provisioning succeeds (i.e. there's a hub to serve).
+{
+cat <<'SVCEOF'
 [Unit]
 Description=Noosphere First-Boot Provisioning (Raspberry Pi)
 After=network-online.target
@@ -256,11 +285,16 @@ StandardOutput=journal+console
 StandardError=journal+console
 ExecStart=/bin/bash /root/noosphere-provision.sh --unattended --no-nextcloud
 ExecStartPost=/bin/bash /root/noosphere-migrate-import.sh
+SVCEOF
+[ "$ENABLE_AP" -eq 1 ] && \
+    echo "ExecStartPost=/bin/bash /var/www/noosphere/scripts/setup-hostapd.sh enable"
+cat <<'SVCEOF'
 ExecStartPost=/bin/systemctl disable noosphere-firstboot.service
 
 [Install]
 WantedBy=multi-user.target
 SVCEOF
+} > "$ROOT_MNT/etc/systemd/system/noosphere-firstboot.service"
 
 mkdir -p "$ROOT_MNT/etc/systemd/system/multi-user.target.wants"
 ln -sf ../noosphere-firstboot.service \
@@ -312,15 +346,21 @@ echo "╔═══════════════════════�
 echo "║  NOOSPHERE PI DRIVE READY                                     ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Next steps:"
-echo "  1. Move $TARGET to the Raspberry Pi 5 and power on."
-echo "     (Pi 5 must have USB/NVMe boot enabled in its bootloader - newer"
-echo "      units do by default; if not, boot once from SD to update EEPROM.)"
-echo "  2. First boot self-provisions: 15-40 min, NEEDS INTERNET (apt + Kiwix)."
-echo "     Watch on a monitor, or SSH in: ssh ${PI_USER}@${PI_HOSTNAME}.local"
-echo "  3. When done, the hub is on port 80. Set the AP up:"
-echo "       sudo setup-hostapd.sh configure   # pick onboard wlan0"
-echo "       sudo setup-hostapd.sh enable"
+echo "Hands-off first boot:"
+echo "  1. Plug ETHERNET + power into the Pi 5 and power on."
+echo "     (Ethernet is only needed for this one-time online provisioning;"
+echo "      unplug it afterwards - the hub runs fully offline from then on.)"
+echo "     Pi 5 must have USB/NVMe boot enabled in its bootloader (newer units"
+echo "     do by default; if not, boot once from SD to update EEPROM)."
+echo "  2. It self-provisions (15-40 min), imports data, then AUTO-STARTS the AP."
+echo "     No SSH or commands needed. Watch progress on a monitor, or:"
+echo "       ssh ${PI_USER}@${PI_HOSTNAME}.local   (password: '$PI_PASS')"
+if [ "$ENABLE_AP" -eq 1 ]; then
+echo "  3. When done it broadcasts WiFi '${AP_SSID}' ($([ -n "$AP_PASS" ] && echo "password: $AP_PASS" || echo open))."
+echo "     Connect a phone -> captive portal -> http://${AP_HOSTNAME_VAL}/"
+else
+echo "  3. AP disabled (--no-ap). Enable manually: sudo setup-hostapd.sh configure && enable"
+fi
 [ "$DATA_SOURCE" != "none" ] && \
 echo "  4. Your data (DBs, photos, ZIMs, tiles, maps) is imported automatically."
 echo ""

@@ -245,8 +245,46 @@ AP_HOSTNAME=$AP_HOSTNAME
 PORTAL_URL=$PORTAL_URL
 EOF
 
+    # ── Persist across reboots ────────────────────────────────────────────────
+    # The runtime `ip addr add` and `nmcli managed no` above do NOT survive a
+    # reboot.  A disaster appliance WILL be power-cycled, so make the AP come
+    # back automatically: (1) tell NetworkManager to never manage the AP iface,
+    # (2) a boot-time oneshot that assigns the AP IP before hostapd/dnsmasq.
+    if command -v nmcli &>/dev/null; then
+        mkdir -p /etc/NetworkManager/conf.d
+        cat > /etc/NetworkManager/conf.d/99-noosphere-ap.conf <<EOF
+# Noosphere AP - keep NetworkManager off the AP interface (auto-generated)
+[keyfile]
+unmanaged-devices=interface-name:$AP_INTERFACE
+EOF
+    fi
+
+    info "Installing boot-time AP interface service..."
+    cat > /etc/systemd/system/noosphere-ap-ip.service <<EOF
+[Unit]
+Description=Noosphere AP interface IP ($AP_INTERFACE)
+Wants=network-pre.target
+Before=network-pre.target hostapd.service dnsmasq.service
+DefaultDependencies=no
+After=sys-subsystem-net-devices-$AP_INTERFACE.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/sbin/rfkill unblock wifi
+ExecStartPre=-/sbin/ip addr flush dev $AP_INTERFACE
+ExecStart=/sbin/ip link set $AP_INTERFACE up
+ExecStart=/sbin/ip addr add $AP_IP/$AP_NETMASK dev $AP_INTERFACE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable noosphere-ap-ip.service 2>/dev/null || true
+
     # Reload/restart services
     info "Restarting services..."
+    systemctl start noosphere-ap-ip.service 2>/dev/null || true
     systemctl restart dnsmasq
     systemctl unmask hostapd 2>/dev/null || true
     systemctl enable hostapd 2>/dev/null || true
@@ -275,6 +313,21 @@ cmd_disable() {
         info "Stopping hostapd..."
         systemctl stop hostapd
         systemctl disable hostapd 2>/dev/null || true
+    fi
+
+    # Remove reboot-persistence artifacts (boot IP service + NM unmanaged rule)
+    if [ -f /etc/systemd/system/noosphere-ap-ip.service ]; then
+        info "Removing boot-time AP interface service..."
+        systemctl disable noosphere-ap-ip.service 2>/dev/null || true
+        systemctl stop noosphere-ap-ip.service 2>/dev/null || true
+        rm -f /etc/systemd/system/noosphere-ap-ip.service
+        systemctl daemon-reload 2>/dev/null || true
+    fi
+    if [ -f /etc/NetworkManager/conf.d/99-noosphere-ap.conf ]; then
+        rm -f /etc/NetworkManager/conf.d/99-noosphere-ap.conf
+        # hand the interface back to NetworkManager
+        if [ -f "$AP_CONF" ]; then source "$AP_CONF"; fi
+        [ -n "${AP_INTERFACE:-}" ] && nmcli device set "$AP_INTERFACE" managed yes 2>/dev/null || true
     fi
 
     # Remove dnsmasq drop-in
