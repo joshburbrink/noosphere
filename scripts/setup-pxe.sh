@@ -351,7 +351,7 @@ cmd_status() {
 
     # Machines served (best-effort, from tftpd journal)
     local served last
-    served=$(journalctl -u tftpd-hpa --no-pager 2>/dev/null | grep -c "RRQ from" || echo 0)
+    served=$(journalctl -u tftpd-hpa --no-pager 2>/dev/null | grep -c "RRQ from" || true)
     last=$(journalctl -u tftpd-hpa --no-pager 2>/dev/null | grep "RRQ from" | tail -1 \
            | grep -oE 'RRQ from [0-9.]+' | awk '{print $3}')
     echo "  TFTP requests served: ${served:-0}"
