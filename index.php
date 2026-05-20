@@ -73,6 +73,11 @@ if (get_setting('show_triage','0')==='1')
     $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking  -  START triage priority, print patient tags'];
 if (get_setting('show_canvas','0')==='1')
     $tiles[] = ['href'=>'/canvas/',  'icon'=>'🎨', 'label'=>'Canvas',     'desc'=>'Freehand drawing, diagrams &amp; annotated map sketches'];
+
+// Admin tile  -  visible only to logged-in operators/admins (#84)
+if (!empty($_SESSION['admin']) || can('content.manage'))
+    $tiles[] = ['href'=>'/admin/', 'icon'=>'⚙️', 'label'=>'Admin Panel',
+                'desc'=>'System settings, modules, region, content &amp; downloads', 'admin'=>true];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -88,6 +93,8 @@ if (get_setting('show_canvas','0')==='1')
         .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.5rem; width:100%; max-width:1100px; }
         a.tile { display:block; background:var(--tile-bg); border:1px solid var(--tile-border); border-radius:12px; padding:2rem; text-align:center; text-decoration:none; color:var(--text); transition:0.2s; }
         a.tile:hover { background:var(--tile-hover); transform:translateY(-3px); }
+        a.tile.admin { border-style:dashed; border-color:#4a9eff; background:#0f1a2e; }
+        a.tile.admin:hover { background:#162440; }
         .icon { font-size:2.5rem; margin-bottom:0.75rem; }
         .label { font-size:1.1rem; font-weight:bold; }
         .desc { font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem; }
@@ -100,7 +107,7 @@ if (get_setting('show_canvas','0')==='1')
     <?php endif; ?>
     <div class="grid">
         <?php foreach ($tiles as $t): ?>
-        <a class="tile" href="<?= $t['href'] ?>">
+        <a class="tile<?= !empty($t['admin']) ? ' admin' : '' ?>" href="<?= $t['href'] ?>">
             <div class="icon"><?= $t['icon'] ?></div>
             <div class="label"><?= $t['label'] ?></div>
             <div class="desc"><?= $t['desc'] ?></div>

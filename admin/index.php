@@ -80,6 +80,21 @@ if ($stored_hash ? password_verify($pw, $stored_hash) : ($pw === ADMIN_PASS)) {
 
 $authed = !empty($_SESSION['admin']);
 
+// ── Region build status (GET JSON, no CSRF needed  -  read-only) ──────────────
+if ($authed && ($_GET['act'] ?? '') === 'region_build_status') {
+    header('Content-Type: application/json');
+    $slug = preg_replace('/[^a-z0-9_-]/', '', $_GET['slug'] ?? '');
+    if (!$slug) { echo json_encode(['status'=>'error','step'=>'Missing slug','pct'=>0,'log'=>'']); exit; }
+    $sf = "/var/lib/noosphere/region-builds/{$slug}/status.json";
+    if (!file_exists($sf)) {
+        echo json_encode(['status'=>'pending','step'=>'Build not started','pct'=>0,'log'=>'']);
+    } else {
+        $data = @file_get_contents($sf);
+        echo $data ?: json_encode(['status'=>'error','step'=>'Could not read status file','pct'=>0,'log'=>'']);
+    }
+    exit;
+}
+
 // ── Admin actions (all require auth + CSRF) ───────────────────────────────────
 if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -591,6 +606,87 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
             @unlink($tmp);
             log_audit('upload_region_pack', $f['name'] . ' rc=' . $rc, $rc === 0 ? 'info' : 'warn');
             $msg = ($rc === 0 ? 'Region pack installed. ' : 'Install failed (rc=' . $rc . '). ') . esc(implode("\n", $out));
+        }
+    }
+
+    // --- Region: start online build ---
+    if ($act === 'start_region_build') {
+        $rb_slug    = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim($_POST['rb_slug']    ?? '')));
+        $rb_label   = trim($_POST['rb_label']   ?? '');
+        $rb_country = trim($_POST['rb_country'] ?? 'US');
+        $rb_state   = trim($_POST['rb_state']   ?? '');
+        $rb_counties= trim($_POST['rb_counties'] ?? '');
+        $rb_s       = trim($_POST['rb_south']   ?? '');
+        $rb_w       = trim($_POST['rb_west']    ?? '');
+        $rb_n       = trim($_POST['rb_north']   ?? '');
+        $rb_e       = trim($_POST['rb_east']    ?? '');
+        $rb_bbox    = ($rb_s !== '' && $rb_w !== '' && $rb_n !== '' && $rb_e !== '')
+                    ? "$rb_s,$rb_w,$rb_n,$rb_e" : '';
+        $rb_zone    = trim($_POST['rb_zone']    ?? '');
+        $rb_zoom    = (int)($_POST['rb_zoom']   ?? 11);
+        $rb_tiles   = !empty($_POST['rb_tiles']);
+        $rb_topo    = !empty($_POST['rb_topo']);
+        $rb_nwr     = !empty($_POST['rb_nwr']);
+
+        if (!$rb_slug || !$rb_label) {
+            $err = 'Slug and label are required.';
+        } elseif ($rb_slug === 'world') {
+            $err = 'Cannot overwrite the world fallback pack.';
+        } else {
+            // Check if a build is already running for this slug
+            $sf = "/var/lib/noosphere/region-builds/{$rb_slug}/status.json";
+            $running = false;
+            if (file_exists($sf)) {
+                $old = json_decode(@file_get_contents($sf), true) ?? [];
+                if (($old['status'] ?? '') === 'running') {
+                    $pid = (int)($old['pid'] ?? 0);
+                    if ($pid > 0 && file_exists("/proc/$pid")) $running = true;
+                }
+            }
+            if ($running) {
+                $err = "Build already running for '$rb_slug' (PID {$pid}). Cancel it first.";
+            } else {
+                @mkdir("/var/lib/noosphere/region-builds/{$rb_slug}", 0755, true);
+                $args = escapeshellarg($rb_slug) . ' ' . escapeshellarg($rb_label) . ' ' . escapeshellarg($rb_country);
+                if ($rb_state)   $args .= ' --state '        . escapeshellarg($rb_state);
+                if ($rb_counties)$args .= ' --counties '     . escapeshellarg($rb_counties);
+                if ($rb_bbox)    $args .= ' --bbox '         . escapeshellarg($rb_bbox);
+                if ($rb_zone)    $args .= ' --climate-zone ' . escapeshellarg($rb_zone);
+                if ($rb_zoom)    $args .= ' --zoom '         . escapeshellarg((string)$rb_zoom);
+                if ($rb_tiles)   $args .= ' --fetch-tiles';
+                if ($rb_topo)    $args .= ' --fetch-topo';
+                if ($rb_nwr)     $args .= ' --nwr-all';
+                $cmd = 'nohup /usr/local/bin/noosphere-build-region.sh ' . $args
+                     . ' > /var/lib/noosphere/region-builds/' . escapeshellarg($rb_slug) . '/output.log 2>&1 & echo $!';
+                $pid_str = shell_exec($cmd);
+                $build_pid = (int)trim($pid_str ?? '0');
+                log_audit('start_region_build', "$rb_slug pid=$build_pid", 'info');
+                $msg = "Build started for '$rb_slug' (PID $build_pid). Watch progress below.";
+                // Redirect back to region tab with the slug so we auto-poll
+                header('Location: ?tab=region&building=' . urlencode($rb_slug));
+                exit;
+            }
+        }
+    }
+
+    // --- Region: cancel online build ---
+    if ($act === 'cancel_region_build') {
+        $rb_slug = preg_replace('/[^a-z0-9_-]/', '', trim($_POST['rb_slug'] ?? ''));
+        if ($rb_slug) {
+            $sf = "/var/lib/noosphere/region-builds/{$rb_slug}/status.json";
+            $old = json_decode(@file_get_contents($sf), true) ?? [];
+            $pid = (int)($old['pid'] ?? 0);
+            if ($pid > 0) {
+                shell_exec("kill -- -$pid 2>/dev/null; kill $pid 2>/dev/null");
+            }
+            // Mark cancelled
+            if (file_exists($sf)) {
+                $old['status'] = 'error';
+                $old['step']   = 'Cancelled by operator.';
+                file_put_contents($sf, json_encode($old));
+            }
+            log_audit('cancel_region_build', $rb_slug, 'info');
+            $msg = "Build cancelled for '$rb_slug'.";
         }
     }
 
@@ -2448,13 +2544,243 @@ if (!$usb_eths): ?>
       <?= csrf_field() ?>
       <input type="hidden" name="act" value="upload_region_pack">
       <p style="font-size:13px;color:#aaa;margin-bottom:10px">
-        Upload a <code>.tar.gz</code> whose top level is a single directory matching <code>[a-z0-9_-]</code> and containing <code>region.json</code>. Existing packs with the same slug are backed up to <code>&lt;slug&gt;.bak-YYYYMMDD-HHMMSS</code>.
+        Upload a <code>.tar.gz</code> whose top level is a single directory matching <code>[a-z0-9_-]</code> and containing <code>region.json</code>.
+        If the pack includes a <code>manifest.json</code>, checksums and any GPG signature are automatically verified before install.
+        Existing packs with the same slug are backed up to <code>&lt;slug&gt;.bak-YYYYMMDD-HHMMSS</code>.
       </p>
       <input type="file" name="pack" accept=".tar.gz,.tgz" required>
       <button type="submit" class="btn-sm" style="margin-left:10px">Upload &amp; install</button>
     </form>
   </div>
 </details>
+
+<?php
+// Check internet for the build card
+$rb_online = false;
+$rb_ctx = stream_context_create(['http' => ['timeout' => 4, 'method' => 'HEAD']]);
+$rb_h = @get_headers('https://download.geofabrik.de/', false, $rb_ctx);
+$rb_online = is_array($rb_h) && strpos($rb_h[0] ?? '', '200') !== false;
+
+// Active build slug from redirect
+$rb_active_slug = preg_replace('/[^a-z0-9_-]/', '', $_GET['building'] ?? '');
+
+// US state options for Geofabrik
+$geofabrik_states = [
+  'alabama'=>'Alabama','alaska'=>'Alaska','arizona'=>'Arizona','arkansas'=>'Arkansas',
+  'california'=>'California','colorado'=>'Colorado','connecticut'=>'Connecticut',
+  'delaware'=>'Delaware','florida'=>'Florida','georgia'=>'Georgia','hawaii'=>'Hawaii',
+  'idaho'=>'Idaho','illinois'=>'Illinois','indiana'=>'Indiana','iowa'=>'Iowa',
+  'kansas'=>'Kansas','kentucky'=>'Kentucky','louisiana'=>'Louisiana','maine'=>'Maine',
+  'maryland'=>'Maryland','massachusetts'=>'Massachusetts','michigan'=>'Michigan',
+  'minnesota'=>'Minnesota','mississippi'=>'Mississippi','missouri'=>'Missouri',
+  'montana'=>'Montana','nebraska'=>'Nebraska','nevada'=>'Nevada',
+  'new-hampshire'=>'New Hampshire','new-jersey'=>'New Jersey','new-mexico'=>'New Mexico',
+  'new-york'=>'New York','north-carolina'=>'North Carolina','north-dakota'=>'North Dakota',
+  'ohio'=>'Ohio','oklahoma'=>'Oklahoma','oregon'=>'Oregon','pennsylvania'=>'Pennsylvania',
+  'rhode-island'=>'Rhode Island','south-carolina'=>'South Carolina',
+  'south-dakota'=>'South Dakota','tennessee'=>'Tennessee','texas'=>'Texas',
+  'utah'=>'Utah','vermont'=>'Vermont','virginia'=>'Virginia','washington'=>'Washington',
+  'west-virginia'=>'West Virginia','wisconsin'=>'Wisconsin','wyoming'=>'Wyoming',
+];
+?>
+
+<details class="cpanel" id="cpanel-build-region"<?= $rb_active_slug ? ' open' : '' ?>>
+  <summary>
+    Build Region Pack Online
+    <span class="badge"><?php
+      if ($rb_online) echo '<span style="color:#2ecc71">&#9679; online</span>';
+      else            echo '<span style="color:#888">offline</span>';
+    ?></span>
+  </summary>
+  <div class="cpbody">
+    <?php if (!$rb_online): ?>
+    <p style="color:#888;font-size:13px">No internet connection detected. Connect to the internet to build a region pack from public data sources.</p>
+    <?php else: ?>
+    <p style="font-size:13px;color:#aaa;margin-bottom:14px">
+      Download OSM vector tiles, USGS topo quads, and NWR frequencies for any US county.
+      The build runs in the background  -  this page polls for progress.
+      Disk free: <?= round(disk_free_space('/var/www/noosphere/maps') / 1024 / 1024) ?> MB
+      (need ~1.2 GB for tiles + topo).
+    </p>
+
+    <div id="rb-build-form">
+    <form method="post" id="region-build-form">
+      <?= csrf_field() ?>
+      <input type="hidden" name="act" value="start_region_build">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">Region Slug <span style="color:#e94560">*</span></label>
+          <input type="text" name="rb_slug" id="rb_slug" placeholder="smith-county-in"
+            pattern="[a-z0-9][a-z0-9_-]{0,63}"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px"
+            required>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">Label <span style="color:#e94560">*</span></label>
+          <input type="text" name="rb_label" id="rb_label" placeholder="Smith County, Indiana"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px"
+            required>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">Country</label>
+          <select name="rb_country" id="rb_country" onchange="rbCountryChange()"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+            <option value="GB">United Kingdom</option>
+            <option value="AU">Australia</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div id="rb-state-wrap">
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">State</label>
+          <select name="rb_state" id="rb_state"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+            <option value="">(select)</option>
+            <?php foreach ($geofabrik_states as $slug => $name): ?>
+            <option value="<?= esc($slug) ?>"><?= esc($name) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">County names (comma-separated)</label>
+          <input type="text" name="rb_counties" id="rb_counties" placeholder="Smith, Jones"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <label style="font-size:12px;color:#888">Bounding Box (south, west, north, east)</label>
+          <button type="button" class="btn-sm" onclick="rbLookupBbox()" id="rb-lookup-btn" style="font-size:11px;padding:3px 10px">Lookup from county name</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+          <input type="number" name="rb_south" id="rb_south" placeholder="South" step="0.0001"
+            style="padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+          <input type="number" name="rb_west"  id="rb_west"  placeholder="West"  step="0.0001"
+            style="padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+          <input type="number" name="rb_north" id="rb_north" placeholder="North" step="0.0001"
+            style="padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+          <input type="number" name="rb_east"  id="rb_east"  placeholder="East"  step="0.0001"
+            style="padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+        </div>
+        <div id="rb-bbox-msg" style="font-size:11px;color:#888;margin-top:4px"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">Climate Zone</label>
+          <input type="text" name="rb_zone" placeholder="6a" maxlength="8"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:12px;color:#888;display:block;margin-bottom:4px">Default Zoom</label>
+          <input type="number" name="rb_zoom" value="11" min="4" max="16"
+            style="width:100%;padding:6px 8px;background:#111126;border:1px solid #333;color:#eee;border-radius:4px;font-size:13px">
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:16px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="rb_tiles" value="1" id="rb_tiles_chk"> Vector tiles (OSM -> tippecanoe, ~500 MB temp)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="rb_topo" value="1"> USGS topo PDFs (US only)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" name="rb_nwr" value="1" checked> All 7 NWR frequencies
+        </label>
+      </div>
+
+      <div>
+        <button type="submit" class="btn-green">Start Build</button>
+        <span style="font-size:11px;color:#888;margin-left:12px">Build runs in background. Takes 5-30 minutes depending on size.</span>
+      </div>
+    </form>
+    </div>
+
+    <?php if ($rb_active_slug): ?>
+    <div id="rb-status-card" style="margin-top:16px;background:#0d1a0d;border:1px solid #2a4a2a;border-radius:6px;padding:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <strong style="font-size:13px">Build: <?= esc($rb_active_slug) ?></strong>
+        <span id="rb-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:#222;color:#888">loading...</span>
+        <form method="post" style="margin-left:auto">
+          <?= csrf_field() ?>
+          <input type="hidden" name="act" value="cancel_region_build">
+          <input type="hidden" name="rb_slug" value="<?= esc($rb_active_slug) ?>">
+          <button type="submit" class="btn-red" id="rb-cancel-btn" style="font-size:11px;padding:3px 10px">Cancel</button>
+        </form>
+      </div>
+      <div style="background:#111;border-radius:4px;height:8px;margin-bottom:8px">
+        <div id="rb-prog-bar" style="background:#2ecc71;height:100%;border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+      <div id="rb-step" style="font-size:12px;color:#aaa;margin-bottom:8px"></div>
+      <pre id="rb-log" style="font-size:11px;color:#888;max-height:200px;overflow-y:auto;background:#080810;padding:8px;border-radius:4px;margin:0;white-space:pre-wrap"></pre>
+    </div>
+    <script>
+    (function(){
+      var slug = <?= json_encode($rb_active_slug) ?>;
+      var csrf = document.querySelector('input[name=csrf_token]') ? document.querySelector('input[name=csrf_token]').value : '';
+      function poll(){
+        fetch('?act=region_build_status&slug=' + encodeURIComponent(slug))
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            var badge = document.getElementById('rb-status-badge');
+            var colors = {running:'#f39c12',done:'#2ecc71',error:'#e94560',pending:'#888'};
+            badge.textContent = d.status || 'unknown';
+            badge.style.background = colors[d.status] || '#333';
+            badge.style.color = '#fff';
+            document.getElementById('rb-prog-bar').style.width = (d.pct || 0) + '%';
+            document.getElementById('rb-step').textContent = d.step || '';
+            var log = document.getElementById('rb-log');
+            if (d.log) { log.textContent = d.log; log.scrollTop = log.scrollHeight; }
+            if (d.status === 'running' || d.status === 'pending') {
+              setTimeout(poll, 3000);
+            } else {
+              document.getElementById('rb-cancel-btn').style.display = 'none';
+              if (d.status === 'done') {
+                document.getElementById('rb-status-card').style.borderColor = '#2ecc71';
+                // Show activate link
+                var card = document.getElementById('rb-status-card');
+                var link = document.createElement('div');
+                link.style.cssText = 'margin-top:10px;font-size:13px';
+                link.innerHTML = '&#x2714; Done. <a href="?tab=region" style="color:#4a9eff">Go to Region tab to activate.</a>';
+                card.appendChild(link);
+              }
+            }
+          }).catch(function(){ setTimeout(poll, 5000); });
+      }
+      setTimeout(poll, 800);
+    })();
+    </script>
+    <?php endif; ?>
+    <?php endif; /* $rb_online */ ?>
+  </div>
+</details>
+
+<details class="cpanel">
+  <summary>Sign Region Pack</summary>
+  <div class="cpbody">
+    <p style="font-size:13px;color:#aaa;margin-bottom:12px">
+      Add a verifiable SHA-256 manifest to a region pack so other deployments can confirm it hasn't been tampered with.
+      Run on the server after building or downloading a pack:
+    </p>
+    <pre style="background:#080810;padding:10px;border-radius:4px;font-size:12px;color:#ccc;overflow-x:auto"># Sign with checksum manifest only:
+/var/www/noosphere/scripts/sign-region-pack.sh /var/lib/noosphere/regions/&lt;slug&gt;
+
+# Pack into .tar.gz after signing:
+tar -czf /tmp/&lt;slug&gt;.tar.gz -C /var/lib/noosphere/regions &lt;slug&gt;
+
+# Sign with GPG (for shareable packs):
+/var/www/noosphere/scripts/sign-region-pack.sh /tmp/&lt;slug&gt;.tar.gz --gpg-key &lt;keyid&gt;</pre>
+    <p style="font-size:12px;color:#888;margin-top:10px">
+      When importing a signed pack via "Install Region Pack from Tarball" above,
+      checksums are verified automatically and the GPG signer's key ID is shown in the install output.
+    </p>
+  </div>
+</details>
+
 </div><!-- #tab-region -->
 
 <!-- SYSTEM -->
@@ -3856,6 +4182,130 @@ function apToggle(act) {
       if (btn) btn.disabled = false;
     });
 }
+</script>
+<form id="zim-action-form" method="post" style="display:none">
+  <?= csrf_field() ?>
+  <input type="hidden" name="act" value="kiwix_toggle">
+  <input type="hidden" name="zim" value="">
+  <input type="hidden" name="enable" value="">
+</form>
+
+<script>
+// ── #83: Scroll + open-details preservation across admin form submits ─────────
+(function(){
+  function captureState() {
+    var tab = '';
+    try { tab = localStorage.getItem('ns_admin_tab') || ''; } catch(e){}
+    var openKeys = [];
+    document.querySelectorAll('details[open]').forEach(function(d){
+      var s = d.querySelector('summary');
+      if (!s) return;
+      var text = s.textContent.replace(/[▾▸]/g,'').trim().split('\n')[0].trim();
+      if (text) openKeys.push(text);
+    });
+    try {
+      sessionStorage.setItem('ns_scroll_y',    String(Math.round(window.scrollY)));
+      sessionStorage.setItem('ns_open_details', JSON.stringify(openKeys));
+      sessionStorage.setItem('ns_scroll_tab',   tab);
+    } catch(e){}
+  }
+
+  document.addEventListener('submit', captureState, true);
+
+  function restoreState() {
+    var scrollY, openKeys, savedTab;
+    try {
+      scrollY   = sessionStorage.getItem('ns_scroll_y');
+      openKeys  = JSON.parse(sessionStorage.getItem('ns_open_details') || 'null');
+      savedTab  = sessionStorage.getItem('ns_scroll_tab') || '';
+      sessionStorage.removeItem('ns_scroll_y');
+      sessionStorage.removeItem('ns_open_details');
+      sessionStorage.removeItem('ns_scroll_tab');
+    } catch(e){ return; }
+    if (openKeys === null) return;
+
+    // Only restore details if we're on the same tab
+    var currentTab = '';
+    try { currentTab = localStorage.getItem('ns_admin_tab') || ''; } catch(e){}
+    if (savedTab && savedTab !== currentTab) return;
+
+    // Apply open/closed state
+    document.querySelectorAll('details').forEach(function(d){
+      var s = d.querySelector('summary');
+      if (!s) return;
+      var text = s.textContent.replace(/[▾▸]/g,'').trim().split('\n')[0].trim();
+      if (openKeys.indexOf(text) !== -1) {
+        d.setAttribute('open','');
+      } else {
+        d.removeAttribute('open');
+      }
+    });
+
+    if (scrollY) {
+      window.scrollTo(0, parseInt(scrollY, 10));
+    }
+  }
+
+  // Run after tab restore (which is at DOMContentLoaded)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(restoreState, 80); });
+  } else {
+    setTimeout(restoreState, 80);
+  }
+})();
+
+// ── Region build form helpers ─────────────────────────────────────────────────
+function rbCountryChange() {
+  var country = (document.getElementById('rb_country') || {}).value;
+  var wrap = document.getElementById('rb-state-wrap');
+  if (wrap) wrap.style.display = country === 'US' ? '' : 'none';
+}
+
+function rbAutoSlug() {
+  var label = (document.getElementById('rb_label') || {}).value || '';
+  var slug = label.toLowerCase()
+    .replace(/[^a-z0-9\s,]/g,'')
+    .replace(/,\s*/g,'-')
+    .replace(/\s+/g,'-')
+    .replace(/-+/g,'-')
+    .replace(/^-|-$/g,'')
+    .substring(0,64);
+  var slugEl = document.getElementById('rb_slug');
+  if (slugEl && !slugEl.value) slugEl.value = slug;
+}
+
+function rbLookupBbox() {
+  var county  = (document.getElementById('rb_counties') || {}).value || '';
+  var state   = (document.getElementById('rb_state')    || {}).value || '';
+  var btn     = document.getElementById('rb-lookup-btn');
+  var msgEl   = document.getElementById('rb-bbox-msg');
+  if (!county) { msgEl.textContent = 'Enter county name(s) first.'; return; }
+  var q = county.split(',')[0].trim() + ' County';
+  if (state) q += ', ' + state.replace(/-/g,' ');
+  q += ', USA';
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking up...'; }
+  msgEl.textContent = '';
+  fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&featuretype=county&addressdetails=0')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (btn) { btn.disabled = false; btn.textContent = 'Lookup from county name'; }
+      if (!data || !data.length) { msgEl.textContent = 'Not found. Enter bbox manually.'; return; }
+      var bb = data[0].boundingbox; // [south, north, west, east]
+      if (!bb || bb.length < 4) { msgEl.textContent = 'No bbox in result.'; return; }
+      document.getElementById('rb_south').value = parseFloat(bb[0]).toFixed(4);
+      document.getElementById('rb_north').value = parseFloat(bb[1]).toFixed(4);
+      document.getElementById('rb_west').value  = parseFloat(bb[2]).toFixed(4);
+      document.getElementById('rb_east').value  = parseFloat(bb[3]).toFixed(4);
+      msgEl.textContent = 'Bbox set from Nominatim: ' + data[0].display_name;
+      msgEl.style.color = '#2ecc71';
+    })
+    .catch(function(e){
+      if (btn) { btn.disabled = false; btn.textContent = 'Lookup from county name'; }
+      msgEl.textContent = 'Nominatim lookup failed: ' + e;
+    });
+}
+
+document.getElementById('rb_label') && document.getElementById('rb_label').addEventListener('blur', rbAutoSlug);
 </script>
 <form id="zim-action-form" method="post" style="display:none">
   <?= csrf_field() ?>

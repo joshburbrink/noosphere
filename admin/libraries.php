@@ -292,5 +292,45 @@ function addFieldRow() {
 
 <?php endif; ?>
 </div>
+<script>
+// #83: Scroll + open-details preservation
+(function(){
+  function captureState() {
+    var openKeys = [];
+    document.querySelectorAll('details[open]').forEach(function(d){
+      var s = d.querySelector('summary');
+      if (s) openKeys.push(s.textContent.replace(/[▾▸]/g,'').trim().split('\n')[0].trim());
+    });
+    try {
+      sessionStorage.setItem('ns_scroll_y',    String(Math.round(window.scrollY)));
+      sessionStorage.setItem('ns_open_details', JSON.stringify(openKeys));
+    } catch(e){}
+  }
+  document.addEventListener('submit', captureState, true);
+  function restoreState() {
+    var scrollY, openKeys;
+    try {
+      scrollY  = sessionStorage.getItem('ns_scroll_y');
+      openKeys = JSON.parse(sessionStorage.getItem('ns_open_details') || 'null');
+      sessionStorage.removeItem('ns_scroll_y');
+      sessionStorage.removeItem('ns_open_details');
+    } catch(e){ return; }
+    if (openKeys === null) return;
+    document.querySelectorAll('details').forEach(function(d){
+      var s = d.querySelector('summary');
+      if (!s) return;
+      var text = s.textContent.replace(/[▾▸]/g,'').trim().split('\n')[0].trim();
+      if (openKeys.indexOf(text) !== -1) d.setAttribute('open','');
+      else d.removeAttribute('open');
+    });
+    if (scrollY) window.scrollTo(0, parseInt(scrollY, 10));
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(restoreState, 80); });
+  } else {
+    setTimeout(restoreState, 80);
+  }
+})();
+</script>
 </body>
 </html>
