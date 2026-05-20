@@ -1,6 +1,101 @@
 # Noosphere
 
-A bootable USB system that turns any x86 laptop into a self-contained offline information hub for disaster response, search and rescue, community events, or off-grid scenarios. Users connect to a portable WiFi router, get captive-portaled to the hub, and can coordinate, check in, communicate, and access reference information  -  no internet required.
+**A self-contained, offline information and coordination hub for when the internet isn't there.**
+
+Noosphere turns a single laptop or Raspberry Pi into a complete local network in a box. It broadcasts its own WiFi, captive-portals every device that connects, and serves a full suite of coordination, communication, mapping, and reference tools - with **no internet, no cell service, no cloud, and no accounts required**. Power it on, connect your phone, and you have a working community network.
+
+---
+
+## The vision
+
+When infrastructure fails - a hurricane, a wildfire, a grid blackout, a comms outage - the tools people rely on to find each other, share information, and coordinate help all disappear at once. Noosphere is built for exactly that moment: a rugged, low-power appliance that any community group, shelter, search-and-rescue team, or neighborhood can deploy in minutes to restore the basics of coordinated communication.
+
+It's also useful far from disasters: off-grid events, festivals, remote field camps, basecamps, and anywhere a shared local network beats a flaky internet connection.
+
+The guiding principles:
+
+- **Works with zero infrastructure** - its own WiFi, its own DNS, its own everything.
+- **No barriers to entry** - no signup, no passwords, no app to install. Connect and use it.
+- **Survives the conditions it's built for** - low power draw, boots from removable media, reboot-proof, runs on hardware you already have.
+- **Owned by the operator** - all data is local; nothing phones home.
+
+---
+
+## How it works
+
+1. The device broadcasts a WiFi network (its onboard radio, or an attached travel router).
+2. Anyone who connects is automatically **captive-portaled** to the homepage - no need to know an address.
+3. They get a tile-based menu of every enabled tool, tuned to the deployment.
+4. Everything runs locally on the device. Disconnect from the world entirely and it keeps working.
+
+---
+
+## What it can do
+
+Noosphere is modular - each capability is a self-contained module that operators turn on or off per deployment.
+
+### Communication & coordination
+- **Community Registry** - check in, mark yourself safe, report missing persons, list skills and supplies you have or need. Configurable for shelter intake, event check-in, or SAR personnel tracking.
+- **Chat** - real-time group messaging.
+- **Community Board (Forum)** - threaded announcements, coordination, and discussion with configurable categories.
+- **Files** - share documents, notices, maps, and photos.
+- **Tasks** - a volunteer job board; anyone can claim a task and help out.
+- **Calendar** - community events and schedules.
+- **Canvas** - freehand drawing for diagrams and annotated map sketches.
+
+### Mapping & situational awareness
+- **Offline Map** - vector map of the deployment region with multiple themes; tap to drop shared markers (hazards, camps, medical, resources, blocked routes, search areas).
+- **Incident Reports** - unified reporting for damage, medical, hazard, missing-person, and resource incidents, plotted on the map with severity, status, and assignment.
+- **Topo Maps** - USGS 1:24,000 topographic quads for the local area.
+- **Command Dashboard** - a dense operator view of all active incidents, runners, supplies, and weather at a glance.
+
+### Operations (incident command)
+- **Runners** - track who's out, where they went, and whether they've returned.
+- **Triage Log** - mass-casualty patient tracking with START triage priority and printable patient tags.
+- **Role-based access** - operators, shelter staff, SAR, medical, comms, and volunteers get scoped permissions.
+
+### Reference & knowledge
+- **Offline Library (Kiwix)** - full Wikipedia, WikiMed medical reference, iFixit repair guides, survival/self-reliance content, and more, served from local ZIM files.
+- **Local Knowledge Wiki** - community-editable reference for roads, water sources, local skills, and know-how.
+- **Resources** - supply inventory tracking, a seed library with planting calendar, and tool lending/check-out.
+
+### Radio & weather (with an optional SDR dongle)
+- **NOAA Weather Radio** - receive and log NWR broadcasts and SAME alerts; auto-post alerts to chat; live audio + transcription.
+- **Spectrum Scanner** - SDR waterfall display.
+- **Radio Reference** - a searchable local frequency database with CHIRP export.
+- **Radio Programmer** - program 500+ models of handheld radios directly over USB from the local frequency data.
+- **Radio Log** - log contacts, traffic, and net check-ins.
+
+### Morale & utilities
+- **Games** - browser-based games (Snake, Tetris, 2048, Minesweeper, plus LAN multiplayer Codenames, Pictionary, Battleship).
+- **Admin Panel** - full control center for settings, modules, regions, content, and downloads.
+
+---
+
+## Deployment presets
+
+The admin panel has one-click presets that reconfigure every module and field for a scenario:
+
+| Preset | Best for |
+|---|---|
+| **Emergency** | General disaster response - all features on |
+| **Search & Rescue** | SAR ops - map, incidents, runners, missing persons |
+| **Shelter** | Shelter management - intake, bunk tracking, dietary needs, next of kin |
+| **Event** | Festivals / community events - simplified public check-in |
+| **Resource Hub** | Supply coordination - skills + supplies + inventory |
+| **Kiosk** | Read-only public info - library, board, and map only |
+
+Everything is customizable beyond the presets: instance name, alert banner, registry labels and status options, forum categories, and every module toggle.
+
+---
+
+## Roles & access
+
+By default Noosphere needs **no accounts** - anyone can connect and use the public tools. Operators can optionally:
+
+- Require registration to post, chat, or upload.
+- Disable public self-registration (admin-managed entries only).
+- Assign **roles** (operator, shelter staff, SAR, medical, comms, volunteer) that grant scoped capabilities - editing incidents, dispatching runners, controlling the radio, moderating the board, managing inventory, and so on.
 
 ---
 
@@ -8,208 +103,150 @@ A bootable USB system that turns any x86 laptop into a self-contained offline in
 
 | Component | Role |
 |---|---|
-| Any x86 laptop **or** Raspberry Pi 5 | Server  -  runs all services |
-| GL.iNet GL-SFT1200 (Opal) | WiFi access point  -  connects users wirelessly |
-| 64GB+ USB drive (x86) / SD or NVMe (Pi) | Storage  -  OS + services + content |
+| x86 laptop **or** Raspberry Pi 5 | Server - runs all services |
+| Onboard WiFi **or** a travel router (e.g. GL.iNet GL-SFT1200) | Broadcasts the network |
+| 64GB+ USB / SD / NVMe | OS + services + offline content (128GB+ recommended) |
 
-Tested on HP 3105m. Any x86_64 laptop with 2GB+ RAM will work.
+Tested on an HP 3105m laptop and Raspberry Pi 5. Any x86_64 machine with 2GB+ RAM works.
+
+**Optional hardware:** an RTL-SDR dongle (weather radio, scanner), a VHF antenna for NOAA Weather Radio, and a USB programming cable for handheld radios.
 
 ### Raspberry Pi 5 (arm64)
 
-The stack runs on arm64 - the provisioning scripts auto-detect architecture and
-pull the right Kiwix (`aarch64`) and mbtileserver (`arm64`) binaries. Notes:
+The full stack runs on arm64 - provisioning auto-detects the architecture and pulls the right Kiwix (`aarch64`) and mbtileserver (`arm64`) binaries, and the access point uses the Pi's onboard WiFi (no external adapter needed).
 
-- **Base image must be Trixie** (Debian 13 arm64 *or* Raspberry Pi OS Trixie
-  64-bit). PHP 8.4 is assumed throughout; Bookworm's PHP 8.2 will not work.
-- The Pi's existing x86 Noosphere USB **will not boot a Pi** - different CPU
-  architecture. Flash a fresh arm64 image with rpi-imager, then run
-  `noosphere-provision.sh`.
-- AP mode can use the Pi's **onboard WiFi** (`wlan0`) - no external RTL8812AU
-  adapter or DKMS driver needed. `setup-hostapd.sh` handles rfkill and
-  NetworkManager release automatically.
-
-#### One-shot migration from an x86 server
-
-`scripts/migrate-to-pi.sh` builds a ready-to-boot Pi drive from a laptop: it
-flashes Pi OS, enables headless SSH, registers a first-boot provisioning
-service, and stages your existing data. Plug the drive into the Pi and power on
-- it self-provisions and imports the data on first boot.
-
-```sh
-# data over the network (server stays up):
-sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-server 192.168.2.166
-# or from the old drive mounted locally:
-sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-disk /mnt/old-noosphere
-# or a clean Pi with no data:
-sudo ./scripts/migrate-to-pi.sh /dev/sdX --no-data
-```
-
-Migrates ZIMs, SQLite DBs, photos, regions, map tiles. **Commit and push repo
-changes first** - first-boot provisioning clones the app from GitHub.
+- **Base image must be Trixie** (Raspberry Pi OS Trixie 64-bit or Debian 13 arm64) - the stack uses PHP 8.4; Bookworm's 8.2 will not work.
+- An x86 Noosphere drive **cannot** boot a Pi (different CPU architecture) - the OS is rebuilt and only the data migrates. Use the migration tool below.
 
 ---
 
-## Features
-
-- **Community Registry**  -  check in, report missing persons, list skills and supplies available/needed; configurable for shelter management, event check-in, or SAR
-- **Local Chat**  -  real-time messaging; links to registry profile for status badges
-- **Forum / Bulletin Board**  -  threaded posts with configurable categories (missing persons, lost & found, general, etc.)
-- **Shared Files**  -  upload and download documents, maps, photos
-- **Offline Map**  -  vector tile map of the local area with 4 color themes; tap to drop markers (search areas, hazards, camps, medical, resources, blocked routes)
-- **Offline Library**  -  Wikipedia, WikiMed, iFixit repair guides, and other ZIM content via Kiwix
-- **Topo PDFs**  -  USGS topographic maps for local counties
-- **Calendar**  -  shared event calendar
-- **Admin Panel**  -  6-tab control panel (Dashboard, Network, Community, Content, System, Settings) with collapsible panels, deployment presets, system monitoring, ban management, DB backup
-- **Registration controls**  -  optionally require registration to post/chat/upload; optionally disable public self-registration (admin-managed entries only)
-- **Captive Portal**  -  anyone connecting to the WiFi is automatically redirected to the hub
-- **No accounts required**  -  no signup, no passwords for basic access; optional PIN for registry profile linking
-- **No internet required**  -  fully self-contained
-
----
-
-## Software Stack
+## Software stack
 
 | Component | Purpose |
 |---|---|
-| Debian 13 (Trixie) | Base OS |
+| Debian 13 (Trixie) / Raspberry Pi OS Trixie | Base OS |
 | Nginx | Web server + captive portal |
-| PHP 8.4 + PHP-FPM | App logic |
-| SQLite | All data storage (no database server needed) |
-| mbtileserver | Serves vector map tiles (MBTiles format) |
-| kiwix-serve | Serves offline ZIM library |
-| dnsmasq | DNS redirect for captive portal |
-| iptables | NAT redirect for captive portal |
+| PHP 8.4 + PHP-FPM | Application logic |
+| SQLite | All data storage (no database server) |
+| mbtileserver | Vector map tiles (MBTiles) |
+| kiwix-serve | Offline ZIM library |
+| hostapd | WiFi access point (onboard radio) |
+| dnsmasq | Captive-portal DNS + DHCP |
+| iptables | Captive-portal NAT redirect |
 
 ---
 
 ## Architecture
 
 ```
-[WiFi Device]
-     |
-     | connects to GL-SFT1200 WiFi
-     | DHCP -> 192.168.8.x, DNS -> 192.168.8.2
-     |
-[GL-SFT1200 Router]  192.168.8.1
-     |
-     | ethernet (LAN port -> laptop eno1)
-     |
-[Laptop / USB boot]  192.168.8.2
-     |
-     +-- dnsmasq       all domains -> 192.168.8.2
-     +-- iptables NAT  port 80 from router clients -> localhost:80
-     +-- Nginx (80)
-     |     /              homepage
-     |     /registry/     community check-in
-     |     /chat/         real-time chat
-     |     /forum/        bulletin board
-     |     /files/        shared file uploads
-     |     /maps/         offline vector map + markers
-     |     /calendar/     shared calendar
-     |     /library/      Kiwix offline library (proxy -> :8080)
-     |     /tiles/        map tile server (proxy -> :8889)
-     |     /admin/        admin panel
-     +-- mbtileserver  port 8889 (vector tiles)
-     +-- kiwix-serve   port 8080 (ZIM library)
+[ Phones / tablets / laptops ]
+        |  connect to WiFi "NET"
+        v
+[ Access point ]
+   onboard WiFi (hostapd, 192.168.4.1)   ── or ──   external travel router (192.168.8.x)
+        |
+        v
+[ Noosphere server ]
+   dnsmasq      all domains -> the hub (captive portal)
+   iptables     port 80/443 -> local hub
+   Nginx (80)
+     /              homepage (tile menu)
+     /registry/     community check-in / missing persons
+     /chat/  /forum/  /files/  /tasks/  /calendar/  /canvas/
+     /maps/         offline vector map + shared markers
+     /incidents/    unified incident reporting
+     /command/      operator dashboard
+     /runners/  /triage/
+     /wiki/         local knowledge base
+     /resources/  /supplies/  /seeds/  /tools/
+     /weather/  /radio/        SDR weather radio, scanner, reference, programmer
+     /library/      Kiwix offline library      (proxy -> :8080)
+     /tiles/        vector tile server          (proxy -> :8889)
+     /topo/         USGS topographic PDFs
+     /games/        browser + LAN games
+     /admin/        admin control panel
+   mbtileserver   :8889
+   kiwix-serve    :8080
 ```
 
 ---
 
-## Deployment Presets
+## Installation & deployment
 
-The admin panel includes one-click presets that configure all settings for common scenarios:
-
-| Preset | Best for |
-|---|---|
-| **Emergency** | General disaster response  -  all features, skills + missing persons |
-| **Search & Rescue** | SAR operations  -  map + missing persons focused |
-| **Shelter** | Shelter management  -  bunk tracking, dietary needs, next of kin |
-| **Event** | Festival or community event  -  simplified check-in |
-| **Resource Hub** | Supply coordination  -  skills + supplies fields |
-| **Kiosk** | Read-only display  -  library, forum, and map only |
-
-Individual settings can be customized freely: registry label, status options (free text), forum categories (add/remove), feature toggles, instance name and alert banner.
-
----
-
-## Data
-
-All application data is stored in SQLite databases at `/var/lib/noosphere/`:
-
-| File | Contents |
-|---|---|
-| `settings.db` | All configuration |
-| `registry.db` | Community registry entries |
-| `chat.db` | Chat messages |
-| `forum.db` | Forum posts and threads |
-| `calendar.db` | Calendar events |
-| `map_markers.db` | Map markers |
-| `files/` | Uploaded files |
-
----
-
-## Offline Map Content
-
-Vector tiles covering Bartholomew and Brown County, Indiana (OSM data, zoom 4–14, overzoom to 19). USGS topo PDFs for local quads stored at `/var/www/noosphere/maps/topo/`.
-
-To use different tile coverage, replace `/var/lib/noosphere/tiles/*.mbtiles` and update the mbtileserver config.
-
----
-
-## Offline Library (Kiwix)
-
-ZIM files are stored in `/var/lib/kiwix/`. Drop a new ZIM file there and `kiwix-watch.service` registers it automatically.
-
-Recommended content: `wikipedia_en_medicine`, `wikipedia_en_simple_all`, `ifixit_en_all`, `wiktionary_en_all`, `lrnselfreliance_en_all`. See [docs/kiwix-content.md](docs/kiwix-content.md) for the full list.
-
----
-
-## Build Phases
-
-- [x] **Phase 1**  -  Partition and format USB drive
-- [x] **Phase 2**  -  Install Debian 13 (Trixie)
-- [x] **Phase 3**  -  Install Nginx, PHP 8.4, SQLite; deploy all app code
-- [x] **Phase 4**  -  Install Kiwix, mbtileserver; load map tiles and ZIM content
-- [x] **Phase 5**  -  Captive portal: dnsmasq + iptables + Nginx detection endpoints
-- [ ] **Phase 6**  -  Configure GL-SFT1200 router (ethernet -> `eno1`, run `setup-router.sh`)
-- [ ] **Phase 7**  -  End-to-end test: connect phone, verify captive portal, test all features
-
----
-
-## Router Setup (Phase 6)
-
-Plug an ethernet cable from the laptop's `eno1` port into any LAN port on the GL-SFT1200 (leave the WAN port unplugged), then:
+### x86 laptop
+Boot Debian 13, then run the provisioner - it installs the entire stack, services, and default content:
 
 ```bash
-/usr/local/bin/setup-router.sh
+sudo bash scripts/noosphere-provision.sh
 ```
 
-**Manual alternative:** Connect to GL-SFT1200 web admin at `192.168.8.1` -> Network -> LAN -> DHCP -> Custom DNS: `192.168.8.2`
+`scripts/install-to-disk.sh` builds a bootable USB/disk image with a first-boot provisioning service. `scripts/setup-pxe.sh` can network-boot and install new machines over PXE.
+
+### Raspberry Pi 5 - one-shot migration / build
+
+`scripts/migrate-to-pi.sh` builds a ready-to-boot Pi drive from a laptop. It flashes Raspberry Pi OS, configures headless SSH, registers a first-boot provisioning service, pre-configures the access point, and (optionally) stages your existing data. **Plug the drive into the Pi, plug in ethernet + power, and walk away** - it provisions itself, imports data, and starts broadcasting WiFi automatically.
+
+```bash
+# migrate data from a running server over the network:
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-server 192.168.2.166
+# or copy from the old drive mounted locally:
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-disk /mnt/old-noosphere
+# or a clean Pi with no data:
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --no-data
+```
+
+Ethernet is needed only for the one-time online provisioning; afterward the hub runs fully offline. The AP defaults to an open network named `NET` and is reboot-persistent. (Commit and push repo changes first - first-boot provisioning clones the app from GitHub.)
+
+### Access point
+```bash
+sudo setup-hostapd.sh configure   # pick the wireless interface, SSID, channel
+sudo setup-hostapd.sh enable       # broadcast + captive portal (survives reboots)
+```
 
 ---
 
-## Admin Access
+## Regions & localization
 
-- Click the **Admin** button at the bottom of the homepage
-- From a keyboard: type `aaa` quickly on the homepage
-- From a phone or tablet: navigate to `/admin/` directly
-- Operator documentation (setup, settings reference, troubleshooting) at `/admin/wiki.php`
+Map, topo, and frequency content is organized into **region packs** so Noosphere can be deployed anywhere - not just one area. The built-in example region is **Bartholomew & Brown County, Indiana**. Operators can build a new region for their own area from the admin panel (`scripts/build-region-pack.sh`): it downloads OpenStreetMap data, renders vector tiles, fetches USGS topo quads, and assembles a localized pack. Packs can be checksummed and signed for sharing.
 
 ---
 
-## Known Issues
+## Offline content
 
-See [GitHub Issues](https://github.com/joshburbrink/noosphere/issues) for the full tracker.
-
-| # | Summary |
-|---|---------|
-| [#1](https://github.com/joshburbrink/noosphere/issues/1) | Map pins cannot be placed in desktop/mouse mode  -  `index.html` is served instead of the full-featured `index.php` |
-| [#2](https://github.com/joshburbrink/noosphere/issues/2) | Map street names not shown  -  VectorGrid label layer not yet implemented |
+- **Library (Kiwix):** ZIM files live in `/var/lib/kiwix/`; drop one in and it's auto-registered. The admin panel has a catalog browser + resumable download manager. See [docs/kiwix-content.md](docs/kiwix-content.md).
+- **Maps:** vector tiles (MBTiles) served by mbtileserver; swappable per region.
+- **Topo:** USGS 1:24,000 PDFs for the region's quads.
 
 ---
 
-## Use Case
+## Admin & operation
 
-Designed for scenarios where infrastructure has failed  -  natural disasters, grid outages, communications blackouts. Anyone with a WiFi-capable device can connect and immediately access community coordination tools and reference information.
+- Open the **Admin** tile on the homepage, type `aaa` on the homepage, or go to `/admin/`.
+- The admin panel covers settings, module toggles, presets, network/AP mode, region building, content wipe/download, and system monitoring.
+- On the console, `noosphere-help` is a full paged guide for non-technical operators, and the login MOTD shows live service/network/disk status.
 
-No accounts. No internet. No cloud.
+All application data is SQLite under `/var/lib/noosphere/` (registry, chat, forum, incidents, wiki, tasks, supplies, etc.), with uploads and photos alongside it. Back up that directory and `/var/lib/kiwix/` to preserve a deployment.
+
+---
+
+## Roadmap - where it's going
+
+Noosphere is actively developed. The larger features on the horizon, and why they matter:
+
+- **LoRa mesh networking (Meshtastic)** [#90] - WiFi only reaches a building or campsite. Bridging Noosphere to a long-range, low-power LoRa mesh would let multiple hubs and remote nodes relay messages and alerts across **miles** of a town or county with no infrastructure - turning a single hub into a wide-area disaster network.
+- **Fully offline provisioning** [#92] - today, first-time setup needs internet once (to install packages). Pre-baking all arm64 packages into the build would let a Pi provision itself with **zero internet, ever** - the right end-state for an appliance that may never see a connection.
+- **Unified calendar hub + offline time integrity** [#89, #87] - a hub with no internet has no trusted clock. This adds a tamper-aware offline time source plus a calendar that aggregates events, task due dates, planting windows, and holidays - for planning *and* morale during long outages.
+- **Spanish (and beyond) localization** [#17] - disaster response has to reach everyone. Multilingual user-facing pages remove a language barrier when it matters most.
+- **First-time setup wizard + printable operator guide** [#30, #11] - the operator in a real emergency may not be technical. Guided onboarding and a one-page printable quick-start card make Noosphere deployable by anyone.
+- **Storage & content management** [#91, #82] - hot-plug a second drive for more library content, with low-disk alerts, plus satellite imagery layers - so a hub can hold far more reference material in the field.
+- **Resilience hardening** [#88, #37, #36] - automatic WiFi-driver rebuilds across kernel upgrades, a full mobile-UI pass, and an admin panel overhaul, so the appliance stays reliable and usable under stress.
+
+See the [issue tracker](https://github.com/joshburbrink/noosphere/issues) for the full backlog.
+
+---
+
+## Philosophy
+
+> No accounts. No internet. No cloud.
+
+Noosphere exists so that the loss of infrastructure doesn't have to mean the loss of coordination. Everything it needs, it carries. Everyone who needs it, can use it.
