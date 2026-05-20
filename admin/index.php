@@ -117,6 +117,16 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- PXE / network boot (AJAX  -  returns JSON) ---
+    if (in_array($act, ['pxe_enable', 'pxe_disable', 'pxe_configure', 'pxe_refresh'])) {
+        header('Content-Type: application/json');
+        $map = ['pxe_enable'=>'enable','pxe_disable'=>'disable','pxe_configure'=>'configure','pxe_refresh'=>'refresh'];
+        $subcmd = $map[$act];
+        $out = shell_exec('sudo /usr/local/bin/setup-pxe.sh ' . escapeshellarg($subcmd) . ' 2>&1') ?? '(no output)';
+        echo json_encode(['ok' => true, 'output' => $out]);
+        exit;
+    }
+
     // --- Display mode switch (AJAX  -  returns JSON) ---
     if ($act === 'display_mode') {
         header('Content-Type: application/json');
@@ -1911,6 +1921,19 @@ $ap_conf_iface= _ap_conf_val('AP_INTERFACE', $_ap_conf);
 $ap_has_conf  = !empty($ap_conf_ssid);
 $hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'inactive');
 
+// PXE / network boot state
+$_pxe_conf      = @file_get_contents('/etc/noosphere/pxe.conf') ?: '';
+$pxe_configured = _ap_conf_val('CONFIGURED', $_pxe_conf) === '1';
+$pxe_enabled    = _ap_conf_val('PXE_ENABLED', $_pxe_conf) === '1';
+$pxe_server_ip  = _ap_conf_val('SERVER_IP', $_pxe_conf) ?: ($ap_mode === 'hostapd' ? $ap_ip : '192.168.8.2');
+$tftpd_svc      = trim(shell_exec('systemctl is-active tftpd-hpa 2>/dev/null') ?: 'inactive');
+$pxe_kernel_ok  = is_file('/srv/tftp/noosphere/vmlinuz') && is_file('/srv/tftp/noosphere/initrd.gz');
+$pxe_efi_ok     = is_file('/srv/tftp/ipxe.efi');
+$pxe_bios_ok    = is_file('/srv/tftp/pxelinux.0');
+$pxe_low_disk   = false;
+$_df = @shell_exec("df --output=avail -k / 2>/dev/null");
+if ($_df && preg_match('/(\d+)/', $_df, $m)) { $pxe_low_disk = ((int)$m[1] < 1048576); } // < 1 GB free
+
 // Display mode state
 $_disp_conf   = @file_get_contents('/etc/noosphere/display.conf') ?: '';
 $_disp_mode   = 'off';
@@ -2233,6 +2256,72 @@ bash setup-local-display.sh server</pre>
       &nbsp;|&nbsp; <code>noosphere-display-mode kiosk|command|admin|off</code>
     </div>
     <?php endif; ?>
+  </div>
+</details>
+
+<details class="cpanel" open>
+  <summary>Network Boot / PXE</summary>
+  <div class="cpbody">
+    <p style="color:#aaa;font-size:13px;margin-bottom:12px">
+      Turn this server into a network-boot installer. A bare or wiped machine on the
+      Noosphere LAN can PXE/UEFI network-boot and install Noosphere onto its own disk
+      &mdash; no USB stick needed on the target.
+      <strong style="color:#e94560">The installer WIPES the target machine's disk.</strong>
+    </p>
+
+    <?php if ($pxe_low_disk): ?>
+      <div style="background:#2a0a0a;border:1px solid #6a2a2a;color:#e94560;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px">
+        &#9888; Low disk space (&lt; 1 GB free). Boot files + cached debs need ~400 MB. Free space under Admin &rarr; System.
+      </div>
+    <?php endif; ?>
+
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px;background:#<?= $pxe_enabled ? '0a2a0a' : '161630' ?>;border:1px solid #<?= $pxe_enabled ? '2a6a2a' : '2a2a4a' ?>;border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:#<?= $pxe_enabled ? '2ecc71' : '555' ?>;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+          <?= $pxe_enabled ? '&#9679; Serving' : '&#9675; Not serving' ?>
+        </div>
+        <div style="font-size:13px;font-weight:bold;margin-bottom:4px">Network Boot</div>
+        <div style="font-size:12px;color:#aaa">tftpd-hpa: <span style="color:<?= $tftpd_svc==='active'?'#2ecc71':'#e94560' ?>"><?= esc($tftpd_svc) ?></span></div>
+        <div style="font-size:12px;color:#aaa">Server IP: <code style="font-size:11px"><?= esc($pxe_server_ip) ?></code></div>
+        <div style="font-size:12px;color:#aaa">Configured: <?= $pxe_configured ? 'yes' : '<span style="color:#e94560">no</span>' ?></div>
+      </div>
+      <div style="flex:1;min-width:200px;background:#111118;border:1px solid #222;border-radius:6px;padding:12px">
+        <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Boot files staged</div>
+        <div style="font-size:12px;color:#aaa">BIOS (pxelinux.0): <?= $pxe_bios_ok ? '<span style="color:#2ecc71">&#10003;</span>' : '<span style="color:#e94560">missing</span>' ?></div>
+        <div style="font-size:12px;color:#aaa">UEFI (ipxe.efi): <?= $pxe_efi_ok ? '<span style="color:#2ecc71">&#10003;</span>' : '<span style="color:#e94560">missing</span>' ?></div>
+        <div style="font-size:12px;color:#aaa">Installer kernel/initrd: <?= $pxe_kernel_ok ? '<span style="color:#2ecc71">&#10003;</span>' : '<span style="color:#e94560">missing</span>' ?></div>
+      </div>
+    </div>
+
+    <?php if ($ap_mode === 'external-router'): ?>
+      <div style="background:#1a1a0a;border:1px solid #4a4a2a;color:#d9c97a;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px">
+        &#9888; You are in <strong>External Router</strong> mode. PXE works when this server hands out DHCP
+        (AP mode, or a direct ethernet link). On the GL.iNet router LAN, either point the router's DHCP at
+        <code><?= esc($pxe_server_ip) ?></code> for PXE, or connect the target machine to the Noosphere AP.
+      </div>
+    <?php endif; ?>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <?php if (!$pxe_configured): ?>
+        <button class="btn-sm" id="btn-pxe-configure" onclick="pxeAction('pxe_configure', this)">Configure (stage boot files)</button>
+      <?php else: ?>
+        <?php if (!$pxe_enabled): ?>
+          <button class="btn-sm" id="btn-pxe-enable" onclick="pxeAction('pxe_enable', this)">Enable Network Boot</button>
+        <?php else: ?>
+          <button class="btn-sm" id="btn-pxe-disable" onclick="pxeAction('pxe_disable', this)" style="border-color:#e94560;color:#e94560">Disable Network Boot</button>
+        <?php endif; ?>
+        <button class="btn-sm" id="btn-pxe-refresh" onclick="pxeAction('pxe_refresh', this)">Refresh boot files</button>
+      <?php endif; ?>
+    </div>
+
+    <div style="font-size:11px;color:#555;margin-top:10px">
+      Offline prep: run <code>scripts/cache-pxe-boot.sh</code> while online so Configure works without internet.
+      Boot menu offers <em>Install Noosphere</em> / <em>Boot local drive</em> / <em>Rescue</em>.
+    </div>
+
+    <div id="pxe-output" style="display:none;margin-top:10px">
+      <div class="logbox" id="pxe-output-text" style="font-size:11px;max-height:220px;overflow-y:auto"></div>
+    </div>
   </div>
 </details>
 
@@ -4214,6 +4303,30 @@ function apToggle(act) {
     .then(d => {
       textEl.textContent = d.output || '(done)';
       setTimeout(() => location.reload(), 1500);
+    })
+    .catch(e => {
+      textEl.textContent = 'Error: ' + e;
+      if (btn) btn.disabled = false;
+    });
+}
+
+function pxeAction(act, btn) {
+  if (btn) btn.disabled = true;
+  var outEl = document.getElementById('pxe-output');
+  var textEl = document.getElementById('pxe-output-text');
+  outEl.style.display = 'block';
+  var labels = {pxe_configure:'Staging boot files', pxe_enable:'Enabling network boot',
+                pxe_disable:'Disabling network boot', pxe_refresh:'Refreshing boot files'};
+  textEl.textContent = (labels[act] || 'Working') + '... (configure/refresh can take a minute)';
+  var fd = new FormData();
+  fd.append('act', act);
+  var csrfField = document.querySelector('input[name=csrf_token]');
+  if (csrfField) fd.set('csrf_token', csrfField.value);
+  fetch('', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      textEl.textContent = d.output || '(done)';
+      setTimeout(() => location.reload(), 2000);
     })
     .catch(e => {
       textEl.textContent = 'Error: ' + e;

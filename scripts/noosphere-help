@@ -311,6 +311,20 @@ printf "  ${C}noosphere-display-mode command${X}      operator command view (/co
 printf "  ${C}noosphere-display-mode off${X}          turn off local display\n\n"
 printf "  ${C}systemctl enable --now noosphere-display${X}  start display service on boot\n\n"
 
+printf "${W}Deploy Noosphere to another machine over the network (PXE):${X}\n"
+printf "  Turns this server into a network-boot installer. A bare/wiped machine on\n"
+printf "  the Noosphere LAN boots from the network and installs Noosphere to its disk.\n"
+printf "  ${R}The installer WIPES the target machine's disk.${X}\n\n"
+printf "  ${C}cache-pxe-boot.sh${X}                    (run ONCE online) cache boot files for offline use\n"
+printf "  ${C}setup-pxe.sh configure${X}               install + stage boot files (kernel, menus, preseed)\n"
+printf "  ${C}setup-pxe.sh enable${X}                  start serving network boot\n"
+printf "  ${C}setup-pxe.sh disable${X}                 stop serving network boot\n"
+printf "  ${C}setup-pxe.sh status${X}                  show tftpd state + machines served\n"
+printf "  ${C}setup-pxe.sh refresh${X}                 re-download installer kernel/initrd (needs internet)\n\n"
+printf "  On the target: enter the BIOS/UEFI boot menu and choose Network / PXE boot.\n"
+printf "  ${Y}PXE only works when THIS box hands out DHCP${X} (AP mode, or a direct ethernet\n"
+printf "  link). In external-router mode, connect the target to the Noosphere AP instead.\n\n"
+
 # ── FOOTER ───────────────────────────────────────────────────────────────────
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 printf "  Run ${C}noosphere-selftest${X} for an automated health check.\n"

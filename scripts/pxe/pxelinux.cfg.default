@@ -1,0 +1,25 @@
+# Noosphere PXELINUX boot menu (legacy BIOS clients)
+# Template - setup-pxe.sh replaces @@SERVER_IP@@ when staging to
+# /srv/tftp/pxelinux.cfg/default
+
+UI menu.c32
+PROMPT 0
+TIMEOUT 300
+MENU TITLE Noosphere Network Boot
+
+DEFAULT local
+
+LABEL install
+  MENU LABEL Install Noosphere ( WIPES target disk )
+  KERNEL noosphere/vmlinuz
+  APPEND initrd=noosphere/initrd.gz auto=true priority=critical url=http://@@SERVER_IP@@/netboot/noosphere-preseed.cfg hostname=noosphere domain=local --- quiet
+
+LABEL local
+  MENU LABEL Boot from local drive
+  MENU DEFAULT
+  LOCALBOOT 0
+
+LABEL rescue
+  MENU LABEL Debian installer - rescue mode
+  KERNEL noosphere/vmlinuz
+  APPEND initrd=noosphere/initrd.gz rescue/enable=true --- quiet

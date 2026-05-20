@@ -479,7 +479,7 @@ fi
 # noosphere helper commands in PATH
 ##############################################################################
 for cmd in noosphere-help noosphere-chpasswd.sh setup-credentials.sh \
-           setup-hostapd.sh download-zim.sh; do
+           setup-hostapd.sh setup-pxe.sh download-zim.sh; do
     src="$NOOSPHERE_DIR/scripts/$cmd"
     [[ -f "$src" ]] || continue
     dest="/usr/local/bin/${cmd}"
@@ -497,6 +497,7 @@ cat > /etc/sudoers.d/noosphere-admin <<'EOF'
 Defaults:www-data !requiretty
 www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-credentials.sh *
 www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-hostapd.sh *
+www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-pxe.sh *
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/sdr-diag.sh *
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-set-nwr-freq.sh *
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-radio-mode.sh *

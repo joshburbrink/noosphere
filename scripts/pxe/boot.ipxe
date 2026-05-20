@@ -1,0 +1,42 @@
+#!ipxe
+# Noosphere iPXE boot menu (UEFI clients)
+# Template - setup-pxe.sh replaces @@SERVER_IP@@ when staging.
+# Served over HTTP from http://@@SERVER_IP@@/netboot/boot.ipxe
+
+:start
+menu Noosphere Network Boot
+item --gap --             Target machine: choose an action
+item install   Install Noosphere   ( WIPES the target disk )
+item local     Boot from local drive
+item shell     iPXE shell (advanced)
+item reboot    Reboot
+choose --default local --timeout 30000 selected || goto local
+goto ${selected}
+
+:install
+echo
+echo *** This will ERASE the target machine's disk and install Noosphere. ***
+prompt --key y --timeout 15000 Press 'y' to wipe the disk and install, any other key to cancel... && goto do_install || goto start
+
+:do_install
+echo Loading Noosphere installer...
+kernel http://@@SERVER_IP@@/netboot/vmlinuz auto=true priority=critical url=http://@@SERVER_IP@@/netboot/noosphere-preseed.cfg hostname=noosphere domain=local --- quiet
+initrd http://@@SERVER_IP@@/netboot/initrd.gz
+boot || goto failed
+
+:local
+echo Booting from local disk...
+exit
+
+:shell
+echo Type 'exit' to return to the menu.
+shell
+goto start
+
+:reboot
+reboot
+
+:failed
+echo Boot failed. Dropping to shell.
+shell
+goto start

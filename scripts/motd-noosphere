@@ -52,6 +52,11 @@ if [[ -n "$_disp_connected" || -f /usr/local/bin/noosphere-display ]]; then
         printf "${Y}⚠ %-20s${X} display connected (%s)  -  run: setup-local-display.sh server\n" "local display" "$_disp_port"
     fi
 fi
+# Optional: only shown when PXE network boot is installed
+if systemctl list-unit-files tftpd-hpa.service &>/dev/null \
+   && systemctl list-unit-files tftpd-hpa.service 2>/dev/null | grep -q tftpd-hpa; then
+    svc_status tftpd-hpa     "tftpd (network boot)"
+fi
 
 # ── Web health ─────────────────────────────────────────────────────────────
 echo ""
