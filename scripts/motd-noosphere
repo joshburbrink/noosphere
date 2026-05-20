@@ -38,6 +38,13 @@ svc_status php8.4-fpm       "php8.4-fpm"
 svc_status kiwix            "kiwix (library)"
 svc_status mbtileserver     "mbtileserver (maps)"
 svc_status wifi-reconnect   "wifi watchdog"
+if [[ -f /usr/local/bin/noosphere-display ]]; then
+    _disp_mode=$(grep -oP '(?<=^DISPLAY_MODE=)\S+' /etc/noosphere/display.conf 2>/dev/null || echo 'unknown')
+    _disp_w=$(grep -oP '(?<=^DISPLAY_WIDTH=)\d+' /etc/noosphere/display.conf 2>/dev/null)
+    _disp_h=$(grep -oP '(?<=^DISPLAY_HEIGHT=)\d+' /etc/noosphere/display.conf 2>/dev/null)
+    _disp_label="local display (${_disp_mode}${_disp_w:+, ${_disp_w}x${_disp_h}})"
+    svc_status noosphere-display "$_disp_label"
+fi
 
 # ── Web health ─────────────────────────────────────────────────────────────
 echo ""
@@ -127,6 +134,6 @@ printf "\n  ${W}Kit maintenance${X}\n"
 printf "  ${C}clone-usb.sh <src> <dst>${X}         clone this drive to backup USB\n"
 printf "  ${C}cache-drivers.sh [dir]${X}           pre-cache NIC drivers for unknown hardware\n"
 printf "  ${C}setup-local-display.sh [server|pi]${X}  attach HDMI monitor or Pi touchscreen\n"
-printf "  ${C}noosphere-display-mode kiosk|command|off${X}  switch local display mode\n"
+printf "  ${C}noosphere-display-mode kiosk|command|admin|off${X}  switch local display mode\n"
 printf "${W}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
 echo ""

@@ -1915,10 +1915,29 @@ $hostapd_svc  = trim(shell_exec('systemctl is-active hostapd 2>/dev/null') ?: 'i
 $_disp_conf   = @file_get_contents('/etc/noosphere/display.conf') ?: '';
 $_disp_mode   = 'off';
 $_disp_url    = 'http://localhost';
-if (preg_match('/^DISPLAY_MODE=(.+)$/m', $_disp_conf, $m)) $_disp_mode = trim($m[1]);
-if (preg_match('/^SERVER_URL=(.+)$/m', $_disp_conf, $m))   $_disp_url  = trim($m[1]);
-$_disp_svc    = trim(shell_exec('systemctl is-active noosphere-display 2>/dev/null') ?: 'inactive');
-$_disp_exists = file_exists('/usr/local/bin/noosphere-display');
+$_disp_width  = '';
+$_disp_height = '';
+$_disp_rotate = 'normal';
+if (preg_match('/^DISPLAY_MODE=(.+)$/m',   $_disp_conf, $m)) $_disp_mode   = trim($m[1]);
+if (preg_match('/^SERVER_URL=(.+)$/m',     $_disp_conf, $m)) $_disp_url    = trim($m[1]);
+if (preg_match('/^DISPLAY_WIDTH=(\d+)$/m', $_disp_conf, $m)) $_disp_width  = trim($m[1]);
+if (preg_match('/^DISPLAY_HEIGHT=(\d+)$/m',$_disp_conf, $m)) $_disp_height = trim($m[1]);
+if (preg_match('/^DISPLAY_ROTATE=(.+)$/m', $_disp_conf, $m)) $_disp_rotate = trim($m[1]);
+$_disp_svc      = trim(shell_exec('systemctl is-active noosphere-display 2>/dev/null') ?: 'inactive');
+$_disp_exists   = file_exists('/usr/local/bin/noosphere-display');
+$_mkbd_exists   = (trim(shell_exec('which matchbox-keyboard 2>/dev/null') ?: '') !== '');
+$_touch_devices = [];
+foreach (glob('/sys/class/input/event*/device/properties') ?: [] as $pf) {
+    if (strpos(@file_get_contents($pf) ?: '', 'ID_INPUT_TOUCHSCREEN') !== false
+     || strpos(@file_get_contents(dirname($pf) . '/name') ?: '', 'touch') !== false) {
+        $_touch_devices[] = basename(dirname(dirname($pf)));
+    }
+}
+// Also check udev for touchscreen flag
+if (empty($_touch_devices)) {
+    $udev_out = shell_exec('udevadm info --export-db 2>/dev/null | grep -l ID_INPUT_TOUCHSCREEN 2>/dev/null') ?? '';
+    if (trim($udev_out)) $_touch_devices[] = 'detected';
+}
 ?>
 
 <details class="cpanel" open>
@@ -2152,47 +2171,66 @@ if (!$usb_eths): ?>
 </details>
 
 <details class="cpanel" open>
-  <summary>Local Display</summary>
+  <summary>Local Display
+    <?php if ($_disp_svc === 'active'): ?>
+      <span class="badge" style="color:#2ecc71">● <?= esc($_disp_mode) ?><?= $_disp_width ? ' &nbsp;' . esc("{$_disp_width}x{$_disp_height}") : '' ?></span>
+    <?php elseif ($_disp_exists): ?>
+      <span class="badge" style="color:#888">● off</span>
+    <?php endif; ?>
+  </summary>
   <div class="cpbody">
-    <p style="color:#aaa;font-size:13px;margin-bottom:14px">
-      Attach an HDMI monitor or Raspberry Pi touchscreen to show the kiosk or command view locally.
-      <?php if (!$_disp_exists): ?>
-        <span style="color:#e94560">noosphere-display not installed  -  run <code>setup-local-display.sh server</code> first.</span>
-      <?php endif; ?>
+    <?php if (!$_disp_exists): ?>
+    <p style="color:#aaa;font-size:13px;margin-bottom:10px">
+      Attach an HDMI monitor or touchscreen. Run the setup script first:
     </p>
+    <pre style="background:#080810;padding:8px;border-radius:4px;font-size:12px;color:#ccc">cd /var/www/noosphere/scripts
+bash setup-local-display.sh server</pre>
+    <?php else: ?>
+
+    <?php
+    // Hardware info row
+    $touch_label = !empty($_touch_devices) ? 'detected (' . implode(', ', $_touch_devices) . ')' : 'not detected';
+    $touch_col   = !empty($_touch_devices) ? '#2ecc71' : '#888';
+    $mkbd_col    = $_mkbd_exists ? '#2ecc71' : '#888';
+    ?>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#888;margin-bottom:14px">
+      <?php if ($_disp_width): ?>
+      <span>📺 <?= esc("{$_disp_width}x{$_disp_height}") ?><?= $_disp_rotate !== 'normal' ? ' ' . esc($_disp_rotate) : '' ?></span>
+      <?php endif; ?>
+      <span style="color:<?= $touch_col ?>">👆 touchscreen: <?= $touch_label ?></span>
+      <span style="color:<?= $mkbd_col ?>">⌨ matchbox-keyboard: <?= $_mkbd_exists ? 'installed' : 'not installed' ?></span>
+      <span>service: <span style="color:#<?= $_disp_svc==='active'?'2ecc71':'888' ?>"><?= esc($_disp_svc) ?></span></span>
+    </div>
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       <?php
       $modes = [
-        'kiosk'   => ['label'=>'Kiosk',   'desc'=>'Public view  -  full-screen kiosk display', 'color'=>'2ecc71', 'bg'=>'0a2a0a', 'border'=>'2a6a2a'],
-        'command' => ['label'=>'Command', 'desc'=>'Operator command dashboard',                'color'=>'4a9eff', 'bg'=>'0a1a2a', 'border'=>'2a4a6a'],
-        'off'     => ['label'=>'Off',     'desc'=>'Turn off local display service',           'color'=>'888',    'bg'=>'161616', 'border'=>'2a2a2a'],
+        'kiosk'   => ['label'=>'Kiosk',   'desc'=>'Public touchscreen  -  on-screen keyboard, ?ns_kiosk=1', 'color'=>'2ecc71','bg'=>'0a2a0a','border'=>'2a6a2a'],
+        'command' => ['label'=>'Command', 'desc'=>'Operator command dashboard',                             'color'=>'4a9eff','bg'=>'0a1a2a','border'=>'2a4a6a'],
+        'admin'   => ['label'=>'Admin',   'desc'=>'Admin panel  -  login required on-screen',              'color'=>'f39c12','bg'=>'1a1000','border'=>'4a3000'],
+        'off'     => ['label'=>'Off',     'desc'=>'Disable local display',                                 'color'=>'888',   'bg'=>'161616','border'=>'2a2a2a'],
       ];
       foreach ($modes as $mkey => $mc):
         $active = ($_disp_mode === $mkey);
       ?>
-      <div style="flex:1;min-width:150px;background:#<?= $active ? $mc['bg'] : '111118' ?>;border:1px solid #<?= $active ? $mc['border'] : '222' ?>;border-radius:6px;padding:12px">
+      <div style="flex:1;min-width:140px;background:#<?= $active ? $mc['bg'] : '111118' ?>;border:1px solid #<?= $active ? $mc['border'] : '222' ?>;border-radius:6px;padding:12px">
         <div style="font-size:11px;color:#<?= $active ? $mc['color'] : '444' ?>;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">
-          <?= $active ? '● Active' : '○ Inactive' ?>
+          <?= $active ? '● Active' : '○' ?>
         </div>
         <div style="font-weight:bold;color:#<?= $active ? $mc['color'] : 'aaa' ?>;margin-bottom:4px"><?= $mc['label'] ?></div>
-        <div style="font-size:11px;color:#666;margin-bottom:10px"><?= $mc['desc'] ?></div>
-        <?php if (!$active && $_disp_exists): ?>
-          <button class="btn-sm" onclick="setDisplayMode('<?= $mkey ?>', this)">Switch to <?= $mc['label'] ?></button>
-        <?php elseif ($active): ?>
-          <div style="font-size:11px;color:#555">service: <span style="color:#<?= $_disp_svc==='active'?'2ecc71':'e94560' ?>"><?= esc($_disp_svc) ?></span></div>
+        <div style="font-size:11px;color:#555;margin-bottom:10px"><?= $mc['desc'] ?></div>
+        <?php if (!$active): ?>
+          <button class="btn-sm" onclick="setDisplayMode('<?= $mkey ?>', this)">Switch</button>
+        <?php else: ?>
+          <a href="javascript:void(0)" onclick="setDisplayMode('<?= esc($mkey) ?>',this)" style="font-size:11px;color:#4a9eff">Restart</a>
         <?php endif; ?>
       </div>
       <?php endforeach; ?>
     </div>
-    <div id="disp-out" style="display:none;font-size:11px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
-    <?php if ($_disp_exists): ?>
-    <div style="margin-top:10px;font-size:12px;color:#555">
-      Config: <code>/etc/noosphere/display.conf</code> &nbsp;|&nbsp; URL: <code><?= esc($_disp_url) ?></code>
-      &nbsp;|&nbsp; <a href="javascript:void(0)" onclick="setDisplayMode('<?= esc($_disp_mode) ?>',this)" style="color:#4a9eff">Restart service</a>
-    </div>
-    <?php else: ?>
-    <div style="margin-top:10px;font-size:12px;color:#555">
-      To install: <code>cd /var/www/noosphere/scripts && bash setup-local-display.sh server</code>
+    <div id="disp-out" style="display:none;font-size:11px;color:#aaa;background:#070710;border:1px solid #1a1a2a;border-radius:5px;padding:8px;white-space:pre-wrap;max-height:100px;overflow-y:auto"></div>
+    <div style="margin-top:8px;font-size:11px;color:#444">
+      Config: <code>/etc/noosphere/display.conf</code>
+      &nbsp;|&nbsp; <code>noosphere-display-mode kiosk|command|admin|off</code>
     </div>
     <?php endif; ?>
   </div>

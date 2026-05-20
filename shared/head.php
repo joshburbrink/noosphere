@@ -7,6 +7,12 @@
 $_ns_theme_default        = get_setting('theme_default', 'dark');
 $_ns_theme_allow_override = get_setting('theme_allow_user_override', '1') === '1';
 $_ns_identity_strip       = get_setting('identity_strip', '1') === '1' && !is_readonly();
+
+// Kiosk/touchscreen mode: set by ?ns_kiosk=1 from the Chromium launcher, persists in session.
+if (isset($_GET['ns_kiosk'])) {
+    $_SESSION['ns_kiosk'] = (int)$_GET['ns_kiosk'] === 1;
+}
+$_ns_kiosk = !empty($_SESSION['ns_kiosk']);
 ?>
 <script>
 (function(){
@@ -20,6 +26,7 @@ $_ns_identity_strip       = get_setting('identity_strip', '1') === '1' && !is_re
 </script>
 <link rel="stylesheet" href="/static/theme.css">
 <link rel="stylesheet" href="/static/mobile.css">
+<?php if ($_ns_kiosk): ?><link rel="stylesheet" href="/static/kiosk.css"><?php endif; ?>
 <script>
 document.addEventListener("DOMContentLoaded", function(){
   var allow = <?= $_ns_theme_allow_override ? 'true' : 'false' ?>;
@@ -53,6 +60,9 @@ document.addEventListener("DOMContentLoaded", function(){
   document.body.appendChild(bar);
 });
 </script>
+<?php if ($_ns_kiosk): ?>
+<script src="/static/kiosk-keyboard.js" defer></script>
+<?php endif; ?>
 <?php if ($_ns_identity_strip): ?>
 <style>
 /* Floats top-right on every page. Pages with their own top-right content

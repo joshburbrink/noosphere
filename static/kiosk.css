@@ -1,0 +1,83 @@
+/*
+ * kiosk.css  -  touchscreen / 7" display optimizations (#85)
+ * Loaded only when ?ns_kiosk=1 session is active.
+ */
+
+/* Prevent double-tap zoom and long-press menus on interactive elements */
+a, button, input, select, textarea, label, .tile {
+  touch-action: manipulation;
+}
+
+/* Slightly larger base font for 800x480 readability */
+body {
+  font-size: 15px;
+}
+
+/* Homepage: force 2-column grid on small screens */
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Tile: bigger icon + label for finger tapping */
+a.tile .icon  { font-size: 2.8rem; }
+a.tile .label { font-size: 1.15rem; }
+
+/* Larger form inputs and buttons */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  font-size: 16px !important;
+  padding: 10px 12px !important;
+  min-height: 44px;
+}
+
+button,
+input[type="submit"],
+input[type="button"],
+.btn, .btn-sm, .btn-green, .btn-red {
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 15px;
+}
+
+/* Extra bottom padding so keyboard doesn't cover the last form field */
+.kiosk-pad-bottom,
+form:last-of-type {
+  padding-bottom: 260px;
+}
+
+/* Keyboard toggle button: always-visible corner icon */
+#ns-kbd-toggle {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9000;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(26, 26, 60, 0.92);
+  border: 2px solid #4a9eff;
+  color: #4a9eff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: background 0.15s;
+  touch-action: manipulation;
+  user-select: none;
+}
+#ns-kbd-toggle:active {
+  background: rgba(74, 158, 255, 0.3);
+}
+#ns-kbd-toggle.active {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: #7fbfff;
+}
