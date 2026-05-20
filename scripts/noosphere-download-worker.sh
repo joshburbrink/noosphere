@@ -85,8 +85,33 @@ while true; do
         mv -f "$PART" "$TARGET"
         SZ=$(stat -c%s "$TARGET" 2>/dev/null || echo 0)
         sqlx "UPDATE downloads SET status='done', bytes_done=$SZ, finished_at=strftime('%s','now'), pid=NULL WHERE id=$ID"
+
+        # ── Post-completion actions by kind ───────────────────────────────────
+        case "$KIND" in
+            region)
+                # Extract + verify the downloaded region pack, then reclaim the
+                # tarball (boot USB is tight). install script runs as root (this
+                # worker has no User= so it is root).
+                INSTALL=/var/www/noosphere/scripts/install-region-pack.sh
+                [ -x "$INSTALL" ] || INSTALL=/usr/local/bin/install-region-pack.sh
+                mkdir -p /var/log/noosphere
+                if bash "$INSTALL" "$TARGET" >>/var/log/noosphere/region-install.log 2>&1; then
+                    rm -f "$TARGET"
+                else
+                    sqlx "UPDATE downloads SET status='failed', error='downloaded but pack install failed - see /var/log/noosphere/region-install.log' WHERE id=$ID"
+                fi
+                ;;
+        esac
+
+        # Kiwix registration: a ZIM anywhere needs to be in the library. ZIMs on
+        # the boot drive (/var/lib/kiwix/zim) are auto-added by kiwix-watch.path;
+        # ZIMs on an external drive must be registered explicitly here.
         case "$TARGET" in
-            /var/lib/kiwix/zim/*.zim)
+            *.zim)
+                case "$TARGET" in
+                    /var/lib/kiwix/zim/*) : ;;  # kiwix-watch handles registration
+                    *) kiwix-manage /var/lib/kiwix/library.xml add "$TARGET" 2>/dev/null || true ;;
+                esac
                 systemctl restart kiwix 2>/dev/null
                 ;;
         esac

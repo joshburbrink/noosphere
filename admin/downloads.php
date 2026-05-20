@@ -11,6 +11,7 @@ require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
 require_once '/var/www/noosphere/shared/capabilities.php';
 require_once '/var/www/noosphere/shared/downloads.php';
+require_once '/var/www/noosphere/shared/region.php';
 sec_session_start();
 
 if (!can('content.manage')) {
@@ -50,11 +51,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hit = null;
             foreach ($cat['entries'] as $e) if ($e['id'] === $entry_id) { $hit = $e; break; }
             if (!$hit) throw new RuntimeException('Catalog entry not found.');
-            $target = '/var/lib/kiwix/zim/' . $hit['filename'];
-            if (file_exists($target)) throw new RuntimeException('Already installed: ' . $hit['filename']);
+            $tgt = storage_target_by_id($_POST['dest'] ?? 'boot') ?: storage_target_by_id('boot');
+            $zimdir = storage_zim_dir($tgt);
+            $target = $zimdir . '/' . $hit['filename'];
+            if (file_exists($target)) throw new RuntimeException('Already on ' . $tgt['label'] . ': ' . $hit['filename']);
+            if ((int)$hit['size'] > 0 && $tgt['free'] > 0 && (int)$hit['size'] > $tgt['free']) {
+                throw new RuntimeException('Not enough room on ' . $tgt['label'] . ' (' . fmt_size($tgt['free']) . ' free, need ' . fmt_size($hit['size']) . '). Pick another drive.');
+            }
             $id = dl_queue('zim', $hit['title'], $hit['url'], $target, (int)$hit['size']);
-            log_audit('queue_download', 'zim ' . $hit['filename'] . ' (' . fmt_size($hit['size']) . ')', 'info');
-            $msg = 'Queued: ' . $hit['title'];
+            log_audit('queue_download', 'zim ' . $hit['filename'] . ' (' . fmt_size($hit['size']) . ') -> ' . $tgt['label'], 'info');
+            $msg = 'Queued: ' . $hit['title'] . '  ->  ' . $tgt['label'];
+        } elseif ($act === 'queue_region') {
+            $url   = trim($_POST['region_url'] ?? '');
+            $label = trim($_POST['region_label'] ?? '');
+            if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $url)) {
+                throw new RuntimeException('Enter a valid http(s) URL to a region pack (.tar.gz).');
+            }
+            $fname = basename(parse_url($url, PHP_URL_PATH) ?: '');
+            if (!preg_match('/\.(tar\.gz|tgz)$/i', $fname)) $fname = 'region-' . date('Ymd-His') . '.tar.gz';
+            $fname = preg_replace('/[^A-Za-z0-9._-]/', '_', $fname);
+            $tgt = storage_target_by_id($_POST['dest'] ?? 'boot') ?: storage_target_by_id('boot');
+            $stage = ($tgt['id'] === 'boot') ? '/var/lib/noosphere/region-downloads'
+                                             : rtrim($tgt['root'], '/') . '/noosphere/region-downloads';
+            $target = $stage . '/' . $fname;
+            $id = dl_queue('region', $label ?: ('Region pack ' . $fname), $url, $target, 0);
+            log_audit('queue_download', 'region ' . $fname . ' from ' . parse_url($url, PHP_URL_HOST), 'info');
+            $msg = 'Queued region pack: ' . ($label ?: $fname) . '. It will install automatically when the download finishes.';
+        } elseif ($act === 'queue_topo') {
+            $url   = trim($_POST['topo_url'] ?? '');
+            $fn    = basename(trim($_POST['topo_filename'] ?? ''));
+            $title = trim($_POST['topo_title'] ?? '');
+            $size  = (int)($_POST['topo_size'] ?? 0);
+            if (!topo_url_allowed($url)) throw new RuntimeException('Topo URL must be a USGS/National Map host.');
+            $fn = preg_replace('/[^A-Za-z0-9._-]/', '_', $fn);
+            if (!preg_match('/\.pdf$/i', $fn)) throw new RuntimeException('Topo file must be a .pdf.');
+            $target = region_path('topo') . '/' . $fn;
+            if (file_exists($target)) throw new RuntimeException('Already downloaded: ' . $fn);
+            $id = dl_queue('topo', 'Topo: ' . ($title ?: $fn), $url, $target, $size);
+            log_audit('queue_download', 'topo ' . $fn . ' (' . fmt_size($size) . ')', 'info');
+            $msg = 'Queued topo: ' . ($title ?: $fn);
         } elseif ($act === 'cancel') {
             $id = (int)($_POST['id'] ?? 0);
             if ($id && dl_cancel($id)) {
@@ -107,10 +142,44 @@ if ($cat) {
     $filtered = array_slice($filtered, 0, 200);
 }
 
-// Installed ZIMs (mark as already installed).
+// Storage targets (boot + any mounted external drive).
+$targets = storage_targets();
+$has_ext = count($targets) > 1;
+// Default destination: prefer a roomy external drive if the boot drive is tight.
+$boot_t = $targets[0];
+$default_dest = 'boot';
+if ($has_ext && $boot_t['total'] > 0 && ($boot_t['free'] / $boot_t['total']) < 0.15) {
+    $default_dest = $targets[1]['id'];
+}
+
+// Installed ZIMs (mark as already installed) across all drives.
 $installed = [];
-foreach (glob('/var/lib/kiwix/zim/*.zim') ?: [] as $p) $installed[basename($p)] = true;
-foreach (glob('/var/lib/kiwix/zim/disabled/*.zim') ?: [] as $p) $installed[basename($p)] = true;
+$zim_scan_dirs = ['/var/lib/kiwix/zim', '/var/lib/kiwix/zim/disabled'];
+foreach ($targets as $t) if ($t['id'] !== 'boot') $zim_scan_dirs[] = storage_zim_dir($t);
+foreach ($zim_scan_dirs as $d) {
+    foreach (glob($d . '/*.zim') ?: [] as $p) $installed[basename($p)] = true;
+}
+
+// Topo picker: bbox prefilled from the active region, optional online query.
+$topo_bbox = [
+    's' => region_meta('bbox.south'), 'w' => region_meta('bbox.west'),
+    'n' => region_meta('bbox.north'), 'e' => region_meta('bbox.east'),
+];
+$topo_results = null; $topo_err = '';
+if (isset($_GET['topo_fetch'])) {
+    $s = (float)($_GET['ts'] ?? 0); $w = (float)($_GET['tw'] ?? 0);
+    $n = (float)($_GET['tn'] ?? 0); $e = (float)($_GET['te'] ?? 0);
+    if (!$s || !$w || !$n || !$e || $s >= $n || $w >= $e) {
+        $topo_err = 'Enter a valid bounding box (south < north, west < east).';
+    } else {
+        try { $topo_results = tnm_topo_query($s, $w, $n, $e); }
+        catch (Throwable $ex) { $topo_err = $ex->getMessage(); }
+    }
+    $topo_bbox = ['s'=>$s ?: $topo_bbox['s'],'w'=>$w ?: $topo_bbox['w'],'n'=>$n ?: $topo_bbox['n'],'e'=>$e ?: $topo_bbox['e']];
+}
+$active_slug = active_region_slug();
+$topo_have = [];
+foreach (glob(region_path('topo') . '/*.pdf') ?: [] as $p) $topo_have[basename($p)] = true;
 ?>
 <!doctype html>
 <html lang="en">
@@ -160,7 +229,7 @@ form.inline{display:inline;margin:0}
 
 <div style="margin-bottom:14px"><a href="/admin/">&larr; Back to admin</a></div>
 <h1>Optional Downloads</h1>
-<div class="sub">Browse the Kiwix catalog and queue ZIM downloads. Works offline once cached.</div>
+<div class="sub">Browse the Kiwix catalog, region packs, and topo maps; queue downloads to the boot USB or a second drive. Catalog works offline once cached.</div>
 
 <?php if ($msg): ?><div class="msg ok"><?= esc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg err"><?= esc($err) ?></div><?php endif; ?>
@@ -240,6 +309,18 @@ form.inline{display:inline;margin:0}
       <span class="muted">showing <?= count($filtered) ?> result(s)<?= count($filtered) >= 200 ? ' (capped at 200  -  narrow your search)' : '' ?></span>
     </form>
 
+    <?php if ($has_ext): ?>
+    <div class="toolbar" style="margin-bottom:10px">
+      <label class="muted" for="zim-dest">Download to:</label>
+      <select id="zim-dest">
+        <?php foreach ($targets as $t): ?>
+          <option value="<?= esc($t['id']) ?>" <?= $t['id'] === $default_dest ? 'selected' : '' ?>><?= esc($t['label']) ?> (<?= fmt_size($t['free']) ?> free)</option>
+        <?php endforeach; ?>
+      </select>
+      <span class="muted">Big libraries can go to a second drive so the boot USB doesn't fill up.</span>
+    </div>
+    <?php endif; ?>
+
     <table>
       <thead><tr><th>Title</th><th>Lang</th><th>Size</th><th></th></tr></thead>
       <tbody>
@@ -258,10 +339,11 @@ form.inline{display:inline;margin:0}
           <?php if ($is_installed): ?>
             <span class="pill done">installed</span>
           <?php else: ?>
-            <form class="inline" method="post" onsubmit="return confirm('Queue download (<?= esc(fmt_size($e['size'])) ?>)?')">
+            <form class="inline" method="post" onsubmit="var s=document.getElementById('zim-dest');if(s)this.dest.value=s.value;return confirm('Queue download (<?= esc(fmt_size($e['size'])) ?>)?')">
               <?= csrf_field() ?>
               <input type="hidden" name="act" value="queue_zim">
               <input type="hidden" name="entry_id" value="<?= esc($e['id']) ?>">
+              <input type="hidden" name="dest" value="<?= esc($default_dest) ?>">
               <input type="hidden" name="back_qs" value="<?= esc(http_build_query(['q'=>$q,'lang'=>$lang])) ?>">
               <button class="btn-sm">Queue</button>
             </form>
@@ -271,6 +353,77 @@ form.inline{display:inline;margin:0}
       <?php endforeach; ?>
       </tbody>
     </table>
+  <?php endif; ?>
+</div>
+
+<!-- REGION PACK DOWNLOADER -->
+<div class="card">
+  <h2>Region pack</h2>
+  <div class="muted" style="margin-bottom:10px">
+    Download a prebuilt region pack (maps, topo, county frequencies, planting calendar) by URL.
+    It verifies and installs automatically when the download finishes, then the tarball is removed
+    to save space. Activate it afterward under <a href="/admin/#region">Admin &rarr; Region</a>.
+    To build one yourself, use the region builder in Admin &rarr; Region (#80).
+  </div>
+  <form method="post">
+    <?= csrf_field() ?>
+    <input type="hidden" name="act" value="queue_region">
+    <div class="toolbar">
+      <input type="text" name="region_url" placeholder="https://.../my-region.tar.gz" style="flex:2;min-width:240px" required>
+      <input type="text" name="region_label" placeholder="Label (optional)" style="flex:1;min-width:140px">
+      <button class="btn-sm btn-green" onclick="return confirm('Download and install this region pack?')">Download &amp; install</button>
+    </div>
+    <div class="muted">Region data installs to the boot drive (it must be local to be served).</div>
+  </form>
+</div>
+
+<!-- TOPO PDF PICKER -->
+<div class="card">
+  <h2>USGS topo PDFs <span class="muted">- active region: <?= esc($active_slug) ?></span></h2>
+  <div class="muted" style="margin-bottom:10px">
+    Download USGS 7.5-minute topographic quads covering a bounding box. They install into the
+    active region and appear at <a href="/topo/">/topo/</a>. US only.
+  </div>
+  <form method="get" class="toolbar">
+    <input type="hidden" name="topo_fetch" value="1">
+    <label class="muted">S</label><input type="text" name="ts" value="<?= esc($topo_bbox['s']) ?>" placeholder="38.9" style="width:80px">
+    <label class="muted">W</label><input type="text" name="tw" value="<?= esc($topo_bbox['w']) ?>" placeholder="-86.6" style="width:80px">
+    <label class="muted">N</label><input type="text" name="tn" value="<?= esc($topo_bbox['n']) ?>" placeholder="39.5" style="width:80px">
+    <label class="muted">E</label><input type="text" name="te" value="<?= esc($topo_bbox['e']) ?>" placeholder="-85.5" style="width:80px">
+    <button class="btn-sm">Fetch quad list (online)</button>
+  </form>
+  <?php if ($topo_err): ?><div class="msg err" style="margin-top:10px"><?= esc($topo_err) ?></div><?php endif; ?>
+  <?php if (is_array($topo_results)): ?>
+    <?php if (!$topo_results): ?>
+      <div class="muted" style="margin-top:10px">No topo quads found for that bbox.</div>
+    <?php else: ?>
+    <table style="margin-top:10px">
+      <thead><tr><th>Quad</th><th>Size</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($topo_results as $tr): $have = isset($topo_have[$tr['filename']]); ?>
+      <tr>
+        <td class="title-cell"><div class="ttl"><?= esc($tr['title']) ?></div><div class="fn"><?= esc($tr['filename']) ?></div></td>
+        <td><?= fmt_size($tr['size']) ?></td>
+        <td>
+          <?php if ($have): ?>
+            <span class="pill done">have</span>
+          <?php else: ?>
+            <form class="inline" method="post" onsubmit="return confirm('Queue topo download (<?= esc(fmt_size($tr['size'])) ?>)?')">
+              <?= csrf_field() ?>
+              <input type="hidden" name="act" value="queue_topo">
+              <input type="hidden" name="topo_url" value="<?= esc($tr['url']) ?>">
+              <input type="hidden" name="topo_filename" value="<?= esc($tr['filename']) ?>">
+              <input type="hidden" name="topo_title" value="<?= esc($tr['title']) ?>">
+              <input type="hidden" name="topo_size" value="<?= (int)$tr['size'] ?>">
+              <button class="btn-sm">Queue</button>
+            </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
   <?php endif; ?>
 </div>
 
