@@ -38,12 +38,19 @@ svc_status php8.4-fpm       "php8.4-fpm"
 svc_status kiwix            "kiwix (library)"
 svc_status mbtileserver     "mbtileserver (maps)"
 svc_status wifi-reconnect   "wifi watchdog"
-if [[ -f /usr/local/bin/noosphere-display ]]; then
-    _disp_mode=$(grep -oP '(?<=^DISPLAY_MODE=)\S+' /etc/noosphere/display.conf 2>/dev/null || echo 'unknown')
-    _disp_w=$(grep -oP '(?<=^DISPLAY_WIDTH=)\d+' /etc/noosphere/display.conf 2>/dev/null)
-    _disp_h=$(grep -oP '(?<=^DISPLAY_HEIGHT=)\d+' /etc/noosphere/display.conf 2>/dev/null)
-    _disp_label="local display (${_disp_mode}${_disp_w:+, ${_disp_w}x${_disp_h}})"
-    svc_status noosphere-display "$_disp_label"
+_disp_connected=$(grep -rl '^connected$' /sys/class/drm/*/status 2>/dev/null | head -1)
+_disp_installed=[[ -f /usr/local/bin/noosphere-display ]]
+if [[ -n "$_disp_connected" || -f /usr/local/bin/noosphere-display ]]; then
+    if [[ -f /usr/local/bin/noosphere-display ]]; then
+        _disp_mode=$(grep -oP '(?<=^DISPLAY_MODE=)\S+' /etc/noosphere/display.conf 2>/dev/null || echo 'unknown')
+        _disp_w=$(grep -oP '(?<=^DISPLAY_WIDTH=)\d+' /etc/noosphere/display.conf 2>/dev/null)
+        _disp_h=$(grep -oP '(?<=^DISPLAY_HEIGHT=)\d+' /etc/noosphere/display.conf 2>/dev/null)
+        _disp_label="local display (${_disp_mode}${_disp_w:+, ${_disp_w}x${_disp_h}})"
+        svc_status noosphere-display "$_disp_label"
+    else
+        _disp_port=$(basename "$(dirname "$_disp_connected")" 2>/dev/null | sed 's/card[0-9]-//')
+        printf "${Y}⚠ %-20s${X} display connected (%s)  -  run: setup-local-display.sh server\n" "local display" "$_disp_port"
+    fi
 fi
 
 # ── Web health ─────────────────────────────────────────────────────────────
