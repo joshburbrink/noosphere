@@ -29,10 +29,22 @@ set -euo pipefail
 REPO_URL="https://github.com/joshburbrink/noosphere.git"
 NOOSPHERE_DIR="/var/www/noosphere"
 DATA_DIR="/var/lib/noosphere"
+# ── Architecture detection (amd64 = x86 servers, arm64 = Raspberry Pi 5 etc.) ──
+# Kiwix uses the kernel arch string (x86_64 / aarch64); mbtileserver uses the
+# Debian arch string (amd64 / arm64).
+DEB_ARCH="$(dpkg --print-architecture)"
+case "$DEB_ARCH" in
+    amd64) KIWIX_ARCH="x86_64"  ; MBTILES_ARCH="amd64" ;;
+    arm64) KIWIX_ARCH="aarch64" ; MBTILES_ARCH="arm64" ;;
+    armhf) KIWIX_ARCH="armhf"   ; MBTILES_ARCH="arm"   ;;
+    *)     KIWIX_ARCH="x86_64"  ; MBTILES_ARCH="amd64"
+           echo "WARN: unrecognized arch '$DEB_ARCH' - defaulting to amd64 binaries" >&2 ;;
+esac
+
 KIWIX_VERSION="3.7.0"
-KIWIX_BIN_URL="https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-x86_64-${KIWIX_VERSION}.tar.gz"
+KIWIX_BIN_URL="https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-${KIWIX_ARCH}-${KIWIX_VERSION}.tar.gz"
 MBTILES_VERSION="0.11.0"
-MBTILES_URL="https://github.com/consbio/mbtileserver/releases/download/v${MBTILES_VERSION}/mbtileserver_linux_amd64"
+MBTILES_URL="https://github.com/consbio/mbtileserver/releases/download/v${MBTILES_VERSION}/mbtileserver_linux_${MBTILES_ARCH}"
 NEXTCLOUD_VERSION="33.0.3"
 NEXTCLOUD_URL="https://download.nextcloud.com/server/releases/nextcloud-${NEXTCLOUD_VERSION}.zip"
 
@@ -243,8 +255,8 @@ else
     TMP_KIWIX=$(mktemp -d)
     wget -q -O "$TMP_KIWIX/kiwix.tar.gz" "$KIWIX_BIN_URL"
     tar -xzf "$TMP_KIWIX/kiwix.tar.gz" -C "$TMP_KIWIX"
-    install -m 755 "$TMP_KIWIX"/kiwix-tools_linux-x86_64-*/kiwix-serve /usr/bin/kiwix-serve
-    install -m 755 "$TMP_KIWIX"/kiwix-tools_linux-x86_64-*/kiwix-manage /usr/bin/kiwix-manage 2>/dev/null || true
+    install -m 755 "$TMP_KIWIX"/kiwix-tools_linux-${KIWIX_ARCH}-*/kiwix-serve /usr/bin/kiwix-serve
+    install -m 755 "$TMP_KIWIX"/kiwix-tools_linux-${KIWIX_ARCH}-*/kiwix-manage /usr/bin/kiwix-manage 2>/dev/null || true
     rm -rf "$TMP_KIWIX"
     ok "kiwix-serve installed."
 fi

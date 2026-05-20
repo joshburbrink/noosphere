@@ -29,8 +29,24 @@ echo "  Kernel: $KERNEL"
 echo ""
 
 # ── Prerequisites ─────────────────────────────────────────────────────────────
+DEB_ARCH="$(dpkg --print-architecture)"
+
+# On a Raspberry Pi the onboard Broadcom WiFi can run the AP with no out-of-tree
+# driver at all (see setup-hostapd.sh).  This script is only needed for an
+# external RTL8812AU/8821AU USB adapter.
+if grep -qi raspberry /proc/device-tree/model 2>/dev/null; then
+    info "Raspberry Pi detected - onboard WiFi can run the AP without this USB"
+    info "driver (setup-hostapd.sh configure).  Continuing in case you're using"
+    info "an external RTL8812AU adapter."
+    echo ""
+fi
+
+# Header package name varies: Debian uses linux-headers-<arch>; Raspberry Pi OS
+# uses raspberrypi-kernel-headers.  Try the exact-kernel package first.
 info "Installing build prerequisites..."
-apt-get install -y dkms "linux-headers-${KERNEL}" linux-headers-amd64 2>/dev/null || \
+apt-get install -y dkms "linux-headers-${KERNEL}" 2>/dev/null || \
+apt-get install -y dkms "linux-headers-${DEB_ARCH}" 2>/dev/null || \
+apt-get install -y dkms raspberrypi-kernel-headers 2>/dev/null || \
 apt-get install -y dkms linux-headers-generic 2>/dev/null || \
 err "Could not install linux-headers  -  may need manual install: apt-get install linux-headers-\$(uname -r)"
 

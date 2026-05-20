@@ -8,11 +8,44 @@ A bootable USB system that turns any x86 laptop into a self-contained offline in
 
 | Component | Role |
 |---|---|
-| Any x86 laptop | Server  -  boots from USB, runs all services |
+| Any x86 laptop **or** Raspberry Pi 5 | Server  -  runs all services |
 | GL.iNet GL-SFT1200 (Opal) | WiFi access point  -  connects users wirelessly |
-| 64GB+ USB drive | Storage  -  OS + services + content |
+| 64GB+ USB drive (x86) / SD or NVMe (Pi) | Storage  -  OS + services + content |
 
 Tested on HP 3105m. Any x86_64 laptop with 2GB+ RAM will work.
+
+### Raspberry Pi 5 (arm64)
+
+The stack runs on arm64 - the provisioning scripts auto-detect architecture and
+pull the right Kiwix (`aarch64`) and mbtileserver (`arm64`) binaries. Notes:
+
+- **Base image must be Trixie** (Debian 13 arm64 *or* Raspberry Pi OS Trixie
+  64-bit). PHP 8.4 is assumed throughout; Bookworm's PHP 8.2 will not work.
+- The Pi's existing x86 Noosphere USB **will not boot a Pi** - different CPU
+  architecture. Flash a fresh arm64 image with rpi-imager, then run
+  `noosphere-provision.sh`.
+- AP mode can use the Pi's **onboard WiFi** (`wlan0`) - no external RTL8812AU
+  adapter or DKMS driver needed. `setup-hostapd.sh` handles rfkill and
+  NetworkManager release automatically.
+
+#### One-shot migration from an x86 server
+
+`scripts/migrate-to-pi.sh` builds a ready-to-boot Pi drive from a laptop: it
+flashes Pi OS, enables headless SSH, registers a first-boot provisioning
+service, and stages your existing data. Plug the drive into the Pi and power on
+- it self-provisions and imports the data on first boot.
+
+```sh
+# data over the network (server stays up):
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-server 192.168.2.166
+# or from the old drive mounted locally:
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --from-disk /mnt/old-noosphere
+# or a clean Pi with no data:
+sudo ./scripts/migrate-to-pi.sh /dev/sdX --no-data
+```
+
+Migrates ZIMs, SQLite DBs, photos, regions, map tiles. **Commit and push repo
+changes first** - first-boot provisioning clones the app from GitHub.
 
 ---
 

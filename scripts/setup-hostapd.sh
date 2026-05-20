@@ -144,6 +144,19 @@ cmd_enable() {
         apt-get install -y hostapd
     fi
 
+    # Clear rfkill soft-block (Pi onboard WiFi boots soft-blocked until a
+    # regulatory domain is set) and stop NetworkManager from managing the AP
+    # interface (on Raspberry Pi OS, NM owns wlan0 and will tear down hostapd's
+    # IP / hold the radio via wpa_supplicant).  Both are no-ops on the laptop.
+    if command -v rfkill &>/dev/null; then
+        rfkill unblock wifi 2>/dev/null || true
+        rfkill unblock wlan 2>/dev/null || true
+    fi
+    if command -v nmcli &>/dev/null && systemctl is-active --quiet NetworkManager 2>/dev/null; then
+        info "Releasing $AP_INTERFACE from NetworkManager..."
+        nmcli device set "$AP_INTERFACE" managed no 2>/dev/null || true
+    fi
+
     # Bring interface up, assign IP
     info "Configuring interface $AP_INTERFACE..."
     ip link set "$AP_INTERFACE" up
