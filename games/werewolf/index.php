@@ -169,10 +169,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             $ht=tok();
             wdb()->prepare("INSERT INTO ww_games (code,host_token,state,log,created_at,updated_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$code,$ht,'lobby',json_encode(['🪵 Lobby created. Share the code: '.$code]),now(),now()]);
-            $gid=wdb()->lastInsertId(); $pt=tok();
+            $gid=wdb()->lastInsertId();
+            // host's player token IS the host_token, so host checks match
             wdb()->prepare("INSERT INTO ww_players (game_id,token,name,joined_at,last_seen) VALUES (?,?,?,?,?)")
-                ->execute([$gid,$pt,substr($name,0,24),now(),now()]);
-            out(['ok'=>true,'code'=>$code,'token'=>$pt,'host'=>true]);
+                ->execute([$gid,$ht,substr($name,0,24),now(),now()]);
+            out(['ok'=>true,'code'=>$code,'token'=>$ht,'host'=>true]);
         }
         if ($act==='join') {
             $g=game_by_code($b['code']??''); if(!$g) out(['ok'=>false,'error'=>'game not found']);
