@@ -285,8 +285,28 @@ button:disabled{opacity:.5}
 .banner{text-align:center;font-size:15px;padding:8px;border-radius:7px;margin-bottom:10px}
 .night{background:#161636;color:#9aa}.day{background:#3a3320;color:#f3d27a}.ended{background:#1f2f1f;color:#9de89d}
 </style></head><body>
-<h1>🐺 Werewolf</h1>
+<h1>🐺 Werewolf <button onclick="toggleRules()" style="float:right;width:auto;padding:6px 12px;font-size:13px;margin:0;background:#23233e">📖 Rules</button></h1>
 <div class="sub">Local party game  -  everyone on this WiFi, phones in hand. A narrator helps, but the app runs the game.</div>
+<div id="rules" class="card" style="display:none">
+  <b>How to play</b>
+  <p style="font-size:13px;color:#cfcfe0;margin:8px 0">A hidden team of <b style="color:#e8503a">Werewolves</b> is mixed into the <b style="color:#2ecc71">Village</b>. Each round has a <b>Night</b> and a <b>Day</b>.</p>
+  <ul style="font-size:13px;color:#bbb;margin:0 0 8px 18px;line-height:1.5">
+    <li><b>🌙 Night:</b> everyone "sleeps." On their phones, the wolves secretly pick someone to eliminate, the Seer inspects one person, the Doctor protects one person.</li>
+    <li><b>☀️ Day:</b> the app reveals who (if anyone) died overnight. Everyone talks it out in person, then votes on their phone to eliminate a suspect.</li>
+    <li>Repeat until one side wins.</li>
+  </ul>
+  <b>Roles</b>
+  <ul style="font-size:13px;color:#bbb;margin:6px 0 8px 18px;line-height:1.55">
+    <li><b style="color:#e8503a">🐺 Werewolf</b> - knows the other wolves. Each night the pack picks one victim. Win when wolves equal the villagers. Blend in by day!</li>
+    <li><b style="color:#3aa0e8">🔮 Seer</b> - each night, inspect one player to learn if they are a werewolf. Guide the village without exposing yourself.</li>
+    <li><b style="color:#2ecc71">⚕️ Doctor</b> - each night, protect one player (even yourself). If the wolves target them, they survive.</li>
+    <li><b style="color:#ccc">🧑‍🌾 Villager</b> - no special power. Use discussion and the day vote to root out the wolves.</li>
+  </ul>
+  <b>Winning</b>
+  <p style="font-size:13px;color:#cfcfe0;margin:6px 0"><b style="color:#2ecc71">Village</b> wins when every werewolf is gone. <b style="color:#e8503a">Wolves</b> win when they equal the number of remaining villagers.</p>
+  <div class="tag">Tip: a narrator can read the night/day aloud, but the app tracks roles, deaths and votes for you.</div>
+  <button class="sec" onclick="toggleRules()">Close</button>
+</div>
 <div id="app"></div>
 <div class="err" id="err"></div>
 
@@ -295,6 +315,7 @@ var S={code:null,token:null,host:false,sel:null,timer:null};
 function $(id){return document.getElementById(id)}
 function api(d){return fetch('',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json())}
 function err(m){$('err').textContent=m||''}
+function toggleRules(){var r=$('rules');r.style.display=r.style.display==='none'?'block':'none'}
 function save(){try{localStorage.setItem('ww',JSON.stringify({code:S.code,token:S.token,host:S.host}))}catch(e){}}
 function load(){try{var d=JSON.parse(localStorage.getItem('ww')||'{}');if(d.code){S.code=d.code;S.token=d.token;S.host=d.host}}catch(e){}}
 
