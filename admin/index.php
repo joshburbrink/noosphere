@@ -4025,6 +4025,7 @@ foreach ($simple_mods as [$key, $id, $label]):
   $preset_info = [
       'emergency' => ['Full / Emergency',         'All modules on, emergency status set'],
       'event'     => ['Event',                    'Check-in, no skills or missing persons, event status'],
+      'camping'   => ['Camping / Outdoor Trip',   'Friendly setup: no location/status/child prompts, camping map pins, library + games on'],
       'sar'       => ['Search & Rescue',          'Missing persons + found, maps, chat only'],
       'shelter'   => ['Shelter',                  'Shelter check-in, bunk/dietary fields, capacity tracking'],
       'kiosk'     => ['Kiosk / Read-Only',        'Library, maps, forum view  -  all writes locked'],
