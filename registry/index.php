@@ -346,16 +346,21 @@ function ago($ts) {
             <input type="text" name="name" required id="name-field" placeholder="Jane Smith">
           <?php endif; ?>
 
+          <?php if (get_setting('registry_track_children','1') === '1'): ?>
           <div class="child-row">
             <label><input type="checkbox" name="is_child" id="is_child" value="1" <?= !empty($edit_row['is_child']) ? 'checked' : '' ?>> Child (under 18)</label>
             <div style="flex:1">
               <input type="text" name="age" value="<?= esc($edit_row['age'] ?? '') ?>" placeholder="Age (e.g. 8)" style="width:100%">
             </div>
           </div>
+          <?php endif; ?>
 
+          <?php if (get_setting('registry_show_location','1') === '1'): ?>
           <label id="loc-label">Location <?= $loc_required ? '*' : '' ?></label>
           <input type="text" name="location" value="<?= esc($edit_row['location'] ?? '') ?>" <?= $loc_required ? 'required' : '' ?> id="loc-field" placeholder="123 Oak St / Shelter B / Near the dam">
+          <?php endif; ?>
 
+          <?php if (get_setting('registry_show_status','1') === '1'): ?>
           <div id="status-section">
             <label>Status</label>
             <select name="status">
@@ -364,6 +369,7 @@ function ago($ts) {
               <?php endforeach; ?>
             </select>
           </div>
+          <?php endif; ?>
 
           <!-- Dynamic extra fields  -  only shown for check-in -->
           <div id="checkin-section">

@@ -40,9 +40,9 @@ if (get_setting('show_tasks','1')==='1')
 if (get_setting('show_library','1')==='1')
     $tiles[] = ['href'=>'/library/',  'icon'=>'📚', 'label'=>'Library',         'desc'=>'Offline Wikipedia, WikiMed, guides &amp; more'];
 if (get_setting('show_maps','1')==='1')
-    $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Bartholomew &amp; Brown County  -  offline map with shared markers'];
+    $tiles[] = ['href'=>'/maps/',     'icon'=>'🗺️',  'label'=>'Maps',            'desc'=>'Offline map with shared markers'];
 if (get_setting('show_topo','1')==='1')
-    $tiles[] = ['href'=>'/topo/',      'icon'=>'⛰️',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads  -  Bartholomew &amp; Brown County'];
+    $tiles[] = ['href'=>'/topo/',      'icon'=>'⛰️',  'label'=>'Topo Maps',         'desc'=>'USGS 1:24,000 topographic quads'];
 if (get_setting('show_calendar','1')==='1')
     $tiles[] = ['href'=>'/calendar/', 'icon'=>'📅', 'label'=>'Calendar',        'desc'=>'Community events &amp; schedules'];
 if (get_setting('show_runners','0')==='1')
