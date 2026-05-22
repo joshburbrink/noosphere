@@ -33,6 +33,8 @@ if (get_setting('show_chat','1')==='1')
     $tiles[] = ['href'=>'/chat/',     'icon'=>'💬', 'label'=>'Chat',            'desc'=>'Real-time group messaging'];
 if (get_setting('show_forum','1')==='1')
     $tiles[] = ['href'=>'/forum/',    'icon'=>'📋', 'label'=>'Community Board', 'desc'=>'Announcements, coordination &amp; discussion'];
+if (get_setting('show_vote','1')==='1')
+    $tiles[] = ['href'=>'/vote/',     'icon'=>'🗳️', 'label'=>'Polls',           'desc'=>'Quick community votes  -  one vote per device'];
 if (get_setting('show_files','1')==='1')
     $tiles[] = ['href'=>'/files/',    'icon'=>'📁', 'label'=>'Files',           'desc'=>'Share documents, notices &amp; resources'];
 if (get_setting('show_tasks','1')==='1')
