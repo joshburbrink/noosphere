@@ -4,7 +4,7 @@
 (function() {
 'use strict';
 
-var TYPE = {
+var TYPE = window.NS_INCIDENT_TYPES || {
   damage:   { color:'#e67e22', icon:'🏚',  label:'Damage' },
   medical:  { color:'#e94560', icon:'🏥',  label:'Medical' },
   hazard:   { color:'#f39c12', icon:'⚠️', label:'Hazard' },

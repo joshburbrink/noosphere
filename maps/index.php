@@ -3,6 +3,7 @@ require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
 require_once '/var/www/noosphere/shared/identity.php';
 require_once '/var/www/noosphere/shared/region.php';
+require_once '/var/www/noosphere/incidents/_init.php';
 sec_session_start();
 if (get_setting('show_maps','1') !== '1') { http_response_code(404); exit; }
 $is_admin    = legacy_is_admin();
@@ -116,12 +117,9 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <h2>Drop a Pin</h2>
     <label>Type</label>
     <select id="mk-type">
-      <option value="general">📍  General / Observation</option>
-      <option value="damage">🏚  Damage</option>
-      <option value="medical">🏥  Medical</option>
-      <option value="hazard">⚠️  Hazard</option>
-      <option value="missing">🔍  Missing Person</option>
-      <option value="resource">📦  Resource</option>
+      <?php foreach (INCIDENT_TYPES as $tk => $tlabel): ?>
+      <option value="<?= htmlspecialchars($tk) ?>"><?= (INCIDENT_TYPE_ICONS[$tk] ?? '📍') . '  ' . htmlspecialchars($tlabel) ?></option>
+      <?php endforeach; ?>
     </select>
     <label>Title *</label>
     <input type="text" id="mk-title" placeholder="Short summary  -  e.g. 'Tree across Marr Rd'" maxlength="100">
@@ -141,6 +139,7 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <?php endif; ?>
 <script src="/maps/lib/maplibre-gl.js"></script>
 <?php if ($incidents_active): ?>
+<script>window.NS_INCIDENT_TYPES = <?= incident_types_json() ?>;</script>
 <script src="/shared/js/incidents-map.js"></script>
 <?php endif; ?>
 <script>

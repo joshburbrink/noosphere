@@ -142,6 +142,7 @@ function esc($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 <?php if ($maps_on): ?>
 <link rel="stylesheet" href="/maps/lib/maplibre-gl.css">
 <script src="/maps/lib/maplibre-gl.js"></script>
+<script>window.NS_INCIDENT_TYPES = <?= incident_types_json() ?>;</script>
 <script src="/shared/js/incidents-map.js"></script>
 <?php endif; ?>
 <style>

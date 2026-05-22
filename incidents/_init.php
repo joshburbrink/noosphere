@@ -38,14 +38,64 @@ function incidents_db(): PDO {
     return $db;
 }
 
-const INCIDENT_TYPES = [
-    'damage'   => 'Damage',
-    'medical'  => 'Medical',
-    'hazard'   => 'Hazard',
-    'missing'  => 'Missing Person',
-    'resource' => 'Resource',
-    'general'  => 'General / Observation',
-];
+// Pin types are scenario-driven: 'disaster' (default) or 'camping'.
+if (get_setting('incident_type_set', 'disaster') === 'camping') {
+    define('INCIDENT_TYPES', [
+        'campsite' => 'Campsite',
+        'water'    => 'Water',
+        'firewood' => 'Firewood',
+        'trail'    => 'Trail / Route',
+        'poi'      => 'Point of Interest',
+        'hazard'   => 'Hazard',
+        'general'  => 'General / Note',
+    ]);
+    define('INCIDENT_TYPE_COLORS', [
+        'campsite' => '#2ecc71',
+        'water'    => '#3498db',
+        'firewood' => '#e67e22',
+        'trail'    => '#9b59b6',
+        'poi'      => '#7aa7d9',
+        'hazard'   => '#f39c12',
+        'general'  => '#95a5a6',
+    ]);
+    define('INCIDENT_TYPE_ICONS', [
+        'campsite' => '⛺', 'water' => '💧', 'firewood' => '🪵',
+        'trail' => '🥾', 'poi' => '📍', 'hazard' => '⚠️', 'general' => '📌',
+    ]);
+} else {
+    define('INCIDENT_TYPES', [
+        'damage'   => 'Damage',
+        'medical'  => 'Medical',
+        'hazard'   => 'Hazard',
+        'missing'  => 'Missing Person',
+        'resource' => 'Resource',
+        'general'  => 'General / Observation',
+    ]);
+    define('INCIDENT_TYPE_COLORS', [
+        'damage'   => '#e67e22',
+        'medical'  => '#e94560',
+        'hazard'   => '#f39c12',
+        'missing'  => '#9b59b6',
+        'resource' => '#2ecc71',
+        'general'  => '#7aa7d9',
+    ]);
+    define('INCIDENT_TYPE_ICONS', [
+        'damage' => '🏚', 'medical' => '🏥', 'hazard' => '⚠️',
+        'missing' => '🔍', 'resource' => '📦', 'general' => '📍',
+    ]);
+}
+
+function incident_types_json(): string {
+    $out = [];
+    foreach (INCIDENT_TYPES as $k => $label) {
+        $out[$k] = [
+            'label' => $label,
+            'color' => INCIDENT_TYPE_COLORS[$k] ?? '#7aa7d9',
+            'icon'  => INCIDENT_TYPE_ICONS[$k] ?? '📍',
+        ];
+    }
+    return json_encode($out);
+}
 
 const INCIDENT_SEVERITIES = [
     'critical' => 'Critical',
@@ -58,15 +108,6 @@ const INCIDENT_STATUSES = [
     'open'         => 'Open',
     'acknowledged' => 'Acknowledged',
     'resolved'     => 'Resolved',
-];
-
-const INCIDENT_TYPE_COLORS = [
-    'damage'   => '#e67e22',
-    'medical'  => '#e94560',
-    'hazard'   => '#f39c12',
-    'missing'  => '#9b59b6',
-    'resource' => '#2ecc71',
-    'general'  => '#7aa7d9',
 ];
 
 const INCIDENT_SEVERITY_COLORS = [
