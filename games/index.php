@@ -10,6 +10,7 @@ $multiplayer = [
     ['file'=>'battleship/', 'icon'=>'⚓', 'title'=>'Battleship',  'desc'=>'2 players  -  sink the fleet · share link to join'],
     ['file'=>'codenames/',  'icon'=>'🕵️', 'title'=>'Codenames',   'desc'=>'2–8 players  -  one-word clues, two teams'],
     ['file'=>'pictionary/', 'icon'=>'🎨', 'title'=>'Pictionary',  'desc'=>'2+ players  -  draw and guess · 90s per turn'],
+    ['file'=>'werewolf/',   'icon'=>'🐺', 'title'=>'Werewolf',    'desc'=>'5+ players  -  social deduction · roles, night &amp; day, voting'],
 ];
 $games = [
     ['file'=>'snake.html',      'icon'=>'🐍', 'title'=>'Snake',       'desc'=>'Classic snake  -  eat, grow, survive'],
