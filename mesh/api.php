@@ -33,7 +33,7 @@ if ($action === 'nodes') {
 }
 
 if ($action === 'send') {
-    if (!sec_check_csrf()) { echo json_encode(['ok'=>false,'error'=>'csrf']); exit; }
+    if (!csrf_verify()) { echo json_encode(['ok'=>false,'error'=>'csrf']); exit; }
     if (!can('mesh.send'))  { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit; }
     $body = trim($_POST['body'] ?? '');
     if ($body === '') { echo json_encode(['ok'=>false,'error'=>'empty']); exit; }

@@ -122,10 +122,23 @@ $can_send = can('mesh.send');
     f.addEventListener('submit', function(e){
       e.preventDefault();
       var fd = new FormData(f); fd.append('action','send');
-      fetch('/mesh/api.php', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
-        if (j.ok) { document.getElementById('msg-body').value=''; setTimeout(poll, 500); }
-        else alert('Send failed: '+(j.error||'?'));
-      });
+      var btn = f.querySelector('button[type=submit]');
+      if (btn) { btn.disabled = true; btn.textContent = '...'; }
+      fetch('/mesh/api.php', {method:'POST', body:fd, credentials:'same-origin'})
+        .then(function(r){
+          if (!r.ok) throw new Error('HTTP '+r.status);
+          return r.text();
+        })
+        .then(function(txt){
+          var j; try { j = JSON.parse(txt); } catch (e) { throw new Error('non-JSON: '+txt.slice(0,200)); }
+          if (j.ok) {
+            document.getElementById('msg-body').value=''; setTimeout(poll, 500);
+          } else {
+            alert('Send failed: '+(j.error || JSON.stringify(j)));
+          }
+        })
+        .catch(function(err){ alert('Send failed: '+err.message); })
+        .finally(function(){ if (btn) { btn.disabled = false; btn.textContent = 'Send'; } });
     });
   }
 })();
