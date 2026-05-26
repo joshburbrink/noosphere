@@ -408,10 +408,13 @@ ok "kiwix-watch installed."
 ##############################################################################
 info "Installing Noosphere systemd services..."
 
-for svc in noosphere-aprs.service noosphere-aprs-writer.service noosphere-rtl433.service noosphere-meshtastic.service noosphere-nwr-to-mesh.service noosphere-nwr-to-mesh.timer wifi-reconnect.service; do
+for svc in noosphere-aprs.service noosphere-aprs-writer.service noosphere-rtl433.service noosphere-meshtastic.service noosphere-meshtastic.path noosphere-nwr-to-mesh.service noosphere-nwr-to-mesh.timer wifi-reconnect.service; do
     src="$NOOSPHERE_DIR/systemd/$svc"
     [[ -f "$src" ]] && cp "$src" "/etc/systemd/system/$svc" || true
 done
+# Enable the .path watcher so the meshtastic daemon auto-starts when the
+# USB node appears (handles slow USB enumeration at boot).
+systemctl enable noosphere-meshtastic.path 2>/dev/null || true
 
 mkdir -p /etc/systemd/system/dnsmasq.service.d
 if [[ -d "$NOOSPHERE_DIR/systemd/dnsmasq.service.d" ]]; then

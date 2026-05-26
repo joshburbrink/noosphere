@@ -1,7 +1,9 @@
 [Unit]
 Description=Noosphere Meshtastic bridge (#90)
 After=network.target
-ConditionPathExists=/dev/ttyUSB0
+# Note: ConditionPathExists removed — USB enumeration is racy at boot and
+# systemd does not retry Condition-skipped units. The companion .path unit
+# (noosphere-meshtastic.path) triggers this service when /dev/ttyUSB0 appears.
 
 [Service]
 Type=simple

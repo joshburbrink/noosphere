@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for Meshtastic USB node and start daemon
+After=systemd-udev-settle.service
+
+[Path]
+PathExists=/dev/ttyUSB0
+Unit=noosphere-meshtastic.service
+
+[Install]
+WantedBy=multi-user.target
