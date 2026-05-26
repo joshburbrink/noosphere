@@ -44,13 +44,35 @@ esac
 KIWIX_VERSION="3.7.0"
 KIWIX_BIN_URL="https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-${KIWIX_ARCH}-${KIWIX_VERSION}.tar.gz"
 MBTILES_VERSION="0.11.0"
-MBTILES_URL="https://github.com/consbio/mbtileserver/releases/download/v${MBTILES_VERSION}/mbtileserver_linux_${MBTILES_ARCH}"
+# Release asset is a versioned zip containing the binary (issue #97).
+MBTILES_URL="https://github.com/consbio/mbtileserver/releases/download/v${MBTILES_VERSION}/mbtileserver_v${MBTILES_VERSION}_linux_${MBTILES_ARCH}.zip"
+# Where mbtileserver serves from. Aligned with build-region-pack.sh output (#97).
+MBTILES_DIR="${NOOSPHERE_DIR:-/var/www/noosphere}/maps"
 NEXTCLOUD_VERSION="33.0.3"
 NEXTCLOUD_URL="https://download.nextcloud.com/server/releases/nextcloud-${NEXTCLOUD_VERSION}.zip"
 
 HOSTNAME_VAL="noosphere"
 PORTAL_DOMAIN="noosphere.net"
-SERVER_IP="192.168.2.166"   # Default  -  can be overridden
+# Auto-detected at runtime (#99). Prefer hostapd AP IP if AP mode is configured,
+# else first non-loopback IPv4 from the default route. Override via env: SERVER_IP=x bash provision.sh
+detect_server_ip() {
+    # 1. hostapd AP IP from existing drop-in
+    if [ -f /etc/noosphere/hostapd.conf ]; then
+        local ap_ip
+        ap_ip=$(awk -F= '/^AP_IP=/{print $2}' /etc/noosphere/hostapd.conf 2>/dev/null | tr -d '"' | cut -d/ -f1)
+        [ -n "$ap_ip" ] && { echo "$ap_ip"; return; }
+    fi
+    # 2. IP of default-route interface
+    local iface ip
+    iface=$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}')
+    if [ -n "$iface" ]; then
+        ip=$(ip -4 -o addr show dev "$iface" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)
+        [ -n "$ip" ] && { echo "$ip"; return; }
+    fi
+    # 3. Fallback: hostapd AP default
+    echo "192.168.4.1"
+}
+SERVER_IP="${SERVER_IP:-$(detect_server_ip)}"
 
 UNATTENDED=0
 SKIP_NEXTCLOUD=0
@@ -100,14 +122,26 @@ deb https://security.debian.org/debian-security trixie-security main contrib non
 EOF
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
+# Retry apt-get update: fresh images can hit a stale local index + point-release
+# .deb 404s; one retry after a fresh refresh resolves it (#100).
+apt_update() {
+    local i
+    for i in 1 2 3; do
+        if apt-get update; then return 0; fi
+        warn "apt-get update failed (attempt $i)  -  retrying in 5s"
+        sleep 5
+    done
+    return 1
+}
+apt_update
 ok "apt sources configured."
 
 ##############################################################################
 # Core packages
 ##############################################################################
 info "Installing core packages..."
-apt-get install -y \
+# --fix-missing lets the install proceed past transient 404s and recover on retry (#100).
+apt-get install -y --fix-missing \
     nginx \
     php8.4-fpm php8.4-cli php8.4-sqlite3 php8.4-mbstring php8.4-xml \
     php8.4-curl php8.4-zip php8.4-gd php8.4-intl php8.4-bcmath \
@@ -278,10 +312,21 @@ info "Installing mbtileserver ${MBTILES_VERSION}..."
 if command -v mbtileserver &>/dev/null; then
     skip "mbtileserver already installed"
 else
-    wget -q -O /usr/bin/mbtileserver "$MBTILES_URL"
-    chmod 755 /usr/bin/mbtileserver
-    ok "mbtileserver installed."
+    tmpdir=$(mktemp -d)
+    if curl -fsSL --retry 3 -o "$tmpdir/mb.zip" "$MBTILES_URL" \
+        && unzip -q -o "$tmpdir/mb.zip" -d "$tmpdir" \
+        && [ -s "$tmpdir/mbtileserver" ]; then
+        install -m 0755 "$tmpdir/mbtileserver" /usr/bin/mbtileserver
+        rm -rf "$tmpdir"
+        ok "mbtileserver installed."
+    else
+        rm -rf "$tmpdir"
+        warn "mbtileserver download failed from $MBTILES_URL"
+    fi
 fi
+
+mkdir -p "$MBTILES_DIR"
+chown -R www-data:www-data "$MBTILES_DIR" 2>/dev/null || true
 
 # Systemd service
 cat > /etc/systemd/system/mbtileserver.service <<'EOF'
@@ -292,16 +337,18 @@ After=network.target
 [Service]
 Type=simple
 User=www-data
-ExecStart=/usr/bin/mbtileserver --port 8889 --dir /var/lib/mbtiles --enable-reload-signal
+ExecStart=/usr/bin/mbtileserver --port 8889 --dir __MBTILES_DIR__ --enable-reload-signal
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
+sed -i "s|__MBTILES_DIR__|$MBTILES_DIR|" /etc/systemd/system/mbtileserver.service
+systemctl daemon-reload
 systemctl enable mbtileserver
-systemctl start mbtileserver || warn "mbtileserver started (no MBTiles yet  -  normal)"
-ok "mbtileserver service installed."
+systemctl restart mbtileserver || warn "mbtileserver started (no MBTiles yet  -  normal)"
+ok "mbtileserver service installed (serving $MBTILES_DIR)."
 
 ##############################################################################
 # MapLibre + glyph fetch (assets are gitignored, so a fresh clone has none)

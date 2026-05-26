@@ -13,6 +13,9 @@
 #   --zoom <n>                  Default zoom level (default: 11)
 #   --fetch-tiles               Download OSM PBF + build vector MBTiles
 #   --fetch-topo                Download USGS topo PDFs (US only)
+#   --topo-state <ST>           2-letter state code for S3 fallback (e.g. "IN")
+#   --topo-quads "Q1,Q2,..."    Quad names to fetch directly from USGS S3 when
+#                               TNM API is down (e.g. "Vallonia,Brownstown")
 #   --nwr-all                   Include all 7 NWR frequencies
 #   --nwr-freqs "f1,f2,..."     Specific NWR frequencies
 #
@@ -33,6 +36,8 @@ CENTER_LNG=""
 ZOOM="11"
 FETCH_TILES=0
 FETCH_TOPO=0
+TOPO_STATE=""        # 2-letter USPS code for USGS S3 fallback (#98)
+TOPO_QUADS=""        # Comma-separated quad names for S3 fallback (#98)
 NWR_ALL=0
 NWR_FREQS=""
 
@@ -87,6 +92,8 @@ while [[ $# -gt 0 ]]; do
         --zoom)         ZOOM="$2"; shift 2 ;;
         --fetch-tiles)  FETCH_TILES=1; shift ;;
         --fetch-topo)   FETCH_TOPO=1; shift ;;
+        --topo-state)   TOPO_STATE="$2"; shift 2 ;;
+        --topo-quads)   TOPO_QUADS="$2"; shift 2 ;;
         --nwr-all)      NWR_ALL=1; shift ;;
         --nwr-freqs)    NWR_FREQS="$2"; shift 2 ;;
         *) echo "error: unknown option $1" >&2; exit 64 ;;
@@ -136,10 +143,12 @@ echo "Disk free: $(( FREE_KB / 1024 )) MB  -  OK"
 
 if [ "$FETCH_TILES" = "1" ]; then
     _update_status "running" "Checking tools..." 2
-    if ! command -v tippecanoe >/dev/null 2>&1; then
-        echo "tippecanoe not installed  -  installing..."
-        apt-get install -y tippecanoe >/dev/null 2>&1 || die "Could not install tippecanoe. Run: apt install tippecanoe"
-        echo "tippecanoe installed."
+    # tilemaker produces OpenMapTiles-schema vector tiles that match the /maps/
+    # style (#95). tippecanoe was emitting a single generic layer the style
+    # could not read.
+    if ! command -v tilemaker >/dev/null 2>&1; then
+        echo "tilemaker not installed  -  installing..."
+        apt-get install -y tilemaker >/dev/null 2>&1 || die "Could not install tilemaker. Run: apt install tilemaker"
     fi
     if ! command -v osmium >/dev/null 2>&1; then
         apt-get install -y osmium-tool >/dev/null 2>&1 || die "osmium-tool not installed. Run: apt install osmium-tool"
@@ -179,13 +188,22 @@ if [ "$FETCH_TILES" = "1" ]; then
         || die "osmium extract failed"
     rm -f "$PBF_LOCAL"
 
-    _update_status "running" "Building vector tiles with tippecanoe (this may take several minutes)..." 50
+    _update_status "running" "Building vector tiles with tilemaker (this may take several minutes)..." 50
     MBTILES="$MAPS_DIR/region-${SLUG}.mbtiles"
-    echo "Running tippecanoe -> $MBTILES"
-    tippecanoe -o "$MBTILES" -Z4 -z14 --force \
-        --simplification=4 --drop-densest-as-needed \
-        "$EXTRACT_PBF" \
-        || die "tippecanoe failed"
+    # tilemaker needs the OpenMapTiles config + lua process shipped in the
+    # Debian package's examples dir. --bbox is required (config references
+    # Natural-Earth shapefiles).
+    TM_EX="/usr/share/doc/tilemaker/examples"
+    TM_CONFIG="$TM_EX/config-openmaptiles.json"
+    TM_PROCESS="$TM_EX/process-openmaptiles.lua"
+    [ -f "$TM_CONFIG" ]  || die "tilemaker config missing: $TM_CONFIG (reinstall tilemaker)"
+    [ -f "$TM_PROCESS" ] || die "tilemaker process script missing: $TM_PROCESS"
+    echo "Running tilemaker -> $MBTILES"
+    rm -f "$MBTILES"
+    tilemaker --input "$EXTRACT_PBF" --output "$MBTILES" \
+        --bbox "${BBOX_W},${BBOX_S},${BBOX_E},${BBOX_N}" \
+        --config "$TM_CONFIG" --process "$TM_PROCESS" \
+        || die "tilemaker failed"
     rm -f "$EXTRACT_PBF"
 
     chown www-data:www-data "$MBTILES" 2>/dev/null || true
@@ -213,11 +231,17 @@ if [ "$FETCH_TOPO" = "1" ]; then
     TNM_URL="https://tnmaccess.nationalmap.gov/api/v1/products?bbox=${BBOX_W},${BBOX_S},${BBOX_E},${BBOX_N}&datasets=National%20Geospatial%20Program%20US%20Topo%207.5%20Minute&outputFormat=JSON&max=60"
     echo "TNM query: $TNM_URL"
     TNM_JSON="$TMPDIR_BUILD/tnm.json"
+    TNM_OK=0
     if curl -fsSL --retry 3 --max-time 30 -o "$TNM_JSON" "$TNM_URL"; then
         COUNT=$(python3 -c "import json; d=json.load(open('$TNM_JSON')); print(len(d.get('items',[])))" 2>/dev/null || echo 0)
-        echo "Found $COUNT topo quads"
-        _update_status "running" "Downloading $COUNT USGS topo PDFs..." 72
+        echo "Found $COUNT topo quads via TNM"
+        [ "$COUNT" -gt 0 ] 2>/dev/null && TNM_OK=1
+    else
+        echo "Warning: could not reach TNM API."
+    fi
 
+    if [ "$TNM_OK" = "1" ]; then
+        _update_status "running" "Downloading $COUNT USGS topo PDFs..." 72
         python3 - "$TNM_JSON" "$TOPO_DIR" << 'PYEOF'
 import json, sys, os, urllib.request, time
 tnm_file, topo_dir = sys.argv[1], sys.argv[2]
@@ -252,8 +276,50 @@ for item in items:
         failed += 1
 print(f'Topo: {downloaded} downloaded, {skipped} skipped, {failed} failed')
 PYEOF
-    else
-        echo "Warning: could not reach TNM API. Topo PDFs not downloaded."
+    fi
+
+    # S3 fallback (#98): TNM is often down. Operator can pass --topo-state +
+    # --topo-quads to fetch latest PDFs directly from the public USGS bucket.
+    if [ "$TNM_OK" != "1" ] && [ -n "$TOPO_STATE" ] && [ -n "$TOPO_QUADS" ]; then
+        echo "Falling back to USGS S3 (state=$TOPO_STATE quads=$TOPO_QUADS)"
+        _update_status "running" "Fetching topo from USGS S3..." 75
+        ST="$TOPO_STATE" QUADS="$TOPO_QUADS" TOPO_DIR="$TOPO_DIR" python3 - <<'PYEOF'
+import os, sys, urllib.request, xml.etree.ElementTree as ET
+st = os.environ['ST'].upper()
+quads = [q.strip().replace(' ', '_') for q in os.environ['QUADS'].split(',') if q.strip()]
+topo_dir = os.environ['TOPO_DIR']
+os.makedirs(topo_dir, exist_ok=True)
+base = 'https://prd-tnm.s3.amazonaws.com'
+ns = '{http://s3.amazonaws.com/doc/2006-03-01/}'
+downloaded = skipped = failed = 0
+for quad in quads:
+    prefix = f'StagedProducts/Maps/USTopo/PDF/{st}/{st}_{quad}_'
+    url = f'{base}/?list-type=2&prefix={urllib.request.quote(prefix)}'
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            xml = r.read()
+    except Exception as e:
+        print(f'  warning: list {quad}: {e}'); failed += 1; continue
+    keys = [el.text for el in ET.fromstring(xml).findall(f'.//{ns}Contents/{ns}Key')
+            if el.text and el.text.lower().endswith('.pdf')]
+    if not keys:
+        print(f'  no PDF found for {quad}'); failed += 1; continue
+    key = sorted(keys)[-1]  # lexicographic latest (date is in filename)
+    fname = os.path.basename(key)
+    dest = os.path.join(topo_dir, fname)
+    if os.path.exists(dest):
+        print(f'  skip: {fname}'); skipped += 1; continue
+    try:
+        print(f'  downloading: {fname}')
+        urllib.request.urlretrieve(f'{base}/{key}', dest)
+        downloaded += 1
+    except Exception as e:
+        print(f'  warning: {fname}: {e}'); failed += 1
+print(f'Topo (S3): {downloaded} downloaded, {skipped} skipped, {failed} failed')
+PYEOF
+    elif [ "$TNM_OK" != "1" ]; then
+        echo "Topo PDFs not downloaded. Re-run with --topo-state <ST> --topo-quads \"Q1,Q2\""
+        echo "  or browse https://prd-tnm.s3.amazonaws.com/index.html#StagedProducts/Maps/USTopo/PDF/"
     fi
     _update_status "running" "Topo PDFs done." 82
 fi
