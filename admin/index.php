@@ -798,7 +798,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','show_mesh','mesh_nwr_relay','readonly'];
+                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','show_mesh','mesh_nwr_relay','chat_mesh_tab','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -4228,6 +4228,7 @@ $simple_mods = [
     ['show_tools',    't_tools',    'Tool Lending'],
     ['show_canvas',   't_canvas',   'Canvas (freehand drawing &amp; annotated maps)'],
     ['show_mesh',     't_mesh',     'Meshtastic (LoRa mesh) - requires USB node + daemon'],
+    ['chat_mesh_tab', 't_chat_mesh','Mesh tab inside /chat/ (shows only when mesh module is on)'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>

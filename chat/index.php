@@ -1,8 +1,24 @@
 <?php
 require_once '/var/www/noosphere/shared/security.php';
 require_once '/var/www/noosphere/shared/settings.php';
+require_once '/var/www/noosphere/shared/identity.php';
+require_once '/var/www/noosphere/shared/capabilities.php';
 sec_session_start();
 if (get_setting('show_chat','1') !== '1') { http_response_code(404); exit; }
+
+// Mesh tab integration (#101) - only surface if operator enabled the mesh module,
+// the daemon has initialised the DB, and the per-chat tab toggle is on.
+$mesh_available = false;
+$mesh_can_send  = false;
+if (get_setting('show_mesh','0') === '1' && get_setting('chat_mesh_tab','1') === '1') {
+    try {
+        $mdb = new PDO('sqlite:/var/lib/noosphere/mesh.db');
+        $mdb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $r = $mdb->query("SELECT name FROM sqlite_master WHERE type='table' AND name='mesh_messages'")->fetch();
+        $mesh_available = (bool)$r;
+    } catch (Exception $e) { $mesh_available = false; }
+    if ($mesh_available) $mesh_can_send = function_exists('can') ? can('mesh.send') : false;
+}
 
 $db = new PDO('sqlite:/var/lib/noosphere/chat.db');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -135,6 +151,29 @@ header a:hover { color:#e94560; }
 #vmodal .row .ok { background:#e94560; color:#fff; }
 #vmodal .row .cancel { background:#16213e; color:#aaa; border:1px solid #2a2a4a; }
 #verr { color:#e94560; font-size:12px; margin-bottom:8px; display:none; }
+/* tab strip + mesh pane */
+.tab-strip { background:#13132a; border-bottom:1px solid #2a2a4a; padding:6px 12px; display:flex; gap:6px; flex-shrink:0; }
+.tab-strip button { background:transparent; border:1px solid #2a2a4a; color:#aaa; padding:5px 14px; border-radius:5px; cursor:pointer; font-size:13px; font-family:inherit; }
+.tab-strip button.active { background:#1a1a2e; color:#fff; border-color:#e94560; }
+.tab-strip .mesh-badge { margin-left:auto; font-size:11px; color:#666; align-self:center; }
+.pane { flex:1; display:flex; flex-direction:column; min-height:0; }
+.pane[hidden] { display:none !important; }
+#mesh-list { flex:1; overflow-y:auto; padding:10px 14px; font-family:ui-monospace,Consolas,monospace; font-size:13px; }
+#mesh-list .m { margin-bottom:7px; line-height:1.4; word-break:break-word; }
+#mesh-list .m .t { color:#666; font-size:11px; }
+#mesh-list .m .who { color:#7ad; font-weight:bold; }
+#mesh-list .m.out .who { color:#2ecc71; }
+#mesh-list .m .sig { color:#555; font-size:10px; margin-left:6px; }
+#mesh-empty { color:#555; font-style:italic; text-align:center; padding:30px 10px; font-family:system-ui,sans-serif; }
+#mesh-compose { background:#1a1a2e; border-top:1px solid #2a2a4a; padding:10px 12px; display:flex; gap:8px; flex-shrink:0; align-items:center; }
+#mesh-compose select { background:#16213e; border:1px solid #2a2a4a; color:#e0e0e0; border-radius:6px; padding:8px; font-size:13px; }
+#mesh-compose input[type=text] { flex:1; background:#16213e; border:1px solid #2a2a4a; color:#e0e0e0; border-radius:6px; padding:8px 10px; font-size:14px; font-family:inherit; }
+#mesh-compose input:focus, #mesh-compose select:focus { outline:none; border-color:#e94560; }
+#mesh-compose button { background:#1a4d7a; color:#fff; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-size:14px; font-weight:bold; }
+#mesh-compose button:disabled { opacity:0.5; cursor:not-allowed; }
+#mesh-compose .count { color:#666; font-size:11px; width:40px; text-align:center; }
+#mesh-readonly { background:#0d0d1a; border-top:1px solid #2a2a4a; color:#aaa; font-size:12px; padding:10px 14px; flex-shrink:0; }
+#mesh-readonly a { color:#4a9eff; }
 </style>
 </head>
 <body>
@@ -142,16 +181,52 @@ header a:hover { color:#e94560; }
   <a href="/">← Home</a>
   <h1>Community Chat</h1>
 </header>
-<div class="badge-bar" id="badge-bar">
-  <span id="badge-text">Chatting as guest</span>
-  <button onclick="openVerify()">Link Registry</button>
+<?php if ($mesh_available): ?>
+<div class="tab-strip" id="tab-strip">
+  <button id="tab-local" class="active" onclick="showTab('local')">💬 Local</button>
+  <button id="tab-mesh" onclick="showTab('mesh')">📻 Mesh</button>
+  <span class="mesh-badge" id="mesh-status">…</span>
 </div>
-<div id="messages"></div>
-<div id="compose">
-  <input type="text" id="cname" placeholder="Your name" maxlength="40">
-  <textarea id="cbody" placeholder="Message…" rows="1"></textarea>
-  <button onclick="sendMsg()">Send</button>
+<?php endif; ?>
+
+<div class="pane" id="pane-local">
+  <div class="badge-bar" id="badge-bar">
+    <span id="badge-text">Chatting as guest</span>
+    <button onclick="openVerify()">Link Registry</button>
+  </div>
+  <div id="messages"></div>
+  <div id="compose">
+    <input type="text" id="cname" placeholder="Your name" maxlength="40">
+    <textarea id="cbody" placeholder="Message…" rows="1"></textarea>
+    <button onclick="sendMsg()">Send</button>
+  </div>
 </div>
+
+<?php if ($mesh_available): ?>
+<div class="pane" id="pane-mesh" hidden>
+  <div class="badge-bar" style="color:#7ad">
+    LoRa broadcast - 200 char max - audible to every node in range. <a href="/mesh/" style="color:#aaa">Full mesh view →</a>
+  </div>
+  <div id="mesh-list"><div id="mesh-empty">No mesh traffic yet. Listening on channel 0 (Primary, LongFast).</div></div>
+  <?php if ($mesh_can_send): ?>
+    <form id="mesh-compose" autocomplete="off">
+      <?= csrf_field() ?>
+      <select id="mch" name="channel">
+        <option value="0">ch 0</option><option value="1">ch 1</option>
+        <option value="2">ch 2</option><option value="3">ch 3</option>
+      </select>
+      <input type="text" id="mbody" name="body" maxlength="200" placeholder="Broadcast over LoRa…">
+      <span class="count" id="mcount">200</span>
+      <button type="submit">Send</button>
+    </form>
+  <?php else: ?>
+    <div id="mesh-readonly">
+      Read-only - sending costs RF airtime. Requires the <strong>mesh.send</strong> capability (operator or <em>comms</em> role).
+      <a href="/registry/login.php">Sign in</a> or <a href="/admin/">log in as admin</a>.
+    </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div id="veil">
   <div id="vmodal">
@@ -299,6 +374,94 @@ function doVerify() {
   });
 }
 document.getElementById('vpin').addEventListener('keydown', function(e){ if(e.key==='Enter') doVerify(); });
+
+<?php if ($mesh_available): ?>
+// ----- Mesh tab (#101) -----
+var meshLastId = 0, meshActive = false, meshPollTimer = null, meshStatusTimer = null;
+var meshListEl   = document.getElementById('mesh-list');
+var meshStatusEl = document.getElementById('mesh-status');
+
+function showTab(which){
+  var local = which !== 'mesh';
+  document.getElementById('pane-local').hidden = !local;
+  document.getElementById('pane-mesh').hidden  =  local;
+  document.getElementById('tab-local').classList.toggle('active',  local);
+  document.getElementById('tab-mesh').classList.toggle('active',  !local);
+  localStorage.setItem('chat_tab', which);
+  meshActive = !local;
+  if (meshActive) {
+    meshPoll(); meshStatus();
+    if (!meshPollTimer)   meshPollTimer   = setInterval(meshPoll, 4000);
+    if (!meshStatusTimer) meshStatusTimer = setInterval(meshStatus, 15000);
+  } else {
+    if (meshPollTimer)   { clearInterval(meshPollTimer); meshPollTimer = null; }
+    if (meshStatusTimer) { clearInterval(meshStatusTimer); meshStatusTimer = null; }
+  }
+}
+
+function meshFmtTime(t){ var d=new Date(t*1000); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+
+function meshAppend(m){
+  var emp = document.getElementById('mesh-empty'); if (emp) emp.remove();
+  var div = document.createElement('div');
+  div.className = 'm ' + (m.direction === 'out' ? 'out' : 'in');
+  var who = m.from_short || (m.from_id ? String(m.from_id).slice(-4) : '?');
+  var sig = '';
+  if (m.rssi || m.snr) sig = ' <span class=sig>['+(m.rssi||'')+'dBm '+(String(m.snr||'')).slice(0,4)+'SNR]</span>';
+  div.innerHTML = '<span class=t>'+meshFmtTime(m.received_at)+' ch'+m.channel+'</span> ' +
+                  '<span class=who>'+esc(who)+'</span> ' + esc(m.body) + sig;
+  meshListEl.appendChild(div);
+  if (m.id > meshLastId) meshLastId = m.id;
+}
+
+function meshPoll(){
+  fetch('/mesh/api.php?action=recv&since='+meshLastId)
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      if (!Array.isArray(rows) || !rows.length) return;
+      var atBottom = meshListEl.scrollHeight - meshListEl.scrollTop - meshListEl.clientHeight < 60;
+      rows.forEach(meshAppend);
+      if (atBottom) meshListEl.scrollTop = meshListEl.scrollHeight;
+    })
+    .catch(function(){});
+}
+
+function meshStatus(){
+  fetch('/mesh/api.php?action=status').then(function(r){return r.json();}).then(function(s){
+    if (!s.ok) { meshStatusEl.textContent = 'mesh offline'; return; }
+    var who = s.self ? s.self.short_name : 'node ?';
+    meshStatusEl.textContent = who + ' · ' + s.node_count + ' nodes · ' + s.pending + ' queued';
+  }).catch(function(){ meshStatusEl.textContent = 'mesh offline'; });
+}
+
+var mbody = document.getElementById('mbody');
+if (mbody) {
+  var mcount = document.getElementById('mcount');
+  mbody.addEventListener('input', function(){ mcount.textContent = (200 - mbody.value.length); });
+}
+var mform = document.getElementById('mesh-compose');
+if (mform) {
+  mform.addEventListener('submit', function(e){
+    e.preventDefault();
+    var fd = new FormData(mform); fd.append('action','send');
+    var btn = mform.querySelector('button[type=submit]');
+    btn.disabled = true; var orig = btn.textContent; btn.textContent = '…';
+    fetch('/mesh/api.php', {method:'POST', body:fd, credentials:'same-origin'})
+      .then(function(r){ return r.text(); })
+      .then(function(txt){
+        var j; try { j = JSON.parse(txt); } catch(e){ throw new Error('non-JSON: '+txt.slice(0,140)); }
+        if (j.ok) { mbody.value=''; if (mcount) mcount.textContent='200'; setTimeout(meshPoll, 400); }
+        else { alert('Mesh send failed: '+(j.error||'unknown')); }
+      })
+      .catch(function(err){ alert('Mesh send failed: '+err.message); })
+      .finally(function(){ btn.disabled = false; btn.textContent = orig; });
+  });
+}
+
+// Restore last-used tab.
+if (localStorage.getItem('chat_tab') === 'mesh') showTab('mesh');
+else meshStatus(); // still show status badge on local tab
+<?php endif; ?>
 </script>
 </body>
 </html>
