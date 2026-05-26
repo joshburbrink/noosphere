@@ -22,7 +22,6 @@ if ($ready) {
   .stale { color:#666; }
 </style>
 </head><body>
-<?php include '/var/www/noosphere/shared/topnav.php'; ?>
 <div class="mesh-wrap">
   <h2 style="margin:8px 0">📻 Mesh / Nodes</h2>
   <div class="mesh-tabs">

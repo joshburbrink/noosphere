@@ -106,14 +106,24 @@ def db_open():
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=2000")
     conn.executescript(SCHEMA)
-    # Make sure www-data can write (daemon runs as root, web reads/queues as www-data)
+    # Daemon runs as root; web (www-data) writes to the same DB via mesh_outbox.
+    # Hand ownership to www-data so SQLite writes don't EACCES.
     try:
-        os.chmod(DB_PATH, 0o664)
-        wal = DB_PATH + "-wal"; shm = DB_PATH + "-shm"
-        for p in (wal, shm):
+        import pwd
+        uid = pwd.getpwnam("www-data").pw_uid
+        gid = pwd.getpwnam("www-data").pw_gid
+        for p in (DB_PATH, DB_PATH + "-wal", DB_PATH + "-shm",
+                  str(Path(DB_PATH).parent)):
             if os.path.exists(p):
-                os.chmod(p, 0o664)
-    except OSError:
+                try:
+                    os.chown(p, uid, gid)
+                except (OSError, PermissionError):
+                    pass
+                try:
+                    os.chmod(p, 0o664 if os.path.isfile(p) else 0o775)
+                except OSError:
+                    pass
+    except (KeyError, ImportError):
         pass
     return conn
 

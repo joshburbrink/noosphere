@@ -25,7 +25,6 @@ $can_send = can('mesh.send');
   .status-bar { font-size:11px; color:#666; margin-bottom:8px; }
 </style>
 </head><body>
-<?php include '/var/www/noosphere/shared/topnav.php'; ?>
 <div class="mesh-wrap">
   <h2 style="margin:8px 0">📻 Mesh</h2>
   <div class="mesh-tabs">
