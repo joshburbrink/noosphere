@@ -40,7 +40,9 @@ $can_send = can('mesh.send');
       Mesh daemon hasn't started yet. Check <code>systemctl status noosphere-meshtastic</code>.
     </div>
   <?php else: ?>
-    <div class="msg-list" id="msg-list"></div>
+    <div class="msg-list" id="msg-list">
+      <div id="msg-empty" style="color:#555;font-style:italic;text-align:center;padding:40px 10px">No mesh traffic yet. Listening on channel 0 (Primary, LongFast).</div>
+    </div>
     <?php if ($can_send): ?>
     <form class="send-row" id="send-form" autocomplete="off">
       <?= csrf_field() ?>
@@ -79,6 +81,10 @@ $can_send = can('mesh.send');
   function fmtTime(t){ var d=new Date(t*1000); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
   function esc(s){ return (s||'').replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
   function render(rows){
+    if (rows.length) {
+      var e = document.getElementById('msg-empty');
+      if (e) e.remove();
+    }
     rows.forEach(function(m){
       var div = document.createElement('div');
       div.className = 'msg ' + (m.direction==='out' ? 'out' : 'in');
