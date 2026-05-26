@@ -257,6 +257,51 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- Meshtastic admin actions (#90) ---
+    if (in_array($act, ['mesh_detect','mesh_info','mesh_set','mesh_restart'], true)) {
+        header('Content-Type: application/json');
+        require_once __DIR__ . '/../shared/capabilities.php';
+        if (!can('mesh.manage')) { echo json_encode(['ok'=>false,'error'=>'forbidden']); exit; }
+        $mesh_bin = '/opt/noosphere-meshtastic/bin/meshtastic';
+        $port = '';
+        foreach (glob('/dev/ttyUSB*') ?: [] as $p) { $port = $p; break; }
+        if (!$port) foreach (glob('/dev/ttyACM*') ?: [] as $p) { $port = $p; break; }
+
+        if ($act === 'mesh_detect') {
+            $present = $port !== '';
+            $lsusb = shell_exec("lsusb 2>/dev/null | grep -iE 'silicon labs|cp210|ch340|nrf52|raknor|ftdi|esp32|heltec|lilygo'") ?: '';
+            echo json_encode(['ok'=>true,'port'=>$port,'present'=>$present,'lsusb'=>trim($lsusb)]);
+            exit;
+        }
+        if (!$port) { echo json_encode(['ok'=>false,'error'=>'no serial port found']); exit; }
+        if (!file_exists($mesh_bin)) { echo json_encode(['ok'=>false,'error'=>'meshtastic CLI not installed']); exit; }
+
+        if ($act === 'mesh_info') {
+            $out = shell_exec("sudo $mesh_bin --port " . escapeshellarg($port) . " --info 2>&1") ?: '';
+            echo json_encode(['ok'=>true,'output'=>$out]);
+            exit;
+        }
+        if ($act === 'mesh_set') {
+            $allowed = ['lora.region','lora.modem_preset','lora.use_preset',
+                        'device.role'];
+            $key   = $_POST['key']   ?? '';
+            $value = $_POST['value'] ?? '';
+            if (!in_array($key, $allowed, true) || !preg_match('/^[A-Z0-9_]+$/i', $value)) {
+                echo json_encode(['ok'=>false,'error'=>'invalid setting']); exit;
+            }
+            $cmd = "sudo $mesh_bin --port " . escapeshellarg($port) . " --set " . escapeshellarg($key) . " " . escapeshellarg($value) . " 2>&1";
+            $out = shell_exec($cmd) ?: '';
+            log_audit('mesh_set', "$key=$value");
+            echo json_encode(['ok'=>true,'output'=>$out]);
+            exit;
+        }
+        if ($act === 'mesh_restart') {
+            $out = shell_exec('sudo systemctl restart noosphere-meshtastic.service 2>&1') ?: '';
+            echo json_encode(['ok'=>true,'output'=>$out ?: 'restarted']);
+            exit;
+        }
+    }
+
     // --- Storage drives (AJAX) #91 ---
     if ($act === 'storage_list') {
         header('Content-Type: application/json');
@@ -753,7 +798,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','readonly'];
+                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','show_mesh','mesh_nwr_relay','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -2467,6 +2512,112 @@ bash setup-local-display.sh server</pre>
 })();
 </script>
 
+<!-- Meshtastic (#90) -->
+<details class="cpanel">
+  <summary>📡 Meshtastic
+    <span style="font-size:11px;color:#888;font-weight:normal"> -  LoRa mesh node (requires USB hardware + daemon)</span>
+  </summary>
+  <div class="cpbody">
+    <?php
+      $mesh_svc = trim(shell_exec("systemctl is-active noosphere-meshtastic.service 2>/dev/null") ?: 'inactive');
+      $mesh_db_path = '/var/lib/noosphere/mesh.db';
+      $mesh_stats = ['nodes'=>0,'msgs'=>0,'self'=>null,'last_connect'=>null];
+      if (file_exists($mesh_db_path)) {
+        try {
+          $mdb = new PDO('sqlite:'.$mesh_db_path);
+          $mdb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+          $mesh_stats['nodes'] = (int)$mdb->query("SELECT COUNT(*) FROM mesh_nodes")->fetchColumn();
+          $mesh_stats['msgs']  = (int)$mdb->query("SELECT COUNT(*) FROM mesh_messages")->fetchColumn();
+          $mesh_stats['self']  = $mdb->query("SELECT * FROM mesh_nodes WHERE is_self=1")->fetch(PDO::FETCH_ASSOC);
+          $mesh_stats['last_connect'] = $mdb->query("SELECT value FROM mesh_state WHERE key='last_connect'")->fetchColumn();
+        } catch (Exception $e) {}
+      }
+      $mesh_color = $mesh_svc === 'active' ? '#2ecc71' : '#e94560';
+    ?>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:10px">
+      <div>Daemon: <strong style="color:<?= $mesh_color ?>"><?= esc($mesh_svc) ?></strong></div>
+      <div>Nodes seen: <strong><?= (int)$mesh_stats['nodes'] ?></strong></div>
+      <div>Messages: <strong><?= (int)$mesh_stats['msgs'] ?></strong></div>
+      <?php if ($mesh_stats['last_connect']): ?>
+        <div>Last connect: <strong><?= date('M j H:i', (int)$mesh_stats['last_connect']) ?></strong></div>
+      <?php endif; ?>
+    </div>
+    <?php if ($mesh_stats['self']): $s = $mesh_stats['self']; ?>
+      <div style="font-size:12px;color:#aaa;margin-bottom:10px">
+        This node: <strong><?= esc($s['long_name'] ?? '?') ?></strong>
+        [<?= esc($s['short_name'] ?? '?') ?>]
+        · <?= esc($s['hw_model'] ?? '?') ?>
+        · <?= esc($s['node_id'] ?? '') ?>
+      </div>
+    <?php else: ?>
+      <div style="font-size:12px;color:#888;margin-bottom:10px">No node identity yet  -  start the daemon and plug in a Meshtastic node.</div>
+    <?php endif; ?>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <a href="/mesh/" class="btn-sm" style="text-decoration:none">Open /mesh/</a>
+      <a href="/mesh/nodes.php" class="btn-sm" style="text-decoration:none">Node list</a>
+      <button type="button" class="btn-sm" onclick="meshAction('mesh_detect')">Detect Device</button>
+      <button type="button" class="btn-sm" onclick="meshAction('mesh_info')">Show Node Info</button>
+      <button type="button" class="btn-sm" onclick="meshAction('mesh_restart')">Restart Daemon</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">
+      <label>Region:
+        <select id="mesh_region" onchange="meshSet('lora.region', this.value)">
+          <?php foreach (['US','EU_433','EU_868','CN','JP','ANZ','KR','TW','RU','IN','NZ_865','TH','UA_433','UA_868','MY_433','MY_919','SG_923','LORA_24'] as $rg): ?>
+            <option value="<?= $rg ?>"><?= $rg ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label>Modem preset:
+        <select id="mesh_preset" onchange="meshSet('lora.modem_preset', this.value)">
+          <?php foreach (['LONG_FAST','LONG_SLOW','LONG_MODERATE','MEDIUM_FAST','MEDIUM_SLOW','SHORT_FAST','SHORT_SLOW','SHORT_TURBO','VERY_LONG_SLOW'] as $pr): ?>
+            <option value="<?= $pr ?>"><?= $pr ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+    </div>
+    <pre id="mesh_output" style="display:none;background:#000;color:#9c9;padding:8px;border-radius:4px;font-size:11px;max-height:240px;overflow:auto;white-space:pre-wrap;margin:8px 0"></pre>
+
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #2a2a4a">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" form="netSettingsForm" name="mesh_nwr_relay" <?= get_setting('mesh_nwr_relay','0')==='1'?'checked':'' ?>>
+        Relay NWR alerts to mesh broadcast (RF airtime - use sparingly)
+      </label>
+    </div>
+  </div>
+</details>
+<script>
+(function(){
+  function getCsrf(){ return document.querySelector('[name=csrf_token]')?.value || ''; }
+  function show(text){
+    var el = document.getElementById('mesh_output');
+    el.style.display = 'block'; el.textContent = text;
+  }
+  window.meshAction = function(act){
+    show('Working…');
+    var fd = new FormData(); fd.append('act', act); fd.append('csrf_token', getCsrf());
+    fetch('', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
+      if (!j.ok) { show('Error: '+(j.error||'unknown')); return; }
+      if (act === 'mesh_detect') {
+        show('Port: '+(j.port||'(none)')+'\nPresent: '+j.present+'\nlsusb: '+(j.lsusb||'(nothing matched)'));
+      } else {
+        show(j.output || '(no output)');
+      }
+    }).catch(function(e){ show('Error: '+e); });
+  };
+  window.meshSet = function(key, value){
+    if (!confirm('Set '+key+' = '+value+' on the node?')) return;
+    show('Setting '+key+'…');
+    var fd = new FormData();
+    fd.append('act','mesh_set'); fd.append('csrf_token', getCsrf());
+    fd.append('key', key); fd.append('value', value);
+    fetch('', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
+      show(j.ok ? (j.output||'OK') : ('Error: '+(j.error||'unknown')));
+    });
+  };
+})();
+</script>
+
 <!-- Storage Drives (#91) -->
 <details class="cpanel">
   <summary>💾 Storage Drives
@@ -4076,6 +4227,7 @@ $simple_mods = [
     ['show_seeds',    't_seeds',    'Seed Library'],
     ['show_tools',    't_tools',    'Tool Lending'],
     ['show_canvas',   't_canvas',   'Canvas (freehand drawing &amp; annotated maps)'],
+    ['show_mesh',     't_mesh',     'Meshtastic (LoRa mesh) - requires USB node + daemon'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>

@@ -1,0 +1,14 @@
+[Unit]
+Description=Noosphere Meshtastic bridge (#90)
+After=network.target
+ConditionPathExists=/dev/ttyUSB0
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/noosphere/meshtastic.conf
+ExecStart=/opt/noosphere-meshtastic/bin/python3 /usr/local/bin/noosphere-meshtastic.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

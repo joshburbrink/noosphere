@@ -105,6 +105,9 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
 <?php if ($aprs_active): ?>
   <button class="theme-btn" id="btn-aprs" onclick="toggleAprs()" title="Toggle APRS station markers">APRS</button>
 <?php endif; ?>
+<?php if (get_setting('show_mesh','0')==='1'): ?>
+  <button class="theme-btn" id="btn-mesh" onclick="toggleMesh()" title="Toggle Meshtastic node pins">Mesh</button>
+<?php endif; ?>
 <?php if (get_setting('show_topo','1')==='1'): ?>  <a class="topo-link" href="/topo/">Topo PDFs -></a><?php endif; ?>
 </header>
 <?php if (!$is_readonly && $incidents_active): ?>
@@ -632,6 +635,65 @@ function toggleAprs() {
 
 if (APRS_ACTIVE) {
     setInterval(loadAprs, 30000);
+}
+
+// ── Mesh layer (#90) ─────────────────────────────────────────────────────────
+var meshMarkers = {};
+var meshVisible = false;
+var meshTimer = null;
+
+function meshPopup(n) {
+    var bits = [];
+    if (n.long_name) bits.push('<b>'+n.long_name+'</b>');
+    bits.push('<span style="color:#888">'+(n.node_id || '?')+'</span>');
+    if (n.hw_model) bits.push('HW: '+n.hw_model);
+    if (n.snr !== null) bits.push('SNR: '+n.snr);
+    if (n.rssi !== null) bits.push('RSSI: '+n.rssi+' dBm');
+    if (n.hops_away !== null) bits.push('Hops: '+n.hops_away);
+    if (n.battery_pct !== null) bits.push('Batt: '+n.battery_pct+'%');
+    if (n.last_heard) {
+        var dt = new Date(n.last_heard*1000);
+        bits.push('Last heard: '+dt.toLocaleString());
+    }
+    return bits.join('<br>');
+}
+
+function loadMesh() {
+    if (!meshVisible) return;
+    fetch('/mesh/api.php?action=nodes').then(function(r){return r.json();}).then(function(rows){
+        var seen = {};
+        (rows||[]).forEach(function(n){
+            if (!n.latitude || !n.longitude) return;
+            seen[n.node_id] = true;
+            if (meshMarkers[n.node_id]) {
+                meshMarkers[n.node_id].setLngLat([n.longitude, n.latitude]);
+                return;
+            }
+            var el = document.createElement('div');
+            el.style.cssText = 'background:'+(n.is_self?'#2ecc71':'#7ad')+';color:#000;border:2px solid #000;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;font-family:monospace';
+            el.textContent = (n.short_name || '?').slice(0,4);
+            var popup = new maplibregl.Popup({offset: 14}).setHTML(meshPopup(n));
+            meshMarkers[n.node_id] = new maplibregl.Marker({element: el, anchor: 'center'})
+                .setLngLat([n.longitude, n.latitude]).setPopup(popup).addTo(map);
+        });
+        Object.keys(meshMarkers).forEach(function(id){
+            if (!seen[id]) { meshMarkers[id].remove(); delete meshMarkers[id]; }
+        });
+    }).catch(function(){});
+}
+
+function toggleMesh() {
+    meshVisible = !meshVisible;
+    var btn = document.getElementById('btn-mesh');
+    if (btn) btn.classList.toggle('active', meshVisible);
+    if (meshVisible) {
+        loadMesh();
+        if (!meshTimer) meshTimer = setInterval(loadMesh, 30000);
+    } else {
+        Object.values(meshMarkers).forEach(function(mk){ mk.remove(); });
+        meshMarkers = {};
+        if (meshTimer) { clearInterval(meshTimer); meshTimer = null; }
+    }
 }
 </script>
 </body>

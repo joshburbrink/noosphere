@@ -361,6 +361,21 @@ else
 fi
 
 ##############################################################################
+# Meshtastic CLI venv (#90)  -  used by the /mesh/ bridge and admin Mesh card.
+# Lives in /opt so it survives repo updates. Installed even without hardware;
+# the daemon service is plug-and-play (ConditionPathExists=/dev/ttyUSB0).
+##############################################################################
+info "Installing Meshtastic CLI venv..."
+if [ ! -x /opt/noosphere-meshtastic/bin/meshtastic ]; then
+    apt-get install -y python3-venv >/dev/null 2>&1 || warn "python3-venv install failed"
+    python3 -m venv /opt/noosphere-meshtastic
+    /opt/noosphere-meshtastic/bin/pip install --quiet meshtastic || warn "pip install meshtastic failed"
+    ok "Meshtastic CLI installed."
+else
+    skip "Meshtastic CLI already present"
+fi
+
+##############################################################################
 # Kiwix-watch service (adds newly downloaded ZIMs automatically)
 ##############################################################################
 cat > /etc/systemd/system/kiwix-watch.service <<'EOF'
@@ -393,7 +408,7 @@ ok "kiwix-watch installed."
 ##############################################################################
 info "Installing Noosphere systemd services..."
 
-for svc in noosphere-aprs.service noosphere-aprs-writer.service noosphere-rtl433.service wifi-reconnect.service; do
+for svc in noosphere-aprs.service noosphere-aprs-writer.service noosphere-rtl433.service noosphere-meshtastic.service noosphere-nwr-to-mesh.service noosphere-nwr-to-mesh.timer wifi-reconnect.service; do
     src="$NOOSPHERE_DIR/systemd/$svc"
     [[ -f "$src" ]] && cp "$src" "/etc/systemd/system/$svc" || true
 done
@@ -548,7 +563,8 @@ fi
 # noosphere helper commands in PATH
 ##############################################################################
 for cmd in noosphere-help noosphere-chpasswd.sh setup-credentials.sh \
-           setup-hostapd.sh setup-pxe.sh setup-storage.sh download-zim.sh; do
+           setup-hostapd.sh setup-pxe.sh setup-storage.sh download-zim.sh \
+           noosphere-meshtastic.py noosphere-nwr-to-mesh.py; do
     src="$NOOSPHERE_DIR/scripts/$cmd"
     [[ -f "$src" ]] || continue
     dest="/usr/local/bin/${cmd}"
@@ -568,6 +584,8 @@ www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-credentials.sh *
 www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-hostapd.sh *
 www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-pxe.sh *
 www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-storage.sh *
+www-data ALL=(root) NOPASSWD: /opt/noosphere-meshtastic/bin/meshtastic *
+www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart noosphere-meshtastic.service
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/sdr-diag.sh *
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-set-nwr-freq.sh *
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-radio-mode.sh *

@@ -1,0 +1,7 @@
+[Unit]
+Description=Noosphere NWR alert -> Meshtastic relay (#90)
+After=noosphere-meshtastic.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/noosphere-nwr-to-mesh.py

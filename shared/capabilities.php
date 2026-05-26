@@ -76,6 +76,10 @@ function capability_map(): array {
 
         // Content downloads + wipes (#82)
         'content.manage'        => ['operator'],
+
+        // Meshtastic (#90)
+        'mesh.send'             => ['operator', 'comms'],
+        'mesh.manage'           => ['operator'],
     ];
 }
 
