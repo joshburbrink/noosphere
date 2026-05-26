@@ -304,6 +304,16 @@ systemctl start mbtileserver || warn "mbtileserver started (no MBTiles yet  -  n
 ok "mbtileserver service installed."
 
 ##############################################################################
+# MapLibre + glyph fetch (assets are gitignored, so a fresh clone has none)
+##############################################################################
+info "Fetching MapLibre + Noto Sans glyphs for /maps/ ..."
+if WEBROOT="$NOOSPHERE_DIR" bash "$NOOSPHERE_DIR/scripts/fetch-map-assets.sh"; then
+    ok "Map assets fetched."
+else
+    warn "fetch-map-assets.sh failed  -  /maps/ may render blank until rerun."
+fi
+
+##############################################################################
 # Kiwix-watch service (adds newly downloaded ZIMs automatically)
 ##############################################################################
 cat > /etc/systemd/system/kiwix-watch.service <<'EOF'
