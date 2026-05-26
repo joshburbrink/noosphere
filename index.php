@@ -32,7 +32,7 @@ if (get_setting('show_registry','1')==='1') {
 if (get_setting('show_chat','1')==='1')
     $tiles[] = ['href'=>'/chat/',     'icon'=>'💬', 'label'=>'Chat',            'desc'=>'Real-time group messaging'];
 if (get_setting('show_mesh','0')==='1')
-    $tiles[] = ['href'=>'/mesh/',     'icon'=>'📡', 'label'=>'Mesh',            'desc'=>'LoRa mesh chat &amp; node map'];
+    $tiles[] = ['href'=>'/mesh/',     'icon'=>'📻', 'label'=>'Mesh',            'desc'=>'LoRa mesh chat &amp; node map'];
 if (get_setting('show_forum','1')==='1')
     $tiles[] = ['href'=>'/forum/',    'icon'=>'📋', 'label'=>'Community Board', 'desc'=>'Announcements, coordination &amp; discussion'];
 if (get_setting('show_vote','1')==='1')

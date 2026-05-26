@@ -27,7 +27,7 @@ $can_send = can('mesh.send');
 </head><body>
 <?php include '/var/www/noosphere/shared/topnav.php'; ?>
 <div class="mesh-wrap">
-  <h2 style="margin:8px 0">📡 Mesh</h2>
+  <h2 style="margin:8px 0">📻 Mesh</h2>
   <div class="mesh-tabs">
     <a href="/mesh/" class="active">Chat</a>
     <a href="/mesh/nodes.php">Nodes</a>
@@ -54,7 +54,12 @@ $can_send = can('mesh.send');
       <button type="submit">Send</button>
     </form>
     <?php else: ?>
-    <div style="font-size:11px;color:#666;margin-top:8px">Read-only - mesh.send capability required to broadcast.</div>
+    <div style="font-size:12px;color:#aaa;margin-top:8px;padding:10px;background:#0d0d1a;border:1px solid #2a2a4a;border-radius:6px">
+      Read-only. Sending broadcasts costs scarce RF airtime, so it requires the
+      <strong>mesh.send</strong> capability  -  granted to operators and registered users with the
+      <em>comms</em> role. <a href="/admin/" style="color:#4a9eff">Log in as admin</a> or
+      <a href="/registry/login.php" style="color:#4a9eff">sign in</a> to enable sending.
+    </div>
     <?php endif; ?>
   <?php endif; ?>
 </div>

@@ -23,7 +23,7 @@ if ($ready) {
 </head><body>
 <?php include '/var/www/noosphere/shared/topnav.php'; ?>
 <div class="mesh-wrap">
-  <h2 style="margin:8px 0">📡 Mesh / Raw Log</h2>
+  <h2 style="margin:8px 0">📻 Mesh / Raw Log</h2>
   <div class="mesh-tabs">
     <a href="/mesh/">Chat</a>
     <a href="/mesh/nodes.php">Nodes</a>
