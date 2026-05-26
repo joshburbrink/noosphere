@@ -257,6 +257,33 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- Storage drives (AJAX) #91 ---
+    if ($act === 'storage_list') {
+        header('Content-Type: application/json');
+        $raw = shell_exec('sudo /usr/local/bin/setup-storage.sh list 2>&1') ?: '{}';
+        $data = json_decode($raw, true) ?: ['blockdevices' => []];
+        echo json_encode(['ok' => true, 'data' => $data]);
+        exit;
+    }
+    if ($act === 'storage_mount' || $act === 'storage_unmount' || $act === 'storage_format') {
+        header('Content-Type: application/json');
+        $sub = ['storage_mount'=>'mount','storage_unmount'=>'unmount','storage_format'=>'format'][$act];
+        $dev = $_POST['dev'] ?? '';
+        if (!preg_match('#^/dev/[a-zA-Z0-9]+$#', $dev)) {
+            echo json_encode(['ok'=>false,'error'=>'invalid device']); exit;
+        }
+        $args = escapeshellarg($dev);
+        if ($sub === 'mount' && !empty($_POST['label'])) {
+            $args .= ' ' . escapeshellarg($_POST['label']);
+        }
+        // setup-storage.sh emits a JSON line ({ok:true,msg:...} or {ok:false,error:...})
+        $out = shell_exec("sudo /usr/local/bin/setup-storage.sh $sub $args 2>&1") ?: '';
+        $j = json_decode(trim(explode("\n", trim($out))[0] ?? ''), true);
+        if (!is_array($j)) $j = ['ok'=>false,'error'=>'no response: '.trim($out)];
+        log_audit('storage_' . $sub, "dev=$dev " . ($j['ok'] ? 'ok' : ('err: ' . ($j['error'] ?? ''))));
+        echo json_encode($j); exit;
+    }
+
     // --- Transcribe now (AJAX) ---
     if ($act === 'transcribe_now') {
         header('Content-Type: application/json');
@@ -2437,6 +2464,106 @@ bash setup-local-display.sh server</pre>
   // Load on tab open + auto-refresh every 15s
   devRefresh();
   setInterval(devRefresh, 15000);
+})();
+</script>
+
+<!-- Storage Drives (#91) -->
+<details class="cpanel">
+  <summary>💾 Storage Drives
+    <span style="font-size:11px;color:#888;font-weight:normal"> -  mount external USB drives for ZIM downloads</span>
+    <button type="button" onclick="storageRefresh()" style="margin-left:12px;background:#0d0d1a;border:1px solid #2a2a4a;color:#7ad;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer">↺ Refresh</button>
+  </summary>
+  <div class="cpbody" id="storage-panel">
+    <div style="font-size:12px;color:#555;padding:8px 0">Click Refresh to scan attached drives.</div>
+  </div>
+</details>
+<script>
+(function(){
+  function fmtSize(b){
+    if (!b) return ' - ';
+    var u=['B','KB','MB','GB','TB']; var i=0; while (b>=1024 && i<u.length-1){ b/=1024; i++; }
+    return b.toFixed(b<10?1:0)+' '+u[i];
+  }
+  function getCsrf(){ return document.querySelector('[name=csrf_token]')?.value || ''; }
+
+  window.storageRefresh = function(){
+    var p = document.getElementById('storage-panel');
+    p.innerHTML = '<div style="font-size:12px;color:#555;padding:8px 0">Scanning…</div>';
+    var fd = new FormData(); fd.append('act','storage_list'); fd.append('csrf_token', getCsrf());
+    fetch('', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
+      if (!j.ok) { p.innerHTML = '<div style="color:#e94560">Error.</div>'; return; }
+      renderStorage(j.data);
+    }).catch(function(e){ p.innerHTML='<div style="color:#e94560">Error: '+e+'</div>'; });
+  };
+
+  function partsOf(node){
+    // Flatten partitions from any disk node
+    var out=[]; (node.children||[]).forEach(function(c){
+      if (c.type==='part') out.push(c);
+    }); return out;
+  }
+
+  function renderStorage(data){
+    var p = document.getElementById('storage-panel');
+    var disks = (data.blockdevices||[]).filter(function(n){ return n.type==='disk' && n.path.indexOf('/dev/zram')!==0 && n.path.indexOf('/dev/loop')!==0; });
+    if (!disks.length) { p.innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">No drives detected.</div>'; return; }
+    var h = '<table class="dtable"><thead><tr><th>Device</th><th>Size</th><th>Filesystem</th><th>Mount</th><th>Actions</th></tr></thead><tbody>';
+    disks.forEach(function(d){
+      var bootBadge = d.boot ? ' <span style="background:#f39c1222;color:#f39c12;border:1px solid #f39c1255;border-radius:3px;padding:1px 6px;font-size:10px">BOOT</span>' : '';
+      var model = d.model ? ' <span style="color:#666;font-size:11px">'+d.model+'</span>' : '';
+      h += '<tr><td colspan="5" style="background:#0d0d1a;color:#8af;font-size:12px;padding:4px 8px">'+d.path+bootBadge+model+' · '+fmtSize(d.size)+'</td></tr>';
+      var parts = partsOf(d);
+      if (!parts.length) {
+        h += '<tr><td colspan="5" style="color:#555;font-size:11px;padding:4px 8px">No partitions.</td></tr>';
+      }
+      parts.forEach(function(part){
+        var mounted = !!part.mountpoint;
+        var actions = '';
+        if (part.boot) {
+          actions = '<span style="color:#666;font-size:11px">boot disk (protected)</span>';
+        } else if (mounted) {
+          actions += '<button onclick="storageAction(\'unmount\',\''+part.path+'\')" class="btn-sm">Unmount</button>';
+        } else {
+          if (part.fstype) {
+            actions += '<button onclick="storageAction(\'mount\',\''+part.path+'\','+JSON.stringify(part.label||'').replace(/"/g,'&quot;')+')" class="btn-sm">Mount</button> ';
+          }
+          actions += '<button onclick="storageFormat(\''+part.path+'\')" class="btn-red" style="font-size:11px">Format</button>';
+        }
+        h += '<tr>'
+          + '<td style="font-family:monospace;font-size:12px">'+part.path+'</td>'
+          + '<td>'+fmtSize(part.size)+'</td>'
+          + '<td style="color:#888;font-size:12px">'+(part.fstype||'(none)')+(part.label?' · '+part.label:'')+'</td>'
+          + '<td style="color:'+(mounted?'#2ecc71':'#555')+';font-size:12px">'+(part.mountpoint||'not mounted')+'</td>'
+          + '<td>'+actions+'</td>'
+          + '</tr>';
+      });
+    });
+    h += '</tbody></table>';
+    h += '<div style="font-size:11px;color:#666;margin-top:8px">Mounted drives appear as ZIM destinations in <a href="/admin/downloads.php" style="color:#4a9eff">Downloads</a>. Mounts persist across reboots via /etc/fstab (nofail).</div>';
+    p.innerHTML = h;
+  }
+
+  window.storageAction = function(sub, dev, label){
+    if (sub==='unmount' && !confirm('Unmount '+dev+'? Any ZIMs registered from it will become unavailable until remounted.')) return;
+    var fd = new FormData();
+    fd.append('act','storage_'+sub); fd.append('dev', dev); fd.append('csrf_token', getCsrf());
+    if (label) fd.append('label', label);
+    fetch('', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
+      if (j.ok) { alert(j.msg || 'OK'); storageRefresh(); }
+      else alert('Error: '+(j.error||'unknown'));
+    });
+  };
+
+  window.storageFormat = function(dev){
+    var typed = prompt('Type FORMAT to erase '+dev+' and create a fresh ext4 filesystem.\nThis destroys all data on the partition.');
+    if (typed !== 'FORMAT') return;
+    var fd = new FormData();
+    fd.append('act','storage_format'); fd.append('dev', dev); fd.append('csrf_token', getCsrf());
+    fetch('', {method:'POST', body:fd}).then(r=>r.json()).then(function(j){
+      if (j.ok) { alert(j.msg||'Formatted.'); storageRefresh(); }
+      else alert('Error: '+(j.error||'unknown'));
+    });
+  };
 })();
 </script>
 
