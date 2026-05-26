@@ -33,7 +33,11 @@ if ($action === 'nodes') {
 }
 
 if ($action === 'send') {
-    if (!csrf_verify()) { echo json_encode(['ok'=>false,'error'=>'csrf']); exit; }
+    // csrf_verify() die()s with HTML on failure, so do an inline JSON-friendly check.
+    $tok = $_POST['_csrf'] ?? '';
+    if (empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $tok)) {
+        echo json_encode(['ok'=>false,'error'=>'csrf']); exit;
+    }
     if (!can('mesh.send'))  { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'forbidden']); exit; }
     $body = trim($_POST['body'] ?? '');
     if ($body === '') { echo json_encode(['ok'=>false,'error'=>'empty']); exit; }
