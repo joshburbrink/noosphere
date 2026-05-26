@@ -7,6 +7,11 @@ sec_session_start();
 
 if (get_setting('show_mesh','0') !== '1') { http_response_code(404); exit; }
 
+// Per-file convenience helpers used by the mesh pages.
+if (!function_exists('esc')) {
+    function esc($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
+}
+
 function mesh_db(): PDO {
     static $db = null;
     if ($db) return $db;

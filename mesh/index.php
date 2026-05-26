@@ -53,12 +53,19 @@ $can_send = can('mesh.send');
       <input type="text" name="body" id="msg-body" maxlength="200" placeholder="Message (max 200 chars)" required>
       <button type="submit">Send</button>
     </form>
-    <?php else: ?>
+    <?php else:
+      $u = current_user();
+      $session_msg = !empty($_SESSION['admin'])
+        ? 'You are admin but mesh.send still failed - this is a bug, please report.'
+        : ($u ? ('Signed in as '.esc($u['name']).' with roles: '.esc($u['roles'] ?: '(none)').'. Add the <em>operator</em> or <em>comms</em> role in Admin -> Registry to enable sending.')
+              : 'Not signed in.');
+    ?>
     <div style="font-size:12px;color:#aaa;margin-top:8px;padding:10px;background:#0d0d1a;border:1px solid #2a2a4a;border-radius:6px">
       Read-only. Sending broadcasts costs scarce RF airtime, so it requires the
       <strong>mesh.send</strong> capability  -  granted to operators and registered users with the
       <em>comms</em> role. <a href="/admin/" style="color:#4a9eff">Log in as admin</a> or
-      <a href="/registry/login.php" style="color:#4a9eff">sign in</a> to enable sending.
+      <a href="/registry/login.php" style="color:#4a9eff">sign in</a> to enable sending.<br>
+      <span style="color:#888;font-size:11px"><?= $session_msg ?></span>
     </div>
     <?php endif; ?>
   <?php endif; ?>
