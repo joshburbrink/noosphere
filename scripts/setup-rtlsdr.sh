@@ -1,18 +1,43 @@
 #!/bin/bash
-# Install RTL-SDR extra packages (rtl-433, direwolf) and deploy supporting files.
-# The base rtl-sdr package and DVB blacklist are handled by the main install-tools.sh.
+# Install RTL-SDR support: blacklist conflicting DVB drivers, install
+# rtl-433 + direwolf + multimon-ng, deploy admin scripts, and stage the
+# NWR transcription pipeline. Idempotent - safe to re-run.
 # Run as root on the Noosphere server.
 
 set -e
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "==> Installing rtl-433 and direwolf"
-apt-get install -y rtl-433 direwolf python3
+echo "==> Blacklisting kernel DVB drivers (they grab the dongle on plug-in)"
+cat > /etc/modprobe.d/rtlsdr-blacklist.conf <<'EOF'
+# Prevent the kernel from binding the RTL2832U as a DVB-T device.
+# Required for rtl-sdr / rtl_fm / rtl_power to open the dongle.
+blacklist dvb_usb_rtl28xxu
+blacklist rtl2832_sdr
+blacklist rtl2832
+blacklist dvb_usb_v2
+blacklist dvb_core
+EOF
+for m in rtl2832_sdr dvb_usb_rtl28xxu rtl2832 dvb_usb_v2 dvb_core; do
+    rmmod "$m" 2>/dev/null || true
+done
+
+echo "==> Installing rtl-433, direwolf, multimon-ng"
+# multimon-ng is required by noaa-capture.sh for EAS / SAME decode.
+apt-get install -y rtl-433 direwolf multimon-ng python3
+
+echo "==> Adding www-data to plugdev (matches the udev rule below)"
+usermod -aG plugdev www-data 2>/dev/null || true
 
 echo "==> Deploying scripts"
-install -m 755 "$REPO_DIR/scripts/rtl433-bridge.py"        /usr/local/bin/noosphere-rtl433-bridge.py
-install -m 755 "$REPO_DIR/scripts/aprs-writer.py"          /usr/local/bin/noosphere-aprs-writer.py
-install -m 755 "$REPO_DIR/scripts/noosphere-radio-mode.sh" /usr/local/bin/noosphere-radio-mode.sh
+install -m 755 "$REPO_DIR/scripts/rtl433-bridge.py"               /usr/local/bin/noosphere-rtl433-bridge.py
+install -m 755 "$REPO_DIR/scripts/aprs-writer.py"                 /usr/local/bin/noosphere-aprs-writer.py
+install -m 755 "$REPO_DIR/scripts/noosphere-radio-mode.sh"        /usr/local/bin/noosphere-radio-mode.sh
+# Admin UI calls these by /usr/local/bin/ path - sudoers must match.
+install -m 755 "$REPO_DIR/scripts/noosphere-set-nwr-freq.sh"      /usr/local/bin/noosphere-set-nwr-freq.sh
+install -m 755 "$REPO_DIR/scripts/noosphere-scan-nwr.sh"          /usr/local/bin/noosphere-scan-nwr.sh
+# NWR capture + SAME logger + transcription pipeline.
+install -m 755 "$REPO_DIR/scripts/noaa-log-alert.py"              /usr/local/bin/noaa-log-alert.py
+install -m 755 "$REPO_DIR/scripts/noosphere-weather-transcribe.py" /usr/local/bin/noosphere-weather-transcribe.py
 
 echo "==> Writing default config files"
 mkdir -p /etc/noosphere
@@ -40,9 +65,14 @@ EOF
 udevadm control --reload-rules
 
 echo "==> Deploying systemd units"
-install -m 644 "$REPO_DIR/systemd/noosphere-rtl433.service"       /etc/systemd/system/
-install -m 644 "$REPO_DIR/systemd/noosphere-aprs.service"          /etc/systemd/system/
-install -m 644 "$REPO_DIR/systemd/noosphere-aprs-writer.service"   /etc/systemd/system/
+install -m 644 "$REPO_DIR/systemd/noosphere-rtl433.service"                /etc/systemd/system/
+install -m 644 "$REPO_DIR/systemd/noosphere-aprs.service"                  /etc/systemd/system/
+install -m 644 "$REPO_DIR/systemd/noosphere-aprs-writer.service"           /etc/systemd/system/
+# NWR transcription timer (admin UI enables/disables; operator picks backend).
+[ -f "$REPO_DIR/systemd/noosphere-weather-transcribe.service" ] && \
+    install -m 644 "$REPO_DIR/systemd/noosphere-weather-transcribe.service" /etc/systemd/system/
+[ -f "$REPO_DIR/systemd/noosphere-weather-transcribe.timer" ] && \
+    install -m 644 "$REPO_DIR/systemd/noosphere-weather-transcribe.timer"   /etc/systemd/system/
 systemctl daemon-reload
 # Units are disabled by default; admin panel enables them when mode is set
 

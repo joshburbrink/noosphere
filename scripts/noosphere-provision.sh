@@ -156,7 +156,7 @@ apt-get install -y --fix-missing \
     net-tools nmap iproute2 \
     htop ncdu smartmontools \
     parted dosfstools e2fsprogs \
-    rtl-sdr sox ffmpeg \
+    rtl-sdr sox ffmpeg multimon-ng \
     imagemagick
 ok "Core packages installed."
 
@@ -170,8 +170,9 @@ sed -i 's/^post_max_size.*/post_max_size = 100M/'              "$PHP_INI"
 sed -i 's/^memory_limit.*/memory_limit = 512M/'                "$PHP_INI"
 sed -i 's/^max_execution_time.*/max_execution_time = 300/'     "$PHP_INI"
 
-# www-data needs to write to data dirs
-usermod -aG audio,video,dialout www-data 2>/dev/null || true
+# www-data needs to write to data dirs and access the RTL-SDR USB dongle
+# (the udev rule in setup-rtlsdr.sh grants the device to GROUP=plugdev).
+usermod -aG audio,video,dialout,plugdev www-data 2>/dev/null || true
 ok "PHP configured."
 
 ##############################################################################
@@ -590,15 +591,31 @@ www-data ALL=(root) NOPASSWD: /usr/local/bin/setup-storage.sh *
 www-data ALL=(root) NOPASSWD: /opt/noosphere-meshtastic/bin/meshtastic *
 www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart noosphere-meshtastic.service
 www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/sdr-diag.sh *
-www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-set-nwr-freq.sh *
-www-data ALL=(root) NOPASSWD: /var/www/noosphere/scripts/noosphere-radio-mode.sh *
+# NWR / SDR admin scripts - paths MUST match what the PHP exec()s actually call.
+# Admin UI calls these as /usr/local/bin/... so the rules live there too.
+www-data ALL=(root) NOPASSWD: /usr/local/bin/noosphere-set-nwr-freq.sh *
+www-data ALL=(root) NOPASSWD: /usr/local/bin/noosphere-scan-nwr.sh
+www-data ALL=(root) NOPASSWD: /usr/local/bin/noosphere-radio-mode.sh *
 www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart noaa-weather.service
 www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart scanner-waterfall.service
 www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart noosphere-weather-transcribe.service
+www-data ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now noosphere-weather-transcribe.timer
+www-data ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now noosphere-weather-transcribe.timer
 www-data ALL=(root) NOPASSWD: /usr/bin/systemctl restart kiwix.service
 EOF
 chmod 440 /etc/sudoers.d/noosphere-admin
 ok "sudo rules installed."
+
+##############################################################################
+# RTL-SDR support (DVB blacklist, multimon-ng, NWR scripts, transcribe units)
+##############################################################################
+info "Provisioning RTL-SDR support..."
+if [[ -x "$NOOSPHERE_DIR/scripts/setup-rtlsdr.sh" ]]; then
+    bash "$NOOSPHERE_DIR/scripts/setup-rtlsdr.sh" || warn "setup-rtlsdr.sh exited non-zero (continuing)"
+    ok "RTL-SDR support provisioned."
+else
+    warn "scripts/setup-rtlsdr.sh missing - SDR services will not be plug-and-go."
+fi
 
 ##############################################################################
 # Nextcloud (optional)

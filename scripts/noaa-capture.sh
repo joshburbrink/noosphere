@@ -7,11 +7,16 @@ CONF=/etc/noosphere/weather.conf
 [ -f "$CONF" ] && . "$CONF"
 
 FREQUENCY="${FREQUENCY:-162.550M}"
-GAIN="${GAIN:-49.6}"
+# GAIN: 49.6 (max) causes R820T PLL lock failures and noise distortion on
+# strong local repeaters. 40 dB is a safer default; operators can override.
+GAIN="${GAIN:-40}"
 PPM="${PPM:-0}"
 CAPTURE_RATE="${CAPTURE_RATE:-200k}"
 OUTPUT_RATE="${OUTPUT_RATE:-22050}"
-SQUELCH="${SQUELCH:-100}"
+# SQUELCH=100 mutes the audio between voice broadcasts, which starves ffmpeg
+# and prevents HLS segments from being written - operators then hear nothing
+# and assume the dongle is broken. 0 = always pass audio.
+SQUELCH="${SQUELCH:-0}"
 SAME_FIPS="${SAME_FIPS:-}"
 
 DATA=/var/lib/noosphere/weather
@@ -100,7 +105,7 @@ rm -f "$STREAM_DIR/live.m3u8" 2>/dev/null
 
 # Fanout: rtl_fm -> tee -> (ffmpeg HLS) + (multimon-ng SAME)
 rtl_fm -f "$FREQUENCY" -M fm -s "$CAPTURE_RATE" -r "$OUTPUT_RATE" -g "$GAIN" -p "$PPM" -l "$SQUELCH" -A fast -E deemp -E dc 2>>"$LOG" \
-  | tee >(ffmpeg -hide_banner -loglevel warning -f s16le -ar "$OUTPUT_RATE" -ac 1 -i - -c:a aac -b:a 32k -f hls -hls_time 2 -hls_list_size 6 -hls_flags delete_segments+omit_endlist+independent_segments -hls_segment_filename "$STREAM_DIR/seg%05d.ts" "$STREAM_DIR/live.m3u8" 2>>"$LOG") \
+  | tee >(ffmpeg -hide_banner -loglevel warning -f s16le -ar "$OUTPUT_RATE" -ac 1 -i - -c:a aac -b:a 32k -f hls -hls_time 2 -hls_list_size 60 -hls_flags delete_segments+omit_endlist+independent_segments -hls_segment_filename "$STREAM_DIR/seg%05d.ts" "$STREAM_DIR/live.m3u8" 2>>"$LOG") \
   | multimon-ng -t raw -a EAS -q - 2>>"$LOG" \
   | stdbuf -oL grep --line-buffered '^EAS:' | tee -a "$LOG" | /usr/local/bin/noaa-log-alert.py >> "$LOG" 2>&1
 

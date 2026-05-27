@@ -28,8 +28,16 @@ def get_setting(key, default=''):
         return default
 
 
-def has_avx():
+def has_cpu_support():
+    """True if CPU can run faster-whisper: x86 with AVX, or ARM aarch64 (NEON).
+
+    ctranslate2 ships wheels for both. ARMv7 (armhf, e.g. Pi 4 32-bit) is not
+    supported and falls back to vosk.
+    """
     try:
+        import platform
+        if platform.machine() in ('aarch64', 'arm64'):
+            return True
         flags = open('/proc/cpuinfo').read()
         for line in flags.splitlines():
             if line.startswith('flags'):
@@ -37,6 +45,11 @@ def has_avx():
         return False
     except:
         return False
+
+
+# Back-compat alias - older code paths and log strings still use has_avx().
+def has_avx():
+    return has_cpu_support()
 
 
 def faster_whisper_ok():
@@ -82,7 +95,10 @@ def select_backend():
 
 
 def get_segments(n=30):
-    segs = sorted(glob.glob(f'{STREAM_DIR}/seg*.aac'))
+    # noaa-capture.sh writes seg*.ts (MPEG-TS w/ AAC); older deployments used .aac.
+    segs = sorted(glob.glob(f'{STREAM_DIR}/seg*.ts')) or sorted(glob.glob(f'{STREAM_DIR}/seg*.aac'))
+    # HLS rotates segments; the newest one is often 0 bytes mid-write.
+    segs = [s for s in segs if os.path.getsize(s) > 0]
     return segs[-n:] if segs else []
 
 
