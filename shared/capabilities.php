@@ -80,6 +80,12 @@ function capability_map(): array {
         // Meshtastic (#90)
         'mesh.send'             => ['operator', 'comms'],
         'mesh.manage'           => ['operator'],
+
+        // Vehicle log / ALPR (#phase3) - opt-in surveillance-adjacent module,
+        // kept operator-only by default since it logs plates of vehicles
+        // that were never asked to be tracked.
+        'alpr.view'             => ['operator'],
+        'alpr.manage'           => ['operator'],
     ];
 }
 

@@ -77,6 +77,8 @@ if (get_setting('show_triage','0')==='1')
     $tiles[] = ['href'=>'/triage/',  'icon'=>'🏥', 'label'=>'Triage Log', 'desc'=>'MCI patient tracking  -  START triage priority, print patient tags'];
 if (get_setting('show_canvas','0')==='1')
     $tiles[] = ['href'=>'/canvas/',  'icon'=>'🎨', 'label'=>'Canvas',     'desc'=>'Freehand drawing, diagrams &amp; annotated map sketches'];
+if (get_setting('show_alpr','0')==='1' && can('alpr.view'))
+    $tiles[] = ['href'=>'/vehicle-log/', 'icon'=>'🚗', 'label'=>'Vehicle Log', 'desc'=>'ALPR capture log  -  plate sightings from the USB camera'];
 
 // Admin tile  -  visible only to logged-in operators/admins (#84)
 if (!empty($_SESSION['admin']) || can('content.manage'))

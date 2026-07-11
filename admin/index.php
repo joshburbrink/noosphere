@@ -117,6 +117,17 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- ALPR capture daemon start/stop (AJAX  -  returns JSON) ---
+    if ($act === 'alpr_start' || $act === 'alpr_stop') {
+        header('Content-Type: application/json');
+        $subcmd = $act === 'alpr_start' ? 'start' : 'stop';
+        $out = shell_exec('sudo /usr/bin/systemctl ' . $subcmd . ' noosphere-alpr.service 2>&1') ?? '(no output)';
+        $state = trim(shell_exec('systemctl is-active noosphere-alpr.service 2>/dev/null') ?: 'inactive');
+        log_audit('alpr_' . $subcmd, $state, 'info');
+        echo json_encode(['ok' => true, 'output' => $out ?: 'OK', 'state' => $state]);
+        exit;
+    }
+
     // --- PXE / network boot (AJAX  -  returns JSON) ---
     if (in_array($act, ['pxe_enable', 'pxe_disable', 'pxe_configure', 'pxe_refresh'])) {
         header('Content-Type: application/json');
@@ -798,7 +809,7 @@ if ($authed && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         'show_registry','registry_checkin','registry_found_person','registry_location_required','registry_shelter',
                         'show_tasks','tasks_show_rewards','tasks_require_login','tasks_allow_self_create',
                         'show_chat','show_forum','show_files','show_library','show_maps','show_topo','show_calendar',
-                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','show_mesh','mesh_nwr_relay','chat_mesh_tab','readonly'];
+                        'show_weather','show_radio','show_runners','show_damage','show_incidents','show_incidents_command','show_triage','show_games','show_wiki','show_supplies','show_seeds','show_tools','show_canvas','show_mesh','mesh_nwr_relay','chat_mesh_tab','show_alpr','readonly'];
         foreach ($toggle_keys as $k) {
             set_setting($k, isset($_POST[$k]) ? '1' : '0');
         }
@@ -2718,6 +2729,54 @@ bash setup-local-display.sh server</pre>
 })();
 </script>
 
+<!-- ALPR Vehicle Log (Phase 3) -->
+<details class="cpanel">
+  <summary>🚗 Vehicle Log / ALPR
+    <span style="font-size:11px;color:#888;font-weight:normal"> -  license plate capture daemon (requires USB webcam), opt-in</span>
+  </summary>
+  <div class="cpbody">
+    <?php
+      $alpr_svc   = trim(shell_exec('systemctl is-active noosphere-alpr.service 2>/dev/null') ?: 'inactive');
+      $alpr_color = $alpr_svc === 'active' ? '#2ecc71' : '#e94560';
+      $alpr_on    = get_setting('show_alpr','0') === '1';
+    ?>
+    <div style="font-size:12px;color:#555;margin-bottom:10px">
+      Wraps the standalone capture daemon at <code>/home/noosphere/alpr-test/capture_daemon.py</code>
+      as <code>noosphere-alpr.service</code>. Not enabled at boot  -  start it manually here when needed.
+      The public log viewer is at <a href="/vehicle-log/" style="color:#4a9eff">/vehicle-log/</a>, gated by the
+      <code>show_alpr</code> setting (Modules tab) and the <code>alpr.view</code>/<code>alpr.manage</code> capabilities.
+      <?php if (!$alpr_on): ?><br><strong style="color:#f39c12">Module is currently OFF</strong>  -  turn on "Vehicle Log / ALPR" in the Modules tab to expose the viewer.<?php endif ?>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:10px">
+      <div>Daemon: <strong id="alpr-state" style="color:<?= $alpr_color ?>"><?= esc($alpr_svc) ?></strong></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn-sm" onclick="alprAction('alpr_start')">Start</button>
+      <button type="button" class="btn-sm" onclick="alprAction('alpr_stop')">Stop</button>
+      <a href="/vehicle-log/" class="btn-sm" style="text-decoration:none">Open /vehicle-log/</a>
+    </div>
+    <pre id="alpr_output" style="display:none;background:#000;color:#9c9;padding:8px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;margin:8px 0"></pre>
+  </div>
+</details>
+<script>
+(function(){
+  function getCsrf(){ return document.querySelector('[name=csrf_token]')?.value || ''; }
+  window.alprAction = function(act){
+    var out = document.getElementById('alpr_output');
+    out.style.display = 'block'; out.textContent = 'Working…';
+    var fd = new FormData(); fd.append('act', act); fd.append('csrf_token', getCsrf());
+    fetch('', {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(j){
+      out.textContent = j.output || '(no output)';
+      var stateEl = document.getElementById('alpr-state');
+      if (j.state) {
+        stateEl.textContent = j.state;
+        stateEl.style.color = j.state === 'active' ? '#2ecc71' : '#e94560';
+      }
+    }).catch(function(e){ out.textContent = 'Error: ' + e; });
+  };
+})();
+</script>
+
 </div><!-- #tab-network -->
 
 <!-- CONTENT -->
@@ -4229,6 +4288,7 @@ $simple_mods = [
     ['show_canvas',   't_canvas',   'Canvas (freehand drawing &amp; annotated maps)'],
     ['show_mesh',     't_mesh',     'Meshtastic (LoRa mesh) - requires USB node + daemon'],
     ['chat_mesh_tab', 't_chat_mesh','Mesh tab inside /chat/ (shows only when mesh module is on)'],
+    ['show_alpr',     't_alpr',     'Vehicle Log / ALPR (license plate capture) - opt-in, requires USB webcam + capture daemon'],
 ];
 foreach ($simple_mods as [$key, $id, $label]):
 ?>

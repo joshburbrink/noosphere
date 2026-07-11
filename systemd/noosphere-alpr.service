@@ -1,0 +1,19 @@
+[Unit]
+Description=Noosphere ALPR capture daemon (Phase 3, opt-in)
+After=network.target
+
+[Service]
+Type=simple
+User=noosphere
+WorkingDirectory=/home/noosphere/alpr-test
+ExecStart=/home/noosphere/alpr-test/venv/bin/python3 /home/noosphere/alpr-test/capture_daemon.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Not enabled at boot  -  this is an opt-in, personal side feature. Start/stop
+# is controlled from the admin panel (Network tab -> Vehicle Log / ALPR),
+# which shells out to `sudo systemctl start/stop noosphere-alpr.service`.
+[Install]
+WantedBy=multi-user.target
