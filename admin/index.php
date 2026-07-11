@@ -2760,11 +2760,11 @@ bash setup-local-display.sh server</pre>
 </details>
 <script>
 (function(){
-  function getCsrf(){ return document.querySelector('[name=csrf_token]')?.value || ''; }
+  function getCsrf(){ return document.querySelector('[name=_csrf]')?.value || ''; }
   window.alprAction = function(act){
     var out = document.getElementById('alpr_output');
     out.style.display = 'block'; out.textContent = 'Working…';
-    var fd = new FormData(); fd.append('act', act); fd.append('csrf_token', getCsrf());
+    var fd = new FormData(); fd.append('act', act); fd.append('_csrf', getCsrf());
     fetch('', {method:'POST', body:fd}).then(function(r){ return r.json(); }).then(function(j){
       out.textContent = j.output || '(no output)';
       var stateEl = document.getElementById('alpr-state');
