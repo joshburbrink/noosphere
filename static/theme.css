@@ -163,3 +163,23 @@
 .ns-swatch[data-t="high-contrast"] { background: #ffff00; }
 .ns-swatch[data-t="forest"]        { background: #4caf50; }
 .ns-swatch[data-t="amber"]         { background: #ff8c00; }
+
+/* ---------------------------------------------------------------------------
+ * Base ground.
+ *
+ * The variables above were only ever APPLIED by individual pages, so any page
+ * that forgot - the mesh pages among them - rendered its dark-theme text
+ * colours (#ccc, #888, #666) on the browser's white default. The result was
+ * light grey on white: technically themed, actually unreadable, and worst on
+ * the head unit where it is read at arm's length in a moving car.
+ *
+ * Low specificity on purpose. The 38 pages that already set their own body
+ * background continue to win; this only catches the ones that never did.
+ * ------------------------------------------------------------------------ */
+html {
+  background: var(--bg, #1a1a2e);
+}
+body {
+  background: var(--bg, #1a1a2e);
+  color: var(--text, #eee);
+}

@@ -30,3 +30,7 @@ shared/presence_auth.php
 # Satellite raster tiles: a bind mount onto the CAR-DATA card, currently
 # 3.4 GB and growing toward ~14 GB.
 maps/sat/
+
+# Live audio from the scanning receiver - rewritten every couple of seconds
+# while it is running, exactly like weather/stream above.
+radio/listen/stream/

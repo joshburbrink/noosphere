@@ -96,6 +96,8 @@ header h1 { font-size: 15px; color: #e94560; flex: 1; min-width: 60px; }
     <button class="theme-btn" data-theme="hc"    onclick="setTheme('hc')">Hi-Vis</button>
     <button class="theme-btn" id="btn-satellite" onclick="toggleSatellite()">Satellite</button>
   </div>
+  <button class="theme-btn" id="btn-routeto" onclick="toggleRouteTo()"
+          title="Arm, then tap anywhere on the map to drive there">Route to&hellip;</button>
 <?php if ($incidents_active): ?>
   <button class="theme-btn" id="btn-incidents" onclick="toggleIncidents()" title="Toggle incident / map-report pins">Incidents</button>
 <?php endif; ?>
@@ -695,6 +697,51 @@ function toggleMesh() {
         if (meshTimer) { clearInterval(meshTimer); meshTimer = null; }
     }
 }
+</script>
+
+<script>
+/* ── Route to a tapped point ──────────────────────────────────────────────
+ *
+ * Deliberately the last script on the page and deliberately self-contained:
+ * this map already carries incidents, runners, APRS and mesh, all of which
+ * own state, and routing must not be able to disturb any of them.
+ *
+ * It is armed rather than always-on because a bare tap on this map already
+ * means "drop an incident pin". Armed, the next tap hands the coordinates to
+ * maps/nav.php, which does the actual routing against the on-board
+ * GraphHopper graph. The click handler registers after the incident one, so
+ * when both fire we simply navigate away and whatever dialog opened behind
+ * us goes with the page.
+ */
+var routeToArmed = false;
+
+function toggleRouteTo() {
+    routeToArmed = !routeToArmed;
+    var b = document.getElementById('btn-routeto');
+    if (b) b.classList.toggle('active', routeToArmed);
+    map.getCanvas().style.cursor = routeToArmed ? 'crosshair' : '';
+    var hint = document.getElementById('routeto-hint');
+    if (!hint) {
+        hint = document.createElement('div');
+        hint.id = 'routeto-hint';
+        hint.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);' +
+            'top:12px;z-index:9;background:rgba(11,15,24,.94);border:1px solid #4d8dff;' +
+            'color:#eef2f8;border-radius:10px;padding:8px 14px;font-size:14px;' +
+            'font-family:system-ui,sans-serif;pointer-events:none';
+        hint.textContent = 'Tap the map to route there';
+        document.getElementById('map').appendChild(hint);
+    }
+    hint.style.display = routeToArmed ? 'block' : 'none';
+}
+
+map.on('click', function (e) {
+    if (!routeToArmed) return;
+    routeToArmed = false;
+    window.location = '/maps/nav.php?tlat=' + e.lngLat.lat.toFixed(6) +
+                      '&tlon=' + e.lngLat.lng.toFixed(6) +
+                      '&name=' + encodeURIComponent('Point on map') +
+                      '&back=' + encodeURIComponent('/maps/');
+});
 </script>
 </body>
 </html>
