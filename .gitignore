@@ -17,3 +17,16 @@ radio/scanner/
 # Backups
 *.bak
 scripts/__pycache__/
+
+# ---------------------------------------------------------------------------
+# Head-unit / vehicle install. These live in the PRIVATE joshburbrink/
+# noosphere-wardrive repo, not here. Ignored rather than left untracked so a
+# stray `git add -A` cannot publish them.
+car/
+docs/phone-notifications.md
+docs/Noosphere_Text_To_Head_Unit.prf.xml
+shared/presence_auth.php
+
+# Satellite raster tiles: a bind mount onto the CAR-DATA card, currently
+# 3.4 GB and growing toward ~14 GB.
+maps/sat/

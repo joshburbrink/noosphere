@@ -12,6 +12,18 @@ function sec_session_start() {
         session_regenerate_id(true);
         $_SESSION['_init'] = true;
     }
+
+    // Head-unit auto-auth: grant/revoke admin from trusted-phone presence.
+    // Strictly loopback-only - see shared/presence_auth.php.
+    //
+    // Optional module, present only on head-unit installs. Guarded with
+    // is_file() so the core repo never hard-depends on a file it does not
+    // ship - without this, any install lacking presence_auth.php would fatal
+    // on every page load.
+    if (is_file(__DIR__ . '/presence_auth.php')) {
+        require_once __DIR__ . '/presence_auth.php';
+        presence_auth_apply();
+    }
 }
 
 function csrf_token() {
